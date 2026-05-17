@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "session_id": "preview_20260517_001",
+  "root": "output/2026-05-17_minimal-design-doc",
+  "bind": "127.0.0.1",
+  "port": 43821,
+  "url": "http://127.0.0.1:43821/index.html",
+  "pid": 12345,
+  "created_at": "2026-05-17T00:03:00+09:00",
+  "mode": "local",
+  "status": "running"
+}

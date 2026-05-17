@@ -280,15 +280,16 @@
         <p><span class="status ok">Goal</span> HTML生成・コメント・preview sessionの入出力schemaを固定する。</p>
         <h3>作業</h3>
         <ul>
-          <li><code>document-model.json</code> schemaを定義する。</li>
-          <li><code>comments.json</code> schemaを定義する。</li>
-          <li><code>preview-session.json</code> schemaを定義する。</li>
-          <li><code>tests/fixtures/</code> に最小fixtureを置く。</li>
+          <li><code>schemas/document-model.schema.json</code> で文書モデルの必須field、review settings、block構造を定義する。</li>
+          <li><code>schemas/comments.schema.json</code> でコメントthread、status、agent reply構造を定義する。</li>
+          <li><code>schemas/preview-session.schema.json</code> でpreview session manifestを定義する。</li>
+          <li><code>tests/fixtures/</code> に文書モデル、コメント、preview sessionの最小fixtureを置く。</li>
+          <li><code>scripts/html_review_workbench/schema_validation.py</code> に標準ライブラリだけで動くschema validation helperを置く。</li>
         </ul>
         <h3>完了条件</h3>
         <ul>
-          <li>schema validation testがある。</li>
-          <li>fixtureを使って後続Milestoneのテストを始められる。</li>
+          <li><code>tests/test_schema_validation.py</code> で3 schemaとfixtureの対応を検証できる。</li>
+          <li>fixtureを使って後続Milestoneのrenderer、comment store、preview runtimeテストを始められる。</li>
         </ul>
       </section>
 
@@ -511,7 +512,7 @@
         <ol>
           <li><code>docs/backlog/01-milestone-0-codex-foundation.md</code> から着手する。</li>
           <li>Milestone 0で <code>.github/workflows/test.yml</code> を追加する。</li>
-          <li>Milestone 1で <code>schemas/</code> ディレクトリを作り、3つのschemaを追加する。</li>
+          <li>Milestone 1で <code>schemas/</code> ディレクトリを作り、<code>document-model</code>、<code>comments</code>、<code>preview-session</code> の3つのschemaを追加する。</li>
           <li>Milestone 2で <code>render.py</code> と <code>validate_bundle.py</code> をplaceholderから実装へ進める。</li>
         </ol>
       </section>

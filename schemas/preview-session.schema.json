@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviewable-html-workbench.local/schemas/preview-session.schema.json",
+  "title": "Reviewable HTML preview session",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "session_id",
+    "root",
+    "bind",
+    "port",
+    "url",
+    "pid",
+    "created_at",
+    "mode",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bind": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "const": "0.0.0.0"
+      }
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "tailscale",
+        "local"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "stopped",
+        "failed"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

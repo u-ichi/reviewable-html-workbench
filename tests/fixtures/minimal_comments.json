@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "document_id": "minimal-design-doc",
+  "comments": [
+    {
+      "id": "cmt_20260517_001",
+      "document_id": "minimal-design-doc",
+      "block_id": "overview",
+      "selected_text": "minimal section",
+      "prefix": "A ",
+      "suffix": " that future renderer tests can turn into HTML.",
+      "comment": "Clarify whether this section should become a card.",
+      "status": "needs_user_reply",
+      "created_at": "2026-05-17T00:01:00+09:00",
+      "replies": [
+        {
+          "id": "reply_20260517_001",
+          "author": "codex",
+          "role": "agent",
+          "kind": "clarification_request",
+          "body": "Should this section render as a normal section or as a card?",
+          "created_at": "2026-05-17T00:02:00+09:00"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "document_id": "minimal-design-doc",
+  "title": "Minimal Design Doc",
+  "summary": "Smallest document model used to exercise renderer fixtures.",
+  "generated_at": "2026-05-17T00:00:00+09:00",
+  "metadata": {
+    "source": "fixture"
+  },
+  "review_settings": {
+    "enabled": true,
+    "mode": "standalone"
+  },
+  "blocks": [
+    {
+      "id": "overview",
+      "type": "section",
+      "title": "Overview",
+      "content": "A minimal section that future renderer tests can turn into HTML.",
+      "review_required": true
+    }
+  ]
+}

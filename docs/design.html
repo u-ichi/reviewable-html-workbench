@@ -643,6 +643,7 @@
     }
   ]
 }</code></pre>
+        <p><code>comments.json</code> のstatusは <code>open</code>、<code>needs_agent_review</code>、<code>needs_user_reply</code>、<code>addressed</code>、<code>blocked</code>、<code>rejected</code>、<code>resolved</code> に限定する。reply は <code>role</code> を <code>user</code> / <code>agent</code> / <code>system</code>、<code>kind</code> を <code>note</code> / <code>clarification_request</code> / <code>implementation_note</code> / <code>status_change</code> で表す。</p>
       </section>
 
       <section id="feedback-ingestion" data-review-block="feedback-ingestion">
@@ -691,6 +692,10 @@
         <pre><code>html-review-workbench/
   .codex-plugin/
     plugin.json
+  schemas/
+    document-model.schema.json
+    comments.schema.json
+    preview-session.schema.json
   skills/
     visual-html-renderer/
       SKILL.md
@@ -712,12 +717,46 @@
     review-comments.js
     style.css
   tests/
+    test_schema_validation.py
     test_render.py
     test_preview_bind.py
     test_comment_ingestion.py
     fixtures/
+      minimal_document_model.json
+      minimal_comments.json
+      minimal_preview_session.json
   pyproject.toml
   README.md</code></pre>
+        <h3>Data Contract</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>schema</th>
+              <th>正本にするデータ</th>
+              <th>後続実装での使い方</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>schemas/document-model.schema.json</code></td>
+              <td><code>document-model.json</code>。文書ID、タイトル、生成時刻、review settings、本文block配列を持つ。</td>
+              <td><code>render.py</code> がHTML bundleを生成する入力契約にする。</td>
+            </tr>
+            <tr>
+              <td><code>schemas/comments.schema.json</code></td>
+              <td><code>annotations/comments.json</code>。コメントthread、status、ユーザー/agent/system replyを保持する。</td>
+              <td><code>comment_store.py</code> と <code>ingest_review.py</code> の読み書き契約にする。</td>
+            </tr>
+            <tr>
+              <td><code>schemas/preview-session.schema.json</code></td>
+              <td><code>output/tmp/html-preview-sessions/*.json</code>。root、bind、port、URL、PID、mode、statusを記録する。</td>
+              <td><code>preview_server.py</code> が起動中previewを追跡するmanifest契約にする。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          schema validation は外部packageに依存せず、<code>scripts/html_review_workbench/schema_validation.py</code> の小さな検証ヘルパーで fixture test から使う。後続Milestoneで必要になった場合だけ検証語彙を増やす。
+        </div>
         <h3>script責務</h3>
         <table>
           <thead>

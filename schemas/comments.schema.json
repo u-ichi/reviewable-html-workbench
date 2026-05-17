@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviewable-html-workbench.local/schemas/comments.schema.json",
+  "title": "Reviewable HTML comments",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "document_id",
+    "comments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "document_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "block_id",
+          "selected_text",
+          "comment",
+          "status",
+          "created_at",
+          "replies"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selected_text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "suffix": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "needs_agent_review",
+              "needs_user_reply",
+              "addressed",
+              "blocked",
+              "rejected",
+              "resolved"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "author",
+                "role",
+                "kind",
+                "body",
+                "created_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "author": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "agent",
+                    "system"
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "note",
+                    "clarification_request",
+                    "implementation_note",
+                    "status_change"
+                  ]
+                },
+                "body": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "created_at": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
