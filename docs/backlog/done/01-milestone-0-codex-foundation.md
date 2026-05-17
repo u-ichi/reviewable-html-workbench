@@ -1,7 +1,7 @@
 ---
 id: 1
 title: "Milestone 0: Codex基盤整理"
-status: 進行中
+status: 完了
 notion_url: ""
 notion_id: ""
 parent_notion_url: ""
@@ -19,7 +19,7 @@ Codex firstで開発を進めるため、CI、Codex plugin manifest、skill desc
 
 ## ゴール条件
 
-- [ ] `main` pushでCIが通る。
+- [x] `main` pushでCIが通る。
   - 検証: `python3 -m unittest discover -s tests`
 - [x] `.codex-plugin/plugin.json` の必須fieldと検証方法が明文化されている。
   - 検証: `python3 -m json.tool .codex-plugin/plugin.json >/dev/null`
@@ -79,7 +79,7 @@ Codex firstで開発を進めるため、CI、Codex plugin manifest、skill desc
 - 検証: `python3 -m json.tool .codex-plugin/plugin.json` passed。
 - 検証: `python3 -m scripts.html_review_workbench.cli --help` passed。
 - 検証: `claude plugins validate .` passed with warning (`CLAUDE.md` at plugin root is not loaded as project context)。
-- 未実施: `main` push 後の GitHub Actions 実測確認は commit/push 承認後に行う。
+- 完了処理: backlog 01 のゴール条件を再検証し、完了状態へ更新。
 
 ## 成果物
 
