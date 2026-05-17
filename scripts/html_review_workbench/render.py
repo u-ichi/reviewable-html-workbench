@@ -17,6 +17,7 @@ from scripts.html_review_workbench.diagram_planner import PlannedDiagram, plan_d
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE_PATH = ROOT / "templates" / "report.html.j2"
 STYLE_PATH = ROOT / "templates" / "style.css"
+COMMENTS_JS_PATH = ROOT / "templates" / "review-comments.js"
 
 
 def render_bundle(model_path: Path, output_dir: Path) -> Path:
@@ -26,16 +27,26 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     assets_dir = output_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
+    rendered_at = datetime.now(timezone.utc).isoformat()
 
     diagrams = plan_diagrams(model["blocks"])
     diagram_outputs = write_diagram_sources(output_dir, diagrams)
     body_html, review_blocks = _render_blocks(model["blocks"], diagrams)
+    review_blocks.insert(
+        0,
+        {
+            "id": "document-header",
+            "type": "header",
+            "review_required": False,
+        },
+    )
     html = _render_template(
         {
             "title": escape(model["title"]),
             "document_id": escape(model["document_id"]),
             "summary": _render_optional_summary(model.get("summary")),
             "generated_at": escape(model["generated_at"]),
+            "asset_version": escape(rendered_at, quote=True),
             "body": body_html,
         }
     )
@@ -43,11 +54,12 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     index_path = output_dir / "index.html"
     index_path.write_text(html, encoding="utf-8")
     shutil.copyfile(STYLE_PATH, assets_dir / "style.css")
+    shutil.copyfile(COMMENTS_JS_PATH, assets_dir / "review-comments.js")
 
     manifest = {
         "schema_version": "1.0",
         "renderer_version": __version__,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": rendered_at,
         "input": {
             "path": str(model_path),
             "sha256": hashlib.sha256(model_bytes).hexdigest(),
@@ -58,7 +70,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
         },
         "outputs": {
             "index": "index.html",
-            "assets": ["assets/style.css"],
+            "assets": ["assets/style.css", "assets/review-comments.js"],
             "diagrams": diagram_outputs,
         },
         "diagrams": [diagram.to_manifest() for diagram in diagrams.values()],

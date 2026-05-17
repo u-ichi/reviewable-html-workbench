@@ -1,0 +1,50 @@
+backlog:
+  id: 6
+  file: docs/backlog/06-milestone-5-comment-ui-store.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/06-milestone-5-comment-ui-store/goal.md
+  objective: "HTML上の範囲選択コメントをcomments.jsonへ安全に保存できるようにする"
+completion:
+  status: complete
+  goal_done: true
+  user_review_done: true
+  backlog_closed: true
+  session_complete: false
+  final_receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "Comment UI を実装する"
+    status: completed
+    backlog_task: "`templates/review-comments.js` を実装する"
+    verification: "renderしたHTMLでコメントUI asset と data-review-block が同梱される"
+    receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"
+  - id: T002
+    title: "コメント保存層を実装する"
+    status: completed
+    backlog_task: "`comment_store.py` を実装し、comments.json を成果物ディレクトリ内へ保存する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"
+  - id: T003
+    title: "standalone / review-server 保存動作を実装する"
+    status: completed
+    backlog_task: "localStorage export/import と review-server mode の comments.json 保存"
+    verification: "CLI preview と store tests"
+    receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"
+  - id: T004
+    title: "設計・開発計画HTMLを同期する"
+    status: completed
+    backlog_task: "コメントUI/保存仕様の docs 反映"
+    verification: "`rg -n \"Comment UI|comments.json|review-comments\" docs/design.html docs/development-plan.html`"
+    receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"
+  - id: T005
+    type: judge
+    title: "ユーザー確認ゲート"
+    status: completed
+    objective: "06完了直前、07着手前にPreview URLでコメント作成・保存・再読込を確認する"
+    verification:
+      - "Preview URL と確認観点を提示する"
+      - "ユーザー確認完了までは User review wait として残す"
+    receipt: "docs/goals/06-milestone-5-comment-ui-store/notes/verification-2026-05-17.md"

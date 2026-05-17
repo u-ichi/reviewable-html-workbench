@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
-  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/style.css?v={{ asset_version }}">
 </head>
 <body>
-  <header class="document-header" data-document-id="{{ document_id }}">
+  <header class="document-header" data-document-id="{{ document_id }}" id="document-header" data-review-block="document-header" data-block-type="header" data-review-required="false">
     <p class="eyebrow">Reviewable HTML Workbench</p>
     <h1>{{ title }}</h1>
     {{ summary }}
@@ -16,5 +16,6 @@
   <main id="content" class="document-content">
 {{ body }}
   </main>
+  <script src="assets/review-comments.js?v={{ asset_version }}"></script>
 </body>
 </html>

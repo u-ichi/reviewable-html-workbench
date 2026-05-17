@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import time
 import tempfile
 import unittest
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from scripts.html_review_workbench.preview_server import (
@@ -53,6 +56,76 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertIsNotNone(session.process)
                 session.process.terminate()
                 session.process.wait(timeout=5)
+
+    def test_preview_server_reads_and_writes_comments_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            (root / "renderer-manifest.json").write_text(
+                json.dumps({"document": {"id": "doc-preview"}}),
+                encoding="utf-8",
+            )
+
+            session = start_preview(root, "local")
+            try:
+                _wait_until_preview_ready(session.url)
+                comments_url = session.url.replace("/index.html", "/annotations/comments.json")
+                initial = _read_json_url(comments_url)
+                self.assertEqual(initial["document_id"], "doc-preview")
+                self.assertEqual(initial["comments"], [])
+
+                payload = {
+                    "schema_version": "1.0",
+                    "document_id": "doc-preview",
+                    "comments": [
+                        {
+                            "id": "cmt-1",
+                            "document_id": "doc-preview",
+                            "block_id": "overview",
+                            "selected_text": "text",
+                            "prefix": "",
+                            "suffix": "",
+                            "comment": "Comment body",
+                            "status": "needs_agent_review",
+                            "created_at": "2026-05-17T00:00:00+00:00",
+                            "replies": [],
+                        }
+                    ],
+                }
+                request = urllib.request.Request(
+                    comments_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="PUT",
+                )
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+
+                written = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
+                self.assertEqual(written["comments"][0]["id"], "cmt-1")
+            finally:
+                self.assertIsNotNone(session.process)
+                session.process.terminate()
+                session.process.wait(timeout=5)
+
+
+def _read_json_url(url: str) -> object:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _wait_until_preview_ready(url: str) -> None:
+    deadline = time.monotonic() + 5
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1) as response:
+                if response.status == 200:
+                    return
+        except urllib.error.URLError as exc:
+            last_error = exc
+        time.sleep(0.05)
+    raise AssertionError(f"preview server did not become ready: {last_error}")
 
 
 if __name__ == "__main__":

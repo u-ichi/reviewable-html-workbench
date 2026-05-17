@@ -53,6 +53,24 @@
           "suffix": {
             "type": "string"
           },
+          "anchor": {
+            "type": "object",
+            "required": [
+              "start",
+              "end"
+            ],
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
           "comment": {
             "type": "string",
             "minLength": 1
@@ -60,12 +78,8 @@
           "status": {
             "type": "string",
             "enum": [
-              "open",
               "needs_agent_review",
               "needs_user_reply",
-              "addressed",
-              "blocked",
-              "rejected",
               "resolved"
             ]
           },

@@ -615,12 +615,12 @@
         <div class="grid two">
           <div class="card">
             <h3>standalone mode</h3>
-            <p><code>file://</code> で開ける。コメントは <code>localStorage</code> に保存し、JSON export/import で agent に渡す。</p>
+            <p><code>file://</code> で開ける。コメントは <code>localStorage</code> に保存し、HTML上のExport/Importで <code>comments.json</code> として agent に渡す。</p>
             <p><span class="tag">標準</span><span class="tag">外部依存なし</span><span class="tag">保存はブラウザ単位</span></p>
           </div>
           <div class="card">
             <h3>review-server mode</h3>
-            <p>Preview Runtime と同じbind方針の小さなサーバーで <code>annotations/comments.json</code> に保存する。Tailscale IP が使える場合はVPN越しのSSH/tmux環境からも同じURLで開ける。</p>
+            <p>Preview Runtime と同じbind方針の小さなサーバーで <code>GET/PUT /annotations/comments.json</code> を提供し、成果物root配下へ保存する。Tailscale IP が使える場合はVPN越しのSSH/tmux環境からも同じURLで開ける。</p>
             <p><span class="tag">任意</span><span class="tag">永続JSON</span><span class="tag">VPN限定可</span></p>
           </div>
         </div>
@@ -646,7 +646,7 @@
     }
   ]
 }</code></pre>
-        <p><code>comments.json</code> のstatusは <code>open</code>、<code>needs_agent_review</code>、<code>needs_user_reply</code>、<code>addressed</code>、<code>blocked</code>、<code>rejected</code>、<code>resolved</code> に限定する。reply は <code>role</code> を <code>user</code> / <code>agent</code> / <code>system</code>、<code>kind</code> を <code>note</code> / <code>clarification_request</code> / <code>implementation_note</code> / <code>status_change</code> で表す。</p>
+        <p><code>comments.json</code> のstatusは <code>needs_agent_review</code>、<code>needs_user_reply</code>、<code>resolved</code> に限定する。reply は <code>role</code> を <code>user</code> / <code>agent</code> / <code>system</code>、<code>kind</code> を <code>note</code> / <code>clarification_request</code> / <code>implementation_note</code> / <code>status_change</code> で表す。コメントUIは固定サイドパネルではなく、範囲選択近傍に小さなコメントツールバーを出し、ヘッダーを含む全域の <code>data-review-block</code> にコメントできる。保存済みコメントの <code>selected_text</code> と <code>anchor.start/end</code> は本文側でハイライトする。thread popover ではrole/kindの機械的表記を出さず、本文クリックで編集モードに入る。初回コメントは <code>Cmd+Enter</code> / <code>Ctrl+Enter</code> またはCommentボタンで投稿し、返信欄は <code>Enter</code> で投稿、<code>Shift+Enter</code> で改行する。<code>needs_user_reply</code> は青系、<code>resolved</code> は薄いグレー系、<code>needs_agent_review</code> は通常コメント色で表示する。ユーザー返信を投稿した時点でstatusは <code>needs_agent_review</code> に戻る。Milestone 5の完了前にはPreview URLでユーザーがコメント作成・保存・再読込を確認し、Milestone 6の取り込み実装へ進む。</p>
       </section>
 
       <section id="feedback-ingestion" data-review-block="feedback-ingestion">
@@ -655,7 +655,7 @@
         <div class="grid two">
           <div class="card">
             <h3>自動取り込み対象</h3>
-            <p>明確な修正依頼、誤字、章構成の指摘、図示追加の依頼、レビュー観点の不足は、そのまま設計モデルへ反映する。反映後はコメントstatusを <code>addressed</code> にし、agent replyで反映内容を短く残す。</p>
+            <p>明確な修正依頼、誤字、章構成の指摘、図示追加の依頼、レビュー観点の不足は、そのまま設計モデルへ反映する。反映後はコメントstatusを <code>resolved</code> にし、agent replyで反映内容を短く残す。</p>
           </div>
           <div class="card">
             <h3>確認が必要な対象</h3>
@@ -782,8 +782,8 @@
             </tr>
             <tr>
               <td><code>preview_server.py</code></td>
-              <td>Tailscale IPv4検出、localhost fallback、空きport選択、session manifest作成、サーバー起動を担当する。</td>
-              <td><code>--preview auto|tailscale|local|off</code> に応じて呼ぶ。</td>
+              <td>Tailscale IPv4検出、localhost fallback、空きport選択、session manifest作成、静的配信、<code>annotations/comments.json</code> の読み書きAPIを担当する。</td>
+              <td><code>preview --mode auto|tailscale|local|off</code> に応じて呼ぶ。</td>
             </tr>
             <tr>
               <td><code>comment_store.py</code></td>
@@ -908,7 +908,7 @@ http://&lt;bind-address&gt;:&lt;port&gt;/index.html</code></pre>
 }</code></pre>
         <p>CLI応答は上記manifest項目に加えて <code>manifest</code> と <code>stop_command</code> を返す。manifest本体はschemaに合わせ、停止コマンドは実行導線としてCLI出力に限定する。</p>
         <div class="callout warning">
-          <code>python3 -m http.server</code> は静的プレビュー用の最小実装に限定する。コメントを <code>comments.json</code> に保存する場合は、書き込み先を成果物ディレクトリ内に制限した <code>review-server.py</code> または <code>preview-server.py</code> を使う。
+          コメントを <code>comments.json</code> に保存する場合は、書き込み先を成果物ディレクトリ内に制限した <code>preview_server.py</code> の <code>GET/PUT /annotations/comments.json</code> を使う。<code>python3 -m http.server</code> 相当の静的配信だけでは永続保存できない。
         </div>
       </section>
 

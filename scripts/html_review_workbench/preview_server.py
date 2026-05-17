@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import argparse
+from functools import partial
+from http import HTTPStatus
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import subprocess
 import sys
@@ -11,6 +15,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Literal
+from urllib.parse import urlparse
+
+from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError, empty_comments
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,11 +83,11 @@ def start_preview(root: Path, mode: PreviewMode = "auto") -> PreviewSession:
         [
             sys.executable,
             "-m",
-            "http.server",
+            "scripts.html_review_workbench.preview_server",
+            "--serve",
             str(port),
             "--bind",
             bind,
-            "--directory",
             str(root),
         ],
         stdout=subprocess.DEVNULL,
@@ -173,3 +180,96 @@ def _validate_bind(bind: str) -> str:
     except OSError as exc:
         raise PreviewConfigurationError(f"invalid IPv4 bind address: {bind}") from exc
     return bind
+
+
+class ReviewPreviewHandler(SimpleHTTPRequestHandler):
+    comments_route = "/annotations/comments.json"
+
+    def __init__(self, *args: object, root: Path, **kwargs: object) -> None:
+        self.root = root.resolve()
+        self.store = CommentStore(self.root)
+        super().__init__(*args, directory=str(self.root), **kwargs)
+
+    def do_GET(self) -> None:
+        if self._path() == self.comments_route:
+            self._send_json(self.store.read(self._document_id()))
+            return
+        super().do_GET()
+
+    def do_PUT(self) -> None:
+        if self._path() != self.comments_route:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            payload = json.loads(self.rfile.read(_content_length(self)).decode("utf-8"))
+            self.store.write(payload)
+        except (json.JSONDecodeError, CommentStoreError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        self._send_json({"ok": True, "path": "annotations/comments.json"})
+
+    def _send_json(self, payload: dict[str, object], status: HTTPStatus = HTTPStatus.OK) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _document_id(self) -> str:
+        manifest_path = self.root / "renderer-manifest.json"
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                document = manifest.get("document", {})
+                if isinstance(document, dict) and isinstance(document.get("id"), str):
+                    return document["id"]
+            except json.JSONDecodeError:
+                pass
+        return "document"
+
+    def _path(self) -> str:
+        return urlparse(self.path).path
+
+
+def serve(root: Path, bind: str, port: int) -> None:
+    bind = _validate_bind(bind)
+    root = root.resolve()
+    if not root.is_dir():
+        raise PreviewConfigurationError(f"preview root does not exist: {root}")
+    handler = partial(ReviewPreviewHandler, root=root)
+    with ThreadingHTTPServer((bind, port), handler) as server:
+        server.serve_forever()
+
+
+def _content_length(handler: SimpleHTTPRequestHandler) -> int:
+    header = handler.headers.get("Content-Length")
+    try:
+        length = int(header or "0")
+    except ValueError as exc:
+        raise CommentStoreError("Content-Length must be an integer") from exc
+    if length <= 0:
+        raise CommentStoreError("request body is required")
+    return length
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="preview_server")
+    parser.add_argument("--serve", type=int, metavar="PORT")
+    parser.add_argument("--bind", default="127.0.0.1")
+    parser.add_argument("root", nargs="?")
+    return parser
+
+
+def main() -> int:
+    parser = _build_parser()
+    args = parser.parse_args()
+    if args.serve is None or args.root is None:
+        parser.error("--serve PORT and root are required")
+    serve(Path(args.root), args.bind, args.serve)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

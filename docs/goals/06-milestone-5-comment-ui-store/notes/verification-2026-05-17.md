@@ -1,0 +1,137 @@
+# Verification: backlog 06 Comment UI and Store
+
+## 実装結果
+
+- `templates/review-comments.js` に範囲選択コメントUI、block id / selected text / prefix / suffix 取得、status変更、Export/Import、localStorage fallbackを実装。
+- ユーザー確認を受け、コメントUIを固定サイドパネルから範囲選択近傍のNotion風ツールバー / composer / thread popoverへ変更。
+- thread popoverにコメント本文編集、削除、ユーザー返信追加を実装し、`テスト` commentへagent replyを追加。
+- thread popoverのrole/kind表記と常時表示のSave/Replyボタンを廃止。初回コメントは `Cmd+Enter` / `Ctrl+Enter` またはCommentボタンで投稿し、返信欄は `Enter` で投稿、`Shift+Enter` で改行するUXへ変更。
+- 複数行・複数text node選択用に `anchor.start/end` をcomments schemaへ追加し、複数nodeへ分割ハイライトする実装へ変更。
+- ヘッダーを `data-review-block="document-header"` として生成し、生成HTML全域をコメント対象に含めた。
+- 画像/Mermaid挙動確認用サンプルを `output/tmp/comment-target-sample/bundle` に生成し、Previewを起動。
+- SVG内textへHTML `<mark>` を挿入しないようにし、SVG文字が消える不具合を修正。
+- 描画済みMermaid相当のSVGサンプル `rendered-mermaid` を追加し、SVG textコメント時はblock-level badgeからthreadを開けるようにした。
+- `selected_text` fallback経路でもSVG text nodeを除外し、描画済みMermaidの文字が消える不具合を修正。
+- ユーザーが追加した4件のコメントすべてにagent replyを追加し、返信があるthreadのハイライト、review block枠、block-level badgeを青系表示に変更。
+- 返信欄の投稿キーを `Enter` に変更し、`Shift+Enter` は改行として扱うようにした。初回コメント欄は `Cmd+Enter` / `Ctrl+Enter` とCommentボタンで投稿する。
+- 画面下部のコメントでもthread popoverがviewport内に収まるよう配置を調整し、必要時はpopover内スクロールで返信欄を操作できるようにした。
+- statusを `needs_agent_review` / `needs_user_reply` / `resolved` に絞り、ハイライト色をstatus駆動に変更。`needs_user_reply` は青系、`resolved` は薄いグレー系、`needs_agent_review` は通常色にした。
+- 追加開発で膨らんだ `review-comments.js` をリファクタリング。status文字列を定数化し、ハイライトmark生成とstatus別class付与を共通化。読み込み時に旧statusや欠損reply配列をMVPの3状態へ正規化する入口を追加。
+- `scripts/html_review_workbench/comment_store.py` に `annotations/comments.json` のschema validation、thread / reply / status更新、成果物root外への保存拒否を実装。
+- `scripts/html_review_workbench/preview_server.py` に `GET/PUT /annotations/comments.json` を追加し、既存のTailscale / localhost bind方針を維持。
+- rendererが `assets/review-comments.js` をHTML bundleへ同梱するよう更新。
+- `docs/design.html` と `docs/development-plan.html` に保存API、standalone fallback、ユーザー確認ゲートを反映。
+
+## 検証結果
+
+- `python3 -m unittest discover -s tests`: 21 tests OK
+- `node --check templates/review-comments.js`: OK
+- `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+- `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 1}`
+- `python3 -m scripts.html_review_workbench.cli preview --root output/tmp/comment-ui-review --mode local`: `http://127.0.0.1:62515/index.html`
+- `curl -sS http://127.0.0.1:62515/annotations/comments.json`: empty `comments.json` payload returned with `document_id: minimal-design-doc`
+- `curl -X PUT ... /annotations/comments.json`: `{"ok": true, "path": "annotations/comments.json"}`
+- `output/tmp/comment-ui-review/annotations/comments.json`: thread、agent reply、status metadata が保存済み
+- Notion風UI変更後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 1}`
+- 返信UI追加後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 1}`
+  - `curl -sS http://127.0.0.1:62515/annotations/comments.json`: `テスト` thread に agent reply が存在することを確認
+- UI簡潔化後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+- 複数行選択対応後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 1}`
+- 全域コメント化 / 画像・Mermaidサンプル追加後の再検証:
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 5}`
+  - `python3 -m scripts.html_review_workbench.cli preview --root output/tmp/comment-target-sample/bundle --mode local`: `http://127.0.0.1:51689/index.html`
+  - `curl -sS http://127.0.0.1:51689/annotations/comments.json`: empty comments payload returned
+- SVG textハイライト修正後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 5}`
+- 描画済みMermaidサンプル追加後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+- SVG fallback経路修正後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+- 全コメント返信追加・返信済み色分け後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 2}`
+  - `http://127.0.0.1:51689/annotations/comments.json`: 4 commentsすべてにagent roleのreplyが1件以上あることを確認
+- 送信キー修正後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 2}`
+- 下端popover配置・resolved表示修正後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 2}`
+- status簡素化・status駆動ハイライト修正後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 2}`
+- リファクタリング後の再検証:
+  - `node --check templates/review-comments.js`: OK
+  - `python3 -m unittest discover -s tests`: 21 tests OK
+  - `python3 -m scripts.html_review_workbench.cli render --model output/tmp/comment-target-sample/model.json --output output/tmp/comment-target-sample/bundle`: OK
+  - `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/comment-ui-review`: OK
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-target-sample/bundle`: `{"ok": true, "errors": [], "review_blocks": 6}`
+  - `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/comment-ui-review`: `{"ok": true, "errors": [], "review_blocks": 2}`
+
+## ユーザー確認待ち
+
+- Preview URL: `http://127.0.0.1:62515/index.html`
+- 停止コマンド: `kill 52536`
+- 画像/MermaidサンプルPreview URL: `http://127.0.0.1:51689/index.html`
+- 停止コマンド: `kill 26284`
+- 確認観点:
+  - HTML上で範囲選択した近くに `Comment` ツールバーが出る
+  - `Comment` からコメントを作成できる
+  - 保存済みハイライトをクリックしてthread popoverが開く
+  - agent reply の下にある `Reply` 欄からユーザー返信を追加できる
+  - コメント本文クリックで編集欄に切り替わる
+  - 初回コメント欄は `Cmd+Enter` / `Ctrl+Enter` またはCommentボタンで投稿できる
+  - 返信欄は `Enter` で投稿でき、`Shift+Enter` で改行できる
+  - reload後も `comments.json` 由来のthreadが残る
+  - status selectでstatusを変更できる
+  - 画面下部のコメントでも返信欄まで表示・操作できる
+  - `needs_user_reply` は青系、`needs_agent_review` は通常色、`resolved` は薄いグレー系で表示される
+  - Export/Importで同じJSONを往復できる
+  - UIが実運用上邪魔すぎない
+  - 返信があるハイライト、review block枠、block-level badgeが未返信コメントと違う青系で見える
+
+## ユーザー確認結果
+
+- 2026-05-17: ユーザーから「一通り問題無さそう」と確認済み。
+- backlog 06 のPreview確認ゲートを完了扱いにした。

@@ -361,6 +361,12 @@
           <li><code>comments.json</code> の読み書きとschema validationを実装する。</li>
           <li>standalone modeではlocalStorage export/importを提供する。</li>
           <li>review-server modeでは <code>comments.json</code> を正本にする。</li>
+          <li>ヘッダーを含む生成HTML全域を <code>data-review-block</code> 化してコメント可能にする。</li>
+          <li>範囲選択時は選択位置近くにNotion風のコメントUIを表示する。</li>
+          <li>保存済みコメントの選択範囲を本文側でハイライトする。見出しから本文に跨る複数text node選択は <code>anchor.start/end</code> で復元する。</li>
+          <li>thread popoverはrole/kind表記を出さず、本文クリックで編集できる。初回コメントは <code>Cmd+Enter</code> / <code>Ctrl+Enter</code> またはCommentボタンで投稿し、返信欄は <code>Enter</code> で投稿、<code>Shift+Enter</code> で改行できる。</li>
+          <li>statusは <code>needs_agent_review</code>、<code>needs_user_reply</code>、<code>resolved</code> に絞る。<code>needs_user_reply</code> は青系、<code>resolved</code> は薄いグレー系、<code>needs_agent_review</code> は通常コメント色で表示する。</li>
+          <li>06完了直前、07着手前にPreview URLでユーザーがコメント作成・保存・再読込を確認する。</li>
         </ul>
       </section>
 
