@@ -1,3 +1,16 @@
 display_name: Reviewable Design Doc
 short_description: レビュー可能な設計資料HTMLを作り、コメント反映まで扱う。
 default_prompt: 設計資料をレビュー可能なHTMLで作って
+trigger_examples:
+  - レビュー可能な設計資料
+  - 設計資料をHTMLで
+  - design doc
+  - reviewable design doc
+  - レビュー終わったので確認して
+  - コメントを反映して
+entrypoint: python3 -m scripts.html_review_workbench.cli
+workflow:
+  - render
+  - validate
+  - preview
+  - ingest-review

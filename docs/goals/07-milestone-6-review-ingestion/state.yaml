@@ -1,0 +1,36 @@
+backlog:
+  id: 7
+  file: docs/backlog/07-milestone-6-review-ingestion.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/07-milestone-6-review-ingestion/goal.md
+  objective: "CodexがHTMLレビューコメントを読み込み、分類・agent reply書き戻し・処理状態保存をfixtureで検証できるようにする"
+completion:
+  status: backlog_close_wait
+  goal_done: true
+  backlog_closed: false
+  session_complete: false
+  final_receipt: "docs/goals/07-milestone-6-review-ingestion/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "Review Ingestion最小縦通しを実装する"
+    status: completed
+    backlog_task: "`ingest_review.py`、分類、agent reply、review-cycle-state保存"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/07-milestone-6-review-ingestion/notes/verification-2026-05-17.md"
+  - id: T002
+    title: "fixture検証を追加する"
+    status: completed
+    backlog_task: "fixtureベースのingestion検証を追加する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/07-milestone-6-review-ingestion/notes/verification-2026-05-17.md"
+  - id: T999
+    type: judge
+    title: "backlog close / Session complete gate"
+    status: active
+    objective: "Goal実装後にbacklog close / commit gate / Session complete可能範囲まで進める"
+    verification:
+      - "/backlog done 07 --from-goal docs/goals/07-milestone-6-review-ingestion"
+      - "Goal内の残作業 / Backlog close / Commit / push / Session complete の4軸で報告する"

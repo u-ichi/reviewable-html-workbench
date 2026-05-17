@@ -1,0 +1,42 @@
+backlog:
+  id: 12
+  file: docs/backlog/12-review-ingestion-hardening.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/12-review-ingestion-hardening/goal.md
+  objective: "Review Ingestionの最小縦通し後に、UI検証・JS分割・状態設計・document model反映を安全に強化する"
+completion:
+  status: backlog_close_wait
+  goal_done: true
+  backlog_closed: false
+  session_complete: false
+  final_receipt: "docs/goals/12-review-ingestion-hardening/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "状態設計と検証方針を固定する"
+    status: completed
+    backlog_task: "DOM単位検証方針とstatus/classification整理"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/12-review-ingestion-hardening/notes/verification-2026-05-17.md"
+  - id: T002
+    title: "document model限定反映を実装する"
+    status: completed
+    backlog_task: "document model反映強化"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/12-review-ingestion-hardening/notes/verification-2026-05-17.md"
+  - id: T003
+    title: "実出力評価への引き継ぎを整理する"
+    status: completed
+    backlog_task: "実出力評価への引き継ぎ"
+    verification: "`rg -n \"Review Ingestion Hardening|document model\" docs/design.html docs/development-plan.html`"
+    receipt: "docs/goals/12-review-ingestion-hardening/notes/verification-2026-05-17.md"
+  - id: T999
+    type: judge
+    title: "backlog close / Session complete gate"
+    status: active
+    objective: "Goal実装後にbacklog close / commit gate / Session complete可能範囲まで進める"
+    verification:
+      - "/backlog done 12 --from-goal docs/goals/12-review-ingestion-hardening"
+      - "Goal内の残作業 / Backlog close / Commit / push / Session complete の4軸で報告する"

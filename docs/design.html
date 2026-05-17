@@ -651,11 +651,11 @@
 
       <section id="feedback-ingestion" data-review-block="feedback-ingestion">
         <h2>レビューコメント取り込み</h2>
-        <p>ユーザーが「レビュー終わったので確認して」「コメントを反映して」と言った場合、<code>reviewable-design-doc</code> は最新の preview session から対象HTML rootを特定し、<code>annotations/comments.json</code> を読み込む。反映できるコメントは設計へ取り込み、確認が必要なコメントは同じHTMLコメントスレッドへ agent reply として書き戻す。</p>
+        <p>ユーザーが「レビュー終わったので確認して」「コメントを反映して」と言った場合、<code>reviewable-design-doc</code> は最新の preview session から対象HTML rootを特定し、<code>annotations/comments.json</code> を読み込む。Milestone 6ではコメント分類、agent reply書き戻し、<code>annotations/review-cycle-state.json</code> への処理結果保存までを最小縦通しとし、document modelへの反映はMilestone 6.5で <code>--apply-model</code> 指定時の限定的な完全一致置換から扱う。</p>
         <div class="grid two">
           <div class="card">
             <h3>自動取り込み対象</h3>
-            <p>明確な修正依頼、誤字、章構成の指摘、図示追加の依頼、レビュー観点の不足は、そのまま設計モデルへ反映する。反映後はコメントstatusを <code>resolved</code> にし、agent replyで反映内容を短く残す。</p>
+            <p>明確な修正依頼、誤字、章構成の指摘、図示追加の依頼、レビュー観点の不足は <code>actionable</code> として分類し、Milestone 6では反映候補としてstateへ記録する。Milestone 6.5では、対象blockの <code>content</code> に選択文字列が完全一致する場合だけ <code>--apply-model</code> で1回置換する。</p>
           </div>
           <div class="card">
             <h3>確認が必要な対象</h3>
@@ -667,9 +667,9 @@
           <li>最新の <code>output/tmp/html-preview-sessions/*.json</code> から成果物rootを特定する。</li>
           <li><code>annotations/comments.json</code> を読み、未処理コメントとユーザー返信を抽出する。</li>
           <li>コメントを <code>actionable</code>, <code>needs_clarification</code>, <code>blocked</code>, <code>already_addressed</code> に分類する。</li>
-          <li><code>actionable</code> は設計モデルへ反映し、HTMLを再生成する。</li>
+          <li><code>actionable</code> はMilestone 6では反映候補として <code>annotations/review-cycle-state.json</code> に記録する。</li>
           <li><code>needs_clarification</code> は該当コメントの <code>replies</code> に agent の確認質問を追加する。</li>
-          <li>更新済みHTMLとpreview URLを再提示し、確認待ちコメント数を報告する。</li>
+          <li>分類件数、agent reply件数、blocked件数、state保存結果を報告する。</li>
         </ol>
         <div class="callout">
           自動反映と確認返信は同じレビューサイクルで行う。agent がチャット本文に確認質問だけを書いて止まると、HTML上のレビュー文脈から外れるため、確認事項は必ずコメントスレッドにも残す。
@@ -792,8 +792,8 @@
             </tr>
             <tr>
               <td><code>ingest_review.py</code></td>
-              <td>レビュー完了発話後にコメントを分類し、設計モデルへ反映する。確認が必要な場合はagent replyをコメントへ書き戻す。</td>
-              <td><code>reviewable-design-doc</code> がレビュー取り込み時に呼ぶ。</td>
+              <td>レビュー完了発話後にコメントを分類し、agent replyを書き戻し、処理結果を <code>review-cycle-state.json</code> へ保存する。<code>--apply-model</code> 指定時だけdocument modelの完全一致置換を行う。</td>
+              <td><code>reviewable-design-doc</code> がレビュー取り込み時に呼ぶ。既定ではstate保存までに留める。</td>
             </tr>
             <tr>
               <td><code>validate_bundle.py</code></td>
@@ -971,7 +971,7 @@ output/tmp/html-preview-sessions/
             </tr>
             <tr>
               <td><code>annotations/review-cycle-state.json</code></td>
-              <td>レビュー取り込みの実行時刻、未解決コメント数、確認待ちコメント数、反映済みコメントIDを記録する。</td>
+              <td>レビュー取り込みの実行時刻、分類件数、確認待ちコメント数、blocked項目、actionableな反映候補コメントID、限定的なmodel更新結果を記録する。</td>
               <td><span class="status-warn">review mode有効時</span></td>
             </tr>
             <tr>
@@ -1059,8 +1059,8 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
 4. 図示要求と review mode を含む文書モデルを作る。
 5. visual-html-renderer を使ってHTML bundleとpreview URLを生成する。
 6. コメントJSONを次回修正の入力として扱える形で保存する。
-7. レビュー完了後は comments.json を読み込み、明確な指摘は設計へ反映する。
-8. 確認が必要な指摘は、該当コメントスレッドに agent reply を追加してHTMLを再生成する。
+7. レビュー完了後は comments.json を読み込み、コメントを分類して review-cycle-state.json に処理結果を保存する。
+8. 確認が必要な指摘は、該当コメントスレッドに agent reply を追加する。
 
 ## ガード
 - 設計として未確定の内容は確定事項と分けて書く。
@@ -1088,6 +1088,29 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
           <li><code>python3 -m json.tool .codex-plugin/plugin.json >/dev/null</code> と <code>python3 -m json.tool .claude-plugin/plugin.json >/dev/null</code> でmanifest JSON syntaxを確認する。</li>
           <li><code>python3 -m scripts.html_review_workbench.cli --help >/dev/null</code> でCLI entrypointが壊れていないことを確認する。</li>
         </ul>
+        <h3>Codex skill integration</h3>
+        <p>Codex上の2 skillは、skill本文に処理を重複実装せず、必ず <code>python3 -m scripts.html_review_workbench.cli</code> をentrypointにする。<code>agents/openai.yaml</code> にはtrigger例、default prompt、entrypoint、workflow順を記録し、SKILL.mdと同期する。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>skill</th>
+              <th>CLI workflow</th>
+              <th>fixture検証</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>visual-html-renderer</code></td>
+              <td><code>render</code> → <code>validate</code> → <code>preview</code></td>
+              <td>最小document model fixtureからHTML bundleを生成し、previewは検証時に <code>--mode off</code> で副作用を抑える。</td>
+            </tr>
+            <tr>
+              <td><code>reviewable-design-doc</code></td>
+              <td><code>render</code> → <code>validate</code> → <code>preview</code> → <code>ingest-review</code></td>
+              <td>同じdocument model fixtureから同じHTML bundle構造を生成し、コメントfixtureから <code>annotations/review-cycle-state.json</code> を追加生成する。</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <section id="implementation" data-review-block="implementation">
@@ -1147,8 +1170,8 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
             <tr>
               <td>Feedback Ingestion</td>
               <td><code>reviewable-design-doc</code></td>
-              <td>レビュー完了発話を受けたら <code>comments.json</code> を読み込み、明確な指摘は設計へ反映し、確認が必要な指摘には同じコメントスレッドへ agent reply を追加する。</td>
-              <td>反映済みコメント、確認待ちコメント、ブロックコメントがstatusで区別され、更新HTMLに返信が表示されることを確認する。</td>
+              <td>レビュー完了発話を受けたら <code>comments.json</code> を読み込み、コメントを分類し、確認が必要な指摘には同じコメントスレッドへ agent reply を追加し、処理結果をstateへ保存する。</td>
+              <td>分類件数、agent reply、blocked項目、state保存結果がfixtureで確認できる。</td>
             </tr>
           </tbody>
         </table>
@@ -1161,7 +1184,8 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
           <li><strong>図検証:</strong> 図がある場合、source と表示用SVG/PNGが両方存在し、空でない。</li>
           <li><strong>Design doc 検証:</strong> <code>reviewable-design-doc</code> が要求、制約、意思決定、未決事項、レビュー観点を分離できる。</li>
           <li><strong>コメント検証:</strong> 範囲選択からコメント登録、agent reply、一覧表示、JSON export が成功する。</li>
-          <li><strong>レビュー取り込み検証:</strong> 「レビュー終わったので確認して」発話から <code>comments.json</code> を読み、明確な指摘を反映し、確認が必要な指摘へHTMLコメント返信を書き戻せる。</li>
+          <li><strong>レビュー取り込み検証:</strong> 「レビュー終わったので確認して」発話から <code>comments.json</code> を読み、分類・agent reply追記・state保存をfixtureで検証できる。document model反映は <code>--apply-model</code> 指定時の限定置換としてfixtureで検証する。</li>
+          <li><strong>実出力評価後hardening検証:</strong> 実データのレビューサイクルで見つかった不足を、UI E2E、JS物理分割、document model反映拡張、skill導線に分類し、実施または見送り理由を記録する。</li>
           <li><strong>Preview Runtime 検証:</strong> Tailscale IPv4 がある場合はそのIP、ない場合は <code>127.0.0.1</code> のURLを提示し、<code>0.0.0.0</code> にbindしていない。</li>
           <li><strong>境界検証:</strong> レンダラーが入力にない判断をHTMLや図で追加していない。ブラウザ自動起動や恒久daemon化も行っていない。</li>
         </ol>
@@ -1228,13 +1252,28 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
             </tr>
             <tr>
               <td>Phase 6</td>
-              <td>レビュー取り込みと agent reply。レビュー完了発話、コメント分類、設計反映、確認質問のコメント返信。</td>
-              <td>確認が必要な指摘に対し、チャットだけでなくHTMLコメント上にagent返信が残る。</td>
+              <td>レビュー取り込みと agent reply。レビュー完了発話、コメント分類、state保存、確認質問のコメント返信。</td>
+              <td>確認が必要な指摘に対し、チャットだけでなくHTMLコメント上にagent返信が残り、処理結果がstateに残る。</td>
+            </tr>
+            <tr>
+              <td>Phase 6.5</td>
+              <td>Review Ingestion Hardening。JS責務境界の静的検証、status/classification整理、document model限定反映。</td>
+              <td>実出力評価へ進む前に、自動検証とユーザー確認の境界が整理され、物理的なJS分割はPhase 9.5の判断対象として残る。</td>
             </tr>
             <tr>
               <td>Phase 7</td>
               <td>既存の調査・設計系skillから <code>visual-html-renderer</code> を呼び出すよう移行。</td>
               <td>HTML出力系 skill が個別テンプレートではなく共通レンダラーを使う。</td>
+            </tr>
+            <tr>
+              <td>Phase 9</td>
+              <td>Codex実出力評価。実データでコメント作成、取り込み、agent reply、再生成を完走する。</td>
+              <td>UI E2E、JS物理分割、document model反映拡張の要否が評価receiptに分類される。</td>
+            </tr>
+            <tr>
+              <td>Phase 9.5</td>
+              <td>Post Evaluation Hardening。実出力評価で見つかった不足を回収する。</td>
+              <td>UI E2E、JS物理分割、document model反映拡張が、実施済みまたは見送り理由付きで記録される。</td>
             </tr>
           </tbody>
         </table>

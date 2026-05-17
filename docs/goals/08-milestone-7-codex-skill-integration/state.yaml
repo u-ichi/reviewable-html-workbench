@@ -1,0 +1,42 @@
+backlog:
+  id: 8
+  file: docs/backlog/08-milestone-7-codex-skill-integration.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/08-milestone-7-codex-skill-integration/goal.md
+  objective: "Codex上で2つのskillから共通scriptを呼び、一連のHTMLレビューworkflowを実行できるようにする"
+completion:
+  status: session_complete
+  goal_done: true
+  backlog_closed: true
+  session_complete: true
+  final_receipt: "docs/goals/08-milestone-7-codex-skill-integration/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "Codex skill手順を共通CLIに接続する"
+    status: completed
+    backlog_task: "`skills/visual-html-renderer/SKILL.md` と `skills/reviewable-design-doc/SKILL.md` を実装に合わせて更新する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "python3 -m unittest tests.test_codex_skill_integration"
+  - id: T002
+    title: "Codex skill metadataを同期する"
+    status: completed
+    backlog_task: "`agents/openai.yaml` を同期する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "python3 -m unittest tests.test_codex_skill_integration"
+  - id: T003
+    title: "fixture workflowと設計資料を検証する"
+    status: completed
+    backlog_task: "同じfixtureから同じ成果物構造が出ることと、設計/計画HTMLへの反映を確認する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/08-milestone-7-codex-skill-integration/notes/verification-2026-05-17.md"
+  - id: T999
+    type: judge
+    title: "backlog close / Session complete gate"
+    status: completed
+    objective: "Goal実装後にbacklog close / commit gate / Session complete可能範囲まで進める"
+    verification:
+      - "/backlog done 08 --from-goal docs/goals/08-milestone-7-codex-skill-integration"
+      - "Goal内の残作業 / Backlog close / Commit / push / Session complete の4軸で報告する"

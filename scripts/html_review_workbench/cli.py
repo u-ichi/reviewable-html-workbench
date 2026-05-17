@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.html_review_workbench.comment_store import CommentStoreError
+from scripts.html_review_workbench.ingest_review import ReviewIngestionError, ingest_review as run_ingest_review
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
 from scripts.html_review_workbench.validate_bundle import validate_bundle
@@ -27,9 +29,9 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "optional_options": ("--mode",),
     },
     "ingest-review": {
-        "purpose": "Read review comments and prepare feedback ingestion.",
+        "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
         "required_options": ("--root",),
-        "optional_options": ("--comments",),
+        "optional_options": ("--comments", "--state", "--model", "--apply-model"),
     },
     "validate": {
         "purpose": "Validate a generated HTML bundle.",
@@ -63,13 +65,18 @@ def preview(args: argparse.Namespace) -> int:
 
 
 def ingest_review(args: argparse.Namespace) -> int:
-    payload = {
-        "status": "not-started",
-        "reason": "review ingestion implementation pending",
-        "root": args.root,
-        "comments": args.comments,
-    }
-    print(json.dumps(payload, ensure_ascii=False))
+    try:
+        result = run_ingest_review(
+            Path(args.root),
+            comments_path=args.comments,
+            state_path=args.state,
+            model_path=Path(args.model) if args.model else None,
+            apply_model=args.apply_model,
+        )
+    except (CommentStoreError, ReviewIngestionError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(json.dumps(result.payload, ensure_ascii=False))
     return 0
 
 
@@ -108,6 +115,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest_parser.add_argument("--root", required=True)
     ingest_parser.add_argument("--comments", default="annotations/comments.json")
+    ingest_parser.add_argument("--state", default="annotations/review-cycle-state.json")
+    ingest_parser.add_argument("--model")
+    ingest_parser.add_argument("--apply-model", action="store_true")
     ingest_parser.set_defaults(func=ingest_review)
 
     validate_parser = subparsers.add_parser(

@@ -206,7 +206,7 @@
       <section id="purpose">
         <h2>目的</h2>
         <p><code>reviewable-html-workbench</code> を、まずCodex CLIで実用できるpluginとして完走させる。Claude Code対応はCodex版MVPが実出力評価まで通った後に追加する。</p>
-        <p>最初の到達点は、Codex上で設計資料をレビュー可能なHTMLとして生成し、preview URLを提示し、HTML上のコメントを読み込んで設計へ反映し、確認が必要な場合はHTMLコメントスレッドへagent返信を書き戻せる状態にすること。</p>
+        <p>最初の到達点は、Codex上で設計資料をレビュー可能なHTMLとして生成し、preview URLを提示し、HTML上のコメントを読み込み、fixture上で分類・agent返信・処理状態保存を検証できる状態にすること。自由なdocument model反映やUI検証の強化は、最小縦通し後のhardeningで扱う。</p>
       </section>
 
       <section id="principles">
@@ -229,8 +229,10 @@
           <li>Milestone 2: HTML Renderer MVP</li>
           <li>Milestone 4: Preview Runtime</li>
           <li>Milestone 5: Comment UI and Store</li>
-          <li>Milestone 6: Review Ingestion</li>
+          <li>Milestone 6: Review Ingestion最小縦通し</li>
+          <li>Milestone 6.5: Review Ingestion Hardening（backlog #12）</li>
           <li>Milestone 7-9: Codex skill統合、Codex packaging、実出力評価</li>
+          <li>Milestone 9.5: Post Evaluation Hardening（backlog #13）</li>
           <li>Milestone 10: Claude Code対応</li>
         </ol>
         <div class="callout">Milestone 3 の Diagram Planner は重要だが、最初のレビューサイクル成立には必須ではないため、Renderer MVP後に最小実装から進める。</div>
@@ -372,21 +374,41 @@
 
       <section id="m6">
         <h2>Milestone 6: Review Ingestion</h2>
-        <p><span class="status ok">Goal</span> 「レビュー終わったので確認して」発話からコメントを読み込み、設計へ反映できる。</p>
+        <p><span class="status ok">Goal</span> 「レビュー終わったので確認して」発話からコメントを読み込み、分類・agent reply書き戻し・処理状態保存をfixtureで検証できる。</p>
         <h3>作業</h3>
         <ul>
           <li><code>ingest_review.py</code> を実装する。</li>
           <li>コメントを <code>actionable</code>, <code>needs_clarification</code>, <code>blocked</code>, <code>already_addressed</code> に分類する。</li>
-          <li><code>actionable</code> はdocument modelへ反映する。</li>
+          <li><code>actionable</code> はdocument modelへ直接反映せず、反映候補として <code>annotations/review-cycle-state.json</code> に記録する。</li>
           <li><code>needs_clarification</code> は同じコメントスレッドへagent replyを追加する。</li>
           <li><code>annotations/review-cycle-state.json</code> に処理結果を残す。</li>
-          <li>更新HTMLを再生成し、preview URLを再提示する。</li>
+          <li>fixtureで <code>comments.json</code> → 分類 → agent reply追記 → state保存まで検証する。</li>
         </ul>
         <h3>完了条件</h3>
         <ul>
-          <li>明確なコメントが設計に反映される。</li>
+          <li><code>ingest-review</code> CLIが <code>comments.json</code> を読み込み、分類結果を返す。</li>
           <li>確認が必要なコメントにHTML上のagent replyが残る。</li>
-          <li>チャットだけで確認質問を返して止まらない。</li>
+          <li>処理結果が <code>review-cycle-state.json</code> に残る。</li>
+          <li>document model自由反映、UI E2E、<code>review-comments.js</code> 分割、comments status拡張はこのmilestoneに含めない。</li>
+        </ul>
+      </section>
+
+      <section id="m6h">
+        <h2>Milestone 6.5: Review Ingestion Hardening</h2>
+        <p><span class="status warn">Follow-up</span> backlog #12として、07の最小縦通し後にUI検証、JS分割、状態設計、document model反映を安全に強化する。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>review-comments.js</code> の最低限のDOM単位検証方針を決める。新規依存なしでは、まず主要責務境界の静的検証で固定する。</li>
+          <li>物理分割はまだ行わず、<code>comments-api</code>、<code>selection-anchor</code>、<code>thread-popover</code> 相当の境界をテストで追跡する。次に肥大化した時に分割する。</li>
+          <li>comments UI statusとingestion classificationを混ぜない状態設計を維持する。</li>
+          <li>document model反映は、<code>--apply-model</code> 指定時のfixture上の完全一致置換から始め、自由文書への直接反映に拡大しない。</li>
+          <li>Milestone 9の実出力評価へ渡す確認観点を整理する。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li>自動検証に寄せる項目とユーザー確認に残す項目が分離されている。</li>
+          <li>document model反映の安全な適用範囲が設計に反映され、fixtureで検証されている。</li>
+          <li>実出力評価で確認すべきレビューサイクル項目が整理されている。</li>
         </ul>
       </section>
 
@@ -398,6 +420,13 @@
           <li><code>reviewable-design-doc</code> から <code>render</code>, <code>ingest-review</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
           <li>Codex pluginとしてのskill discovery、trigger、CLI呼び出し、成果物配置を確認する。</li>
           <li><code>agents/openai.yaml</code> をSKILL.mdと同期する。</li>
+        </ul>
+        <h3>Codex統合で固定する順序</h3>
+        <ul>
+          <li><code>visual-html-renderer</code> は <code>python3 -m scripts.html_review_workbench.cli render</code> → <code>validate</code> → <code>preview</code> の順に共通CLIを呼ぶ。</li>
+          <li><code>reviewable-design-doc</code> は同じ <code>render</code> → <code>validate</code> → <code>preview</code> に加え、レビュー完了後に <code>ingest-review</code> を呼ぶ。</li>
+          <li><code>agents/openai.yaml</code> は trigger例、default prompt、共通CLI entrypoint、workflow順をSKILL.mdと同期する。</li>
+          <li><code>tests/test_codex_skill_integration.py</code> で同じfixtureから同じHTML bundle構造が出ること、reviewable workflowだけが <code>annotations/review-cycle-state.json</code> を追加することを検証する。</li>
         </ul>
       </section>
 
@@ -458,12 +487,32 @@
           <li><code>ingest-review</code> でコメントを取り込む。</li>
           <li>確認が必要なコメントにagent replyが残ることを確認する。</li>
           <li>反映後HTMLを再生成する。</li>
+          <li>UI E2E、<code>review-comments.js</code> 物理分割、document model反映拡張の要否を評価receiptに記録し、Milestone 9.5へ引き継ぐ。</li>
+        </ul>
+      </section>
+
+      <section id="m9h">
+        <h2>Milestone 9.5: Post Evaluation Hardening</h2>
+        <p><span class="status warn">Gate</span> backlog #13として、実出力評価で見つかった不足をClaude対応前に必ず回収または明示的に見送る。</p>
+        <h3>作業</h3>
+        <ul>
+          <li>実出力評価receiptから、UI E2E、JS物理分割、document model反映、skill導線の不足を分類する。</li>
+          <li>Playwright等のブラウザE2Eを導入するか、導入しない場合の代替検証を決める。</li>
+          <li><code>review-comments.js</code> を <code>comments-api</code>、<code>selection-anchor</code>、<code>thread-popover</code> などへ物理分割するか、維持基準を決める。</li>
+          <li>document model反映を完全一致置換から拡張するか、拡張しない場合の安全基準を決める。</li>
+          <li>実施したhardeningと見送った判断を <code>docs/design.html</code> と <code>docs/development-plan.html</code> に反映する。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li>10の実出力評価で見つかった不足が未分類のまま残っていない。</li>
+          <li>UI E2E、JS物理分割、document model反映拡張が、実施済みまたは見送り理由付きで記録されている。</li>
+          <li>Claude対応へ進んでもよい残リスクだけが明示されている。</li>
         </ul>
       </section>
 
       <section id="m10">
         <h2>Milestone 10: Claude Code対応</h2>
-        <p><span class="status warn">Later</span> Codex版MVPが実出力評価まで完走した後、Claude Code pluginとして同じworkflowを使えるようにする。</p>
+        <p><span class="status warn">Later</span> Codex版MVPの実出力評価とPost Evaluation Hardeningが終わった後、Claude Code pluginとして同じworkflowを使えるようにする。</p>
         <ul>
           <li>Claude plugin schemaに合わせて <code>.claude-plugin/plugin.json</code> を調整する。</li>
           <li><code>claude plugins validate .</code> を通す。</li>
@@ -510,7 +559,19 @@
             </tr>
             <tr>
               <td>コメント反映が勝手な設計判断になる</td>
-              <td><code>needs_clarification</code> に分類し、HTMLコメントへagent replyを書き戻す。</td>
+              <td>Milestone 6ではdocument modelへ直接反映せず、<code>actionable</code> をstateへ記録する。自由反映はMilestone 6.5以降で限定置換から段階的に扱う。</td>
+            </tr>
+            <tr>
+              <td>comments UI statusとingestion分類が混ざる</td>
+              <td>UI statusは <code>needs_agent_review</code> / <code>needs_user_reply</code> / <code>resolved</code> に留め、<code>actionable</code> などの分類は <code>review-cycle-state.json</code> 側で扱う。</td>
+            </tr>
+            <tr>
+              <td>コメントUIの手動確認依存が残る</td>
+              <td>Milestone 6.5では静的境界検証までに留め、Milestone 9.5でPlaywright等のE2E導入または代替検証を必ず判断する。</td>
+            </tr>
+            <tr>
+              <td>実出力評価で見つかった不足が回収されない</td>
+              <td>Milestone 9の完了条件に不足分類を入れ、Milestone 9.5 / backlog #13 で回収または見送り理由の記録を必須にする。</td>
             </tr>
             <tr>
               <td>diagram生成が外部送信を伴う</td>
@@ -523,8 +584,10 @@
       <section id="next">
         <h2>当面の次タスク</h2>
         <ol>
-          <li>Milestone 4で Preview Runtime を実装し、Tailscale IPv4優先、<code>127.0.0.1</code> fallback、<code>0.0.0.0</code> 拒否を検証する。</li>
-          <li>Milestone 5でコメントUIと <code>comments.json</code> 保存を実装する。</li>
+          <li>Milestone 6で <code>comments.json</code> → 分類 → agent reply/state保存の最小縦通しをfixtureで検証する。</li>
+          <li>Milestone 6.5でUI検証、JS分割、状態設計、document model反映のhardeningを行う。</li>
+          <li>その後、Milestone 7-9でCodex skill統合、plugin packaging、実出力評価へ進む。</li>
+          <li>Milestone 9.5で実出力評価の不足を回収してから、Milestone 10のClaude Code対応へ進む。</li>
         </ol>
       </section>
     </main>
@@ -543,9 +606,11 @@
         <a href="#m4">Milestone 4</a>
         <a href="#m5">Milestone 5</a>
         <a href="#m6">Milestone 6</a>
+        <a href="#m6h">Milestone 6.5</a>
         <a href="#m7">Milestone 7</a>
         <a href="#m8">Milestone 8</a>
         <a href="#m9">Milestone 9</a>
+        <a href="#m9h">Milestone 9.5</a>
         <a href="#m10">Milestone 10</a>
         <a href="#risks">リスク</a>
         <a href="#next">次タスク</a>
