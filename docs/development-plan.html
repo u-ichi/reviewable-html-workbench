@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reviewable HTML Workbench 開発計画</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --text: #18212f;
+      --muted: #5b6677;
+      --line: #d9e0ea;
+      --accent: #2563eb;
+      --accent-soft: #eaf1ff;
+      --warn: #9a5b00;
+      --warn-bg: #fff4db;
+      --ok: #126b47;
+      --ok-bg: #e9f7f0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      padding: 40px 32px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    header h1 {
+      margin: 0 0 12px;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: 0;
+    }
+
+    header p {
+      max-width: 920px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+      align-items: start;
+    }
+
+    main {
+      display: grid;
+      gap: 20px;
+    }
+
+    section, aside {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 12px; }
+
+    ul, ol {
+      margin: 8px 0 0 22px;
+      padding: 0;
+    }
+
+    li { margin: 5px 0; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2f7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5fa;
+      font-weight: 700;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+    }
+
+    nav h2 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    nav a {
+      display: block;
+      padding: 8px 0;
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid #edf1f6;
+      font-size: 14px;
+    }
+
+    nav a:hover { text-decoration: underline; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fbfcfe;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin-top: 14px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status.ok {
+      color: var(--ok);
+      background: var(--ok-bg);
+    }
+
+    .status.warn {
+      color: var(--warn);
+      background: var(--warn-bg);
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Reviewable HTML Workbench 開発計画</h1>
+    <p>まずCodex CLIでHTMLレビュー用pluginを完走させ、その後にClaude Code対応を追加するための計画。</p>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section id="purpose">
+        <h2>目的</h2>
+        <p><code>reviewable-html-workbench</code> を、まずCodex CLIで実用できるpluginとして完走させる。Claude Code対応はCodex版MVPが実出力評価まで通った後に追加する。</p>
+        <p>最初の到達点は、Codex上で設計資料をレビュー可能なHTMLとして生成し、preview URLを提示し、HTML上のコメントを読み込んで設計へ反映し、確認が必要な場合はHTMLコメントスレッドへagent返信を書き戻せる状態にすること。</p>
+      </section>
+
+      <section id="principles">
+        <h2>開発方針</h2>
+        <ul>
+          <li><code>SKILL.md</code> は薄く保ち、判断順・ガード・呼び出し手順だけを書く。</li>
+          <li>重い処理は <code>scripts/html_review_workbench/</code> のCLIとして実装する。</li>
+          <li>開発はCodex firstで進める。Claude対応は最後の互換化フェーズで追加する。</li>
+          <li>Claude / Codex 差分は plugin manifest と最小adapterに閉じ込める。</li>
+          <li>HTML comment は <code>comments.json</code> を正本にし、<code>localStorage</code> はstandalone用の補助に留める。</li>
+          <li>Preview Runtime は Tailscale IPv4 を優先し、fallback は <code>127.0.0.1</code>。<code>0.0.0.0</code> は禁止する。</li>
+        </ul>
+      </section>
+
+      <section id="roadmap">
+        <h2>優先順位</h2>
+        <ol>
+          <li>Milestone 0: CIとmanifest整理</li>
+          <li>Milestone 1: schema固定</li>
+          <li>Milestone 2: HTML Renderer MVP</li>
+          <li>Milestone 4: Preview Runtime</li>
+          <li>Milestone 5: Comment UI and Store</li>
+          <li>Milestone 6: Review Ingestion</li>
+          <li>Milestone 7-9: Codex skill統合、Codex packaging、実出力評価</li>
+          <li>Milestone 10: Claude Code対応</li>
+        </ol>
+        <div class="callout">Milestone 3 の Diagram Planner は重要だが、最初のレビューサイクル成立には必須ではないため、Renderer MVP後に最小実装から進める。</div>
+      </section>
+
+      <section id="backlog-policy">
+        <h2>backlog運用</h2>
+        <p>実装はMilestone単位の <code>docs/backlog/NN-*.md</code> を起点に進める。各backlogには、作業中に開発計画と設計を同期するルールを明記する。</p>
+        <ul>
+          <li>作業開始時に対象backlog、<code>docs/development-plan.html</code>、<code>docs/design.html</code> の関連箇所を確認する。</li>
+          <li>大きい進捗、Milestone順序、完了条件、リスクが変わった場合は <code>docs/development-plan.html</code> を同じ作業内で更新する。</li>
+          <li>skill範囲、script API、データ構造、Preview Runtime、コメント取り込み仕様が変わった場合は <code>docs/design.html</code> を同じ作業内で更新する。</li>
+          <li>途中で設計が変わった場合、実装だけを進めず、開発計画と設計HTMLの両方を直してから進捗記録する。</li>
+          <li><code>/backlog progress</code> では、更新した計画/設計セクション、検証結果、残った未決事項を記録する。</li>
+          <li><code>/backlog done</code> は、対象backlogのゴール条件に加えて、開発計画と設計の更新要否を確認してから完了にする。</li>
+        </ul>
+      </section>
+
+      <section id="m0">
+        <h2>Milestone 0: 基盤整理</h2>
+        <p><span class="status ok">Done</span> repoをplugin開発できる最低限の状態にする。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>.codex-plugin/plugin.json</code> を優先して整える。<code>.claude-plugin/plugin.json</code> は存在だけ維持し、本格対応は最後に回す。</li>
+          <li><code>skills/*/SKILL.md</code> のdescriptionを実使用トリガーに合わせて調整する。</li>
+          <li><code>scripts/html_review_workbench.cli</code> のsubcommand契約を固定する。</li>
+          <li><code>docs/design.html</code> と <code>docs/development-flow.md</code> を現行仕様に同期する。</li>
+          <li>GitHub Actionsで unittest、Codex manifest JSON syntax check、plugin構成check を実行する。</li>
+        </ul>
+        <h3>固定した契約</h3>
+        <ul>
+          <li><code>.github/workflows/test.yml</code> は <code>main</code> push と pull request で unittest、plugin manifest JSON syntax check、CLI help check を実行する。</li>
+          <li><code>.codex-plugin/plugin.json</code> は <code>interface</code> の表示名、説明、capabilities、defaultPrompt、brandColor を必須fieldとしてテストで確認する。</li>
+          <li><code>scripts.html_review_workbench.cli</code> は <code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> の4 subcommandを公開契約として持つ。</li>
+          <li><code>skills/*/SKILL.md</code> は Codex が発火判断に使えるように、Triggers と使用しない場面をdescriptionに含める。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li><code>python3 -m unittest discover -s tests</code> が通る。</li>
+          <li><code>python3 -m json.tool .codex-plugin/plugin.json >/dev/null</code> が通る。</li>
+          <li><code>python3 -m scripts.html_review_workbench.cli --help</code> が通る。</li>
+        </ul>
+      </section>
+
+      <section id="m1">
+        <h2>Milestone 1: Data Contract</h2>
+        <p><span class="status ok">Goal</span> HTML生成・コメント・preview sessionの入出力schemaを固定する。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>document-model.json</code> schemaを定義する。</li>
+          <li><code>comments.json</code> schemaを定義する。</li>
+          <li><code>preview-session.json</code> schemaを定義する。</li>
+          <li><code>tests/fixtures/</code> に最小fixtureを置く。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li>schema validation testがある。</li>
+          <li>fixtureを使って後続Milestoneのテストを始められる。</li>
+        </ul>
+      </section>
+
+      <section id="m2">
+        <h2>Milestone 2: HTML Renderer MVP</h2>
+        <p><span class="status ok">Goal</span> 最小文書モデルから <code>index.html</code> と <code>renderer-manifest.json</code> を生成できる。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>render.py</code> を実装する。</li>
+          <li><code>templates/report.html.j2</code> を実用テンプレートにする。</li>
+          <li><code>templates/style.css</code> を読みやすい設計資料向けに整える。</li>
+          <li>section / blockに安定した <code>data-review-block</code> を付ける。</li>
+          <li><code>renderer-manifest.json</code> に入力hash、生成時刻、renderer versionを残す。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li>fixtureから <code>output/.../index.html</code> が生成される。</li>
+          <li><code>validate</code> でHTML存在、manifest存在、review block存在を検証できる。</li>
+        </ul>
+      </section>
+
+      <section id="m3">
+        <h2>Milestone 3: Diagram Planner</h2>
+        <p><span class="status warn">Deferred</span> 図示した方が理解しやすい内容を、本文から分離して図示要求として扱えるようにする。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>diagram_planner.py</code> を実装する。</li>
+          <li><code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> の分類を定義する。</li>
+          <li>Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。</li>
+          <li>画像生成は任意扱いにし、外部送信が発生する場合は承認ゲートを通す。</li>
+        </ul>
+      </section>
+
+      <section id="m4">
+        <h2>Milestone 4: Preview Runtime</h2>
+        <p><span class="status ok">Goal</span> HTML生成後に、ユーザーがクリックできるpreview URLを提示できる。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>preview_server.py</code> を実装する。</li>
+          <li>空きport選択を実装する。</li>
+          <li><code>tailscale ip -4</code> が成功した場合はTailscale IPv4にbindする。</li>
+          <li>Tailscale IPv4が取れない場合は <code>127.0.0.1</code> にbindする。</li>
+          <li><code>0.0.0.0</code> bindを拒否する。</li>
+          <li><code>output/tmp/html-preview-sessions/*.json</code> にsession manifestを書く。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li><code>preview --mode auto</code> がURLを返す。</li>
+          <li>Tailscaleなしのfixture testで <code>127.0.0.1</code> fallbackを確認できる。</li>
+          <li><code>0.0.0.0</code> が入力されても拒否される。</li>
+        </ul>
+      </section>
+
+      <section id="m5">
+        <h2>Milestone 5: Comment UI and Store</h2>
+        <p><span class="status ok">Goal</span> HTML上で範囲選択コメントを作成し、<code>comments.json</code> に保存できる。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>templates/review-comments.js</code> を実装する。</li>
+          <li>Selection APIで選択範囲、block id、前後文脈を取得する。</li>
+          <li><code>comment_store.py</code> を実装する。</li>
+          <li><code>comments.json</code> の読み書きとschema validationを実装する。</li>
+          <li>standalone modeではlocalStorage export/importを提供する。</li>
+          <li>review-server modeでは <code>comments.json</code> を正本にする。</li>
+        </ul>
+      </section>
+
+      <section id="m6">
+        <h2>Milestone 6: Review Ingestion</h2>
+        <p><span class="status ok">Goal</span> 「レビュー終わったので確認して」発話からコメントを読み込み、設計へ反映できる。</p>
+        <h3>作業</h3>
+        <ul>
+          <li><code>ingest_review.py</code> を実装する。</li>
+          <li>コメントを <code>actionable</code>, <code>needs_clarification</code>, <code>blocked</code>, <code>already_addressed</code> に分類する。</li>
+          <li><code>actionable</code> はdocument modelへ反映する。</li>
+          <li><code>needs_clarification</code> は同じコメントスレッドへagent replyを追加する。</li>
+          <li><code>annotations/review-cycle-state.json</code> に処理結果を残す。</li>
+          <li>更新HTMLを再生成し、preview URLを再提示する。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li>明確なコメントが設計に反映される。</li>
+          <li>確認が必要なコメントにHTML上のagent replyが残る。</li>
+          <li>チャットだけで確認質問を返して止まらない。</li>
+        </ul>
+      </section>
+
+      <section id="m7">
+        <h2>Milestone 7: Codex Skill Integration</h2>
+        <p><span class="status ok">Goal</span> Codex上で2つのskillが共通scriptを使って一連のworkflowを実行できる。</p>
+        <ul>
+          <li><code>visual-html-renderer</code> から <code>render</code>, <code>validate</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
+          <li><code>reviewable-design-doc</code> から <code>render</code>, <code>ingest-review</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
+          <li>Codex pluginとしてのskill discovery、trigger、CLI呼び出し、成果物配置を確認する。</li>
+          <li><code>agents/openai.yaml</code> をSKILL.mdと同期する。</li>
+        </ul>
+      </section>
+
+      <section id="m8">
+        <h2>Milestone 8: Codex Plugin Packaging</h2>
+        <p><span class="status ok">Goal</span> Codex CLIでpluginとして読み込める。あわせて、既存のbase repo管理方式へどう組み込むかを決める。</p>
+        <ul>
+          <li>Codex: <code>.codex-plugin/plugin.json</code> と <code>skills/</code> の構成を検証する。</li>
+          <li>Codex marketplace登録方法をdocs化する。</li>
+          <li>Codex側でpluginを有効化し、2 skill が実際に発火することを確認する。</li>
+          <li>base repoの <code>home/skills</code> / <code>home/generated/codex-skills</code> 管理とplugin管理のどちらを正本にするか決める。</li>
+          <li>plugin versioningとrelease tag手順を決める。</li>
+        </ul>
+        <h3>base repo 管理方式との統合検討</h3>
+        <p>現在のbase repoは、共通skillを <code>home/skills/&lt;name&gt;</code> に置き、Codexへは <code>home/generated/codex-skills/</code> 経由で <code>~/.agents/skills/</code> にsymlink配布する。plugin化する場合、この既存経路と衝突しない導入方式をCodex側で先に決める。Claude側の <code>~/.claude/skills</code> / plugin install 方針はMilestone 10で扱う。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>方式</th>
+              <th>内容</th>
+              <th>採用判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>base repo 管理へ取り込み</td>
+              <td><code>home/skills/visual-html-renderer</code> と <code>home/skills/reviewable-design-doc</code> を正本にし、scriptはbase repo配下に置く。</td>
+              <td>Codex全プロジェクトへ即時展開したい場合に向く。plugin repoとしての独立性は下がる。</td>
+            </tr>
+            <tr>
+              <td>外部plugin repoとして管理</td>
+              <td>このrepoを正本にし、Codexはmarketplace entryで参照する。Claude連携は最後に追加する。</td>
+              <td>今回の推奨。scriptが厚く、versioningとテストをrepo単位で持てる。</td>
+            </tr>
+            <tr>
+              <td>hybrid adapter</td>
+              <td>base repo側には薄いadapter skillだけ置き、実処理と正本skillはこのplugin repoを参照する。</td>
+              <td>移行期に向く。二重定義を避けるためadapterの責務を明文化する必要がある。</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>統合時の確認項目</h3>
+        <ul>
+          <li><code>home/skills</code> とplugin repoの同名skillがCodexで同時に有効化された時の優先順位を確認する。</li>
+          <li><code>bin/build-codex-skills.sh</code> が生成する <code>home/generated/codex-skills</code> と、Codex pluginのskill discoveryが衝突しないことを確認する。</li>
+          <li>base repoの <code>install.sh</code> にCodex marketplace登録やplugin installを含めるか、個別導入手順に分けるか決める。</li>
+          <li>既存skillからこのpluginを呼ぶ場合、直接script呼び出しではなくskill境界経由にするかを決める。</li>
+        </ul>
+      </section>
+
+      <section id="m9">
+        <h2>Milestone 9: Codex 実出力評価</h2>
+        <p><span class="status ok">Goal</span> Codex上で実際の設計資料をこのpluginで作り、レビューサイクルが成立することを確認する。</p>
+        <ul>
+          <li><code>docs/design.html</code> 自体をpluginで再生成する。</li>
+          <li>生成されたpreview URLを開いて表示確認する。</li>
+          <li>HTML上でコメントを入れる。</li>
+          <li><code>ingest-review</code> でコメントを取り込む。</li>
+          <li>確認が必要なコメントにagent replyが残ることを確認する。</li>
+          <li>反映後HTMLを再生成する。</li>
+        </ul>
+      </section>
+
+      <section id="m10">
+        <h2>Milestone 10: Claude Code対応</h2>
+        <p><span class="status warn">Later</span> Codex版MVPが実出力評価まで完走した後、Claude Code pluginとして同じworkflowを使えるようにする。</p>
+        <ul>
+          <li>Claude plugin schemaに合わせて <code>.claude-plugin/plugin.json</code> を調整する。</li>
+          <li><code>claude plugins validate .</code> を通す。</li>
+          <li><code>claude --plugin-dir &lt;repo&gt;</code> で手元起動する。</li>
+          <li>Claude側のskill discovery、slash command、CLI呼び出し差分を確認する。</li>
+          <li>base repoの <code>~/.claude/skills</code> symlink配布と plugin install のどちらを正本にするか決める。</li>
+          <li>Codexで確立したfixtureと実出力評価をClaudeでも再実行する。</li>
+        </ul>
+      </section>
+
+      <section id="risks">
+        <h2>リスクと対策</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>リスク</th>
+              <th>対策</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Claude対応を早く入れてCodex MVPが遅れる</td>
+              <td>Milestone 10までClaude対応を後回しにし、Codexでレビューサイクルを先に完走する。</td>
+            </tr>
+            <tr>
+              <td>Claude plugin schemaとCodex plugin schemaがずれる</td>
+              <td>manifestを分け、共通項目だけを同期する。Claude差分はMilestone 10で吸収する。</td>
+            </tr>
+            <tr>
+              <td>base repo管理の <code>home/skills</code> とplugin repoのskillが二重に有効化される</td>
+              <td>Milestone 8で正本を決める。推奨はplugin repoを正本にし、base repo側は必要なら薄いadapterだけにする。</td>
+            </tr>
+            <tr>
+              <td><code>SKILL.md</code> が肥大化する</td>
+              <td>詳細はdocsとscriptへ逃がし、SKILL.mdは手順とガードに限定する。</td>
+            </tr>
+            <tr>
+              <td>localStorageコメントをagentが読めない</td>
+              <td>review-server modeでは <code>comments.json</code> を正本にする。</td>
+            </tr>
+            <tr>
+              <td>preview serverが意図せず公開される</td>
+              <td><code>0.0.0.0</code> を拒否し、Tailscale IPv4または <code>127.0.0.1</code> のみ許可する。</td>
+            </tr>
+            <tr>
+              <td>コメント反映が勝手な設計判断になる</td>
+              <td><code>needs_clarification</code> に分類し、HTMLコメントへagent replyを書き戻す。</td>
+            </tr>
+            <tr>
+              <td>diagram生成が外部送信を伴う</td>
+              <td>外部図式レンダラーや画像生成は承認ゲート対象にする。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="next">
+        <h2>当面の次タスク</h2>
+        <ol>
+          <li><code>docs/backlog/01-milestone-0-codex-foundation.md</code> から着手する。</li>
+          <li>Milestone 0で <code>.github/workflows/test.yml</code> を追加する。</li>
+          <li>Milestone 1で <code>schemas/</code> ディレクトリを作り、3つのschemaを追加する。</li>
+          <li>Milestone 2で <code>render.py</code> と <code>validate_bundle.py</code> をplaceholderから実装へ進める。</li>
+        </ol>
+      </section>
+    </main>
+
+    <aside>
+      <nav aria-label="開発計画ナビゲーション">
+        <h2>目次</h2>
+        <a href="#purpose">目的</a>
+        <a href="#principles">開発方針</a>
+        <a href="#roadmap">優先順位</a>
+        <a href="#backlog-policy">backlog運用</a>
+        <a href="#m0">Milestone 0</a>
+        <a href="#m1">Milestone 1</a>
+        <a href="#m2">Milestone 2</a>
+        <a href="#m3">Milestone 3</a>
+        <a href="#m4">Milestone 4</a>
+        <a href="#m5">Milestone 5</a>
+        <a href="#m6">Milestone 6</a>
+        <a href="#m7">Milestone 7</a>
+        <a href="#m8">Milestone 8</a>
+        <a href="#m9">Milestone 9</a>
+        <a href="#m10">Milestone 10</a>
+        <a href="#risks">リスク</a>
+        <a href="#next">次タスク</a>
+      </nav>
+    </aside>
+  </div>
+</body>
+</html>

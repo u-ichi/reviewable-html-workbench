@@ -949,7 +949,7 @@ output/tmp/html-preview-sessions/
 
       <section id="skill-spec" data-review-block="skill-spec">
         <h2>SKILL.md 草案</h2>
-        <p>実装時はこの設計をもとに <code>home/skills/visual-html-renderer/SKILL.md</code> と <code>home/skills/reviewable-design-doc/SKILL.md</code> を作る。ルール・スキル文書の変更になるため、適用前には変更案提示と承認が必要。</p>
+        <p>実装時はこの設計をもとに <code>skills/visual-html-renderer/SKILL.md</code> と <code>skills/reviewable-design-doc/SKILL.md</code> を作る。SKILL.md は発火条件、使わない場面、呼び出し順、ガードだけを持ち、重い処理は共通scriptへ委譲する。</p>
         <h3>visual-html-renderer</h3>
         <pre><code>---
 name: visual-html-renderer
@@ -1021,6 +1021,27 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
 - レビューコメント機能は必須で有効化する。
 - 確認が必要な場合、チャットだけで聞き返さずHTMLコメントへ返信する。
 - HTML低レベル実装をこのskillに重複実装しない。</code></pre>
+      </section>
+
+      <section id="codex-foundation" data-review-block="codex-foundation">
+        <h2>Codex基盤契約</h2>
+        <p>Milestone 0 では、pluginとして開発を継続できる最低限の契約をコードとテストで固定する。以後のMilestoneはこの契約を破らず、必要な拡張だけを追加する。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>Codex manifest</h3>
+            <p><code>.codex-plugin/plugin.json</code> は <code>name</code>、<code>version</code>、<code>description</code>、<code>skills</code>、<code>interface</code> を持つ。<code>interface</code> には表示名、短い説明、長い説明、capabilities、defaultPrompt、brandColor を明示する。</p>
+          </div>
+          <div class="card">
+            <h3>CLI contract</h3>
+            <p><code>scripts.html_review_workbench.cli</code> は <code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> を公開subcommandとして固定する。各skillはこの入口を呼び、低レベル実装へ直接依存しない。</p>
+          </div>
+        </div>
+        <h3>CIで確認すること</h3>
+        <ul>
+          <li><code>python3 -m unittest discover -s tests</code> でplugin構成、Codex manifest必須field、skill description、CLI契約を確認する。</li>
+          <li><code>python3 -m json.tool .codex-plugin/plugin.json >/dev/null</code> と <code>python3 -m json.tool .claude-plugin/plugin.json >/dev/null</code> でmanifest JSON syntaxを確認する。</li>
+          <li><code>python3 -m scripts.html_review_workbench.cli --help >/dev/null</code> でCLI entrypointが壊れていないことを確認する。</li>
+        </ul>
       </section>
 
       <section id="implementation" data-review-block="implementation">
@@ -1100,6 +1121,24 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
         </ol>
       </section>
 
+      <section id="backlog-operation" data-review-block="backlog-operation">
+        <h2>開発時のbacklog運用</h2>
+        <p>実装はMilestone単位の <code>docs/backlog/NN-*.md</code> を起点に進める。各backlogは、作業中に <code>docs/development-plan.html</code> と本設計書 <code>docs/design.html</code> を同期することを完了条件に含める。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>進捗の反映先</h3>
+            <p>大きい進捗、Milestone順序、完了条件、リスクが変わった場合は <code>docs/development-plan.html</code> を更新する。</p>
+          </div>
+          <div class="card">
+            <h3>設計変更の反映先</h3>
+            <p>skill範囲、script API、データ構造、Preview Runtime、コメント取り込み仕様が変わった場合は <code>docs/design.html</code> を更新する。</p>
+          </div>
+        </div>
+        <div class="callout warning">
+          途中で設計が変わった場合、実装だけを進めない。開発計画と設計HTMLの両方を直し、backlogの進捗ログに更新箇所を残してから作業を続ける。
+        </div>
+      </section>
+
       <section id="rollout" data-review-block="rollout">
         <h2>段階的な作り方</h2>
         <table>
@@ -1170,8 +1209,10 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
       <a href="#preview-runtime">Preview Runtime</a>
       <a href="#bundle">成果物構成</a>
       <a href="#skill-spec">SKILL.md 草案</a>
+      <a href="#codex-foundation">Codex基盤契約</a>
       <a href="#implementation">実装設計</a>
       <a href="#verification">検証計画</a>
+      <a href="#backlog-operation">backlog運用</a>
       <a href="#rollout">段階的な作り方</a>
 
       <div class="review-panel" aria-label="コメント">

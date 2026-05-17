@@ -1,7 +1,7 @@
 ---
 name: visual-html-renderer
 description: |
-  HTMLを最終成果物にする時の共通レンダラー。文書モデルを受け取り、説明に有効な図・画像・表現を使ってHTMLを生成し、セッション限定のプレビューURLを提示する。Triggers: HTMLレンダラー, HTML出力を共通化, 図示つきHTML, visual HTML renderer。
+  HTMLを最終成果物として生成・検証・プレビューしたい時に使う共通レンダラー。文書モデルを受け取り、説明に有効な図・画像・表現を使ってHTML bundleを生成し、セッション限定のプレビューURLを提示する。Triggers: HTMLレンダラー, HTML出力を共通化, 図示つきHTML, visual HTML renderer。使用しない場面: 設計内容そのものの作成、Notion投稿だけ、既存HTMLの軽微な見た目修正だけ。
 ---
 
 # visual-html-renderer

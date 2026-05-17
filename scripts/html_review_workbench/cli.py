@@ -12,6 +12,28 @@ from pathlib import Path
 from typing import Any
 
 
+COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
+    "render": {
+        "purpose": "Generate an HTML bundle from a document model.",
+        "required_options": ("--model", "--output"),
+    },
+    "preview": {
+        "purpose": "Start or describe a session-scoped preview runtime.",
+        "required_options": ("--root",),
+        "optional_options": ("--mode",),
+    },
+    "ingest-review": {
+        "purpose": "Read review comments and prepare feedback ingestion.",
+        "required_options": ("--root",),
+        "optional_options": ("--comments",),
+    },
+    "validate": {
+        "purpose": "Validate a generated HTML bundle.",
+        "required_options": ("--root",),
+    },
+}
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -64,22 +86,38 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="html-review-workbench")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    render_parser = subparsers.add_parser("render")
+    render_parser = subparsers.add_parser(
+        "render",
+        help=str(COMMAND_CONTRACT["render"]["purpose"]),
+        description=str(COMMAND_CONTRACT["render"]["purpose"]),
+    )
     render_parser.add_argument("--model", required=True)
     render_parser.add_argument("--output", required=True)
     render_parser.set_defaults(func=render)
 
-    preview_parser = subparsers.add_parser("preview")
+    preview_parser = subparsers.add_parser(
+        "preview",
+        help=str(COMMAND_CONTRACT["preview"]["purpose"]),
+        description=str(COMMAND_CONTRACT["preview"]["purpose"]),
+    )
     preview_parser.add_argument("--root", required=True)
     preview_parser.add_argument("--mode", choices=["auto", "tailscale", "local", "off"], default="auto")
     preview_parser.set_defaults(func=preview)
 
-    ingest_parser = subparsers.add_parser("ingest-review")
+    ingest_parser = subparsers.add_parser(
+        "ingest-review",
+        help=str(COMMAND_CONTRACT["ingest-review"]["purpose"]),
+        description=str(COMMAND_CONTRACT["ingest-review"]["purpose"]),
+    )
     ingest_parser.add_argument("--root", required=True)
     ingest_parser.add_argument("--comments", default="annotations/comments.json")
     ingest_parser.set_defaults(func=ingest_review)
 
-    validate_parser = subparsers.add_parser("validate")
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help=str(COMMAND_CONTRACT["validate"]["purpose"]),
+        description=str(COMMAND_CONTRACT["validate"]["purpose"]),
+    )
     validate_parser.add_argument("--root", required=True)
     validate_parser.set_defaults(func=validate)
 
