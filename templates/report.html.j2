@@ -4,8 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
+  <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-  <main id="content">{{ body }}</main>
+  <header class="document-header" data-document-id="{{ document_id }}">
+    <p class="eyebrow">Reviewable HTML Workbench</p>
+    <h1>{{ title }}</h1>
+    {{ summary }}
+    <p class="document-meta">Source generated at <time>{{ generated_at }}</time></p>
+  </header>
+  <main id="content" class="document-content">
+{{ body }}
+  </main>
 </body>
 </html>

@@ -302,12 +302,12 @@
           <li><code>templates/report.html.j2</code> を実用テンプレートにする。</li>
           <li><code>templates/style.css</code> を読みやすい設計資料向けに整える。</li>
           <li>section / blockに安定した <code>data-review-block</code> を付ける。</li>
-          <li><code>renderer-manifest.json</code> に入力hash、生成時刻、renderer versionを残す。</li>
+          <li><code>renderer-manifest.json</code> に入力hash、生成時刻、renderer version、出力asset、review block一覧を残す。</li>
         </ul>
         <h3>完了条件</h3>
         <ul>
           <li>fixtureから <code>output/.../index.html</code> が生成される。</li>
-          <li><code>validate</code> でHTML存在、manifest存在、review block存在を検証できる。</li>
+          <li><code>validate</code> でHTML存在、manifest存在、asset存在、review block存在を検証できる。</li>
         </ul>
       </section>
 

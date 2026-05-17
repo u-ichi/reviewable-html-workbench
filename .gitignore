@@ -23,3 +23,6 @@ Thumbs.db
 # Python
 __pycache__/
 *.py[cod]
+
+# Generated artifacts
+output/

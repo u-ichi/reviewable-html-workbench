@@ -11,6 +11,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.html_review_workbench.render import render_bundle
+from scripts.html_review_workbench.validate_bundle import validate_bundle
+
 
 COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
     "render": {
@@ -40,11 +43,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def render(args: argparse.Namespace) -> int:
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    index_path = output_dir / "index.html"
-    index_path.write_text("<!doctype html><meta charset=\"utf-8\"><title>Reviewable HTML Workbench</title>\n", encoding="utf-8")
-    _write_json(output_dir / "renderer-manifest.json", {"status": "placeholder", "model": args.model})
+    index_path = render_bundle(Path(args.model), Path(args.output))
     print(index_path)
     return 0
 
@@ -72,14 +71,9 @@ def ingest_review(args: argparse.Namespace) -> int:
 
 
 def validate(args: argparse.Namespace) -> int:
-    root = Path(args.root)
-    required = [root / "index.html", root / "renderer-manifest.json"]
-    missing = [str(path) for path in required if not path.exists()]
-    if missing:
-        print(json.dumps({"ok": False, "missing": missing}, ensure_ascii=False))
-        return 1
-    print(json.dumps({"ok": True}, ensure_ascii=False))
-    return 0
+    result = validate_bundle(Path(args.root))
+    print(json.dumps(result.to_payload(), ensure_ascii=False))
+    return 0 if result.ok else 1
 
 
 def build_parser() -> argparse.ArgumentParser:

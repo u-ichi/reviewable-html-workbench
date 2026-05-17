@@ -769,7 +769,7 @@
           <tbody>
             <tr>
               <td><code>render.py</code></td>
-              <td>文書モデルからHTML bundleを生成する。テンプレート適用、asset配置、manifest作成を担当する。</td>
+              <td>文書モデルからHTML bundleを生成する。テンプレート適用、CSS asset配置、入力hash・生成時刻・renderer version・review block一覧を含むmanifest作成を担当する。</td>
               <td><code>visual-html-renderer</code> が常に呼ぶ。</td>
             </tr>
             <tr>
@@ -794,7 +794,7 @@
             </tr>
             <tr>
               <td><code>validate_bundle.py</code></td>
-              <td>HTML存在、asset参照、図の非空、comment schema、preview bind方針を検証する。</td>
+              <td>MVPではHTML存在、manifest存在、asset参照、<code>data-review-block</code> とmanifest上のreview block対応を検証する。後続で図の非空、comment schema、preview bind方針を追加する。</td>
               <td>両skillの完了前検証として呼ぶ。</td>
             </tr>
           </tbody>

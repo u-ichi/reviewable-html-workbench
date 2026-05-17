@@ -71,6 +71,11 @@ updated: 2026-05-17
 ### 2026-05-17
 
 - 初期作成。
+- 実装: `render.py` / `validate_bundle.py` / `cli.py` をRenderer MVPとして実装し、`templates/report.html.j2` と `templates/style.css` をreview block付きHTML bundle向けに更新。
+- テスト: `tests/test_renderer_bundle.py` を追加し、manifest、asset、`data-review-block`、bundle validationを検証。
+- 設計同期: `docs/design.html` と `docs/development-plan.html` にmanifest項目とvalidate範囲を反映。
+- 生成物管理: `output/` をgit管理外にするため `.gitignore` に追加。
+- 検証: `python3 -m unittest discover -s tests`、`python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/test-render`、`python3 -m scripts.html_review_workbench.cli validate --root output/tmp/test-render`、`rg -n "data-review-block" output/tmp/test-render/index.html`、`claude plugins validate .` が通過（Claude plugin validate は既存の `CLAUDE.md` warning あり）。
 
 ## 成果物
 
