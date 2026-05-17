@@ -845,7 +845,7 @@
         <div class="grid two">
           <div class="card">
             <h3>責務</h3>
-            <p>成果物ディレクトリをHTTPで配信し、bind address、port、URL、PIDを session manifest に記録する。停止は明示的な終了処理またはセッション終了時に行う。</p>
+            <p>成果物ディレクトリをHTTPで配信し、bind address、port、URL、PIDを session manifest に記録する。CLI出力には manifest path と停止コマンドも含める。停止は明示的な終了処理またはセッション終了時に行う。</p>
           </div>
           <div class="card">
             <h3>非責務</h3>
@@ -895,14 +895,18 @@ http://&lt;bind-address&gt;:&lt;port&gt;/index.html</code></pre>
         <h3>session manifest</h3>
         <pre><code>output/tmp/html-preview-sessions/&lt;session-id&gt;.json
 {
+  "schema_version": "1.0",
+  "session_id": "b7f7d9c0...",
   "root": "output/2026-05-17_html-output-skill-split-design",
   "bind": "100.x.y.z",
   "port": 43821,
   "url": "http://100.x.y.z:43821/index.html",
   "pid": 12345,
   "created_at": "2026-05-17T00:00:00+09:00",
-  "mode": "tailscale"
+  "mode": "tailscale",
+  "status": "running"
 }</code></pre>
+        <p>CLI応答は上記manifest項目に加えて <code>manifest</code> と <code>stop_command</code> を返す。manifest本体はschemaに合わせ、停止コマンドは実行導線としてCLI出力に限定する。</p>
         <div class="callout warning">
           <code>python3 -m http.server</code> は静的プレビュー用の最小実装に限定する。コメントを <code>comments.json</code> に保存する場合は、書き込み先を成果物ディレクトリ内に制限した <code>review-server.py</code> または <code>preview-server.py</code> を使う。
         </div>

@@ -26,3 +26,4 @@ __pycache__/
 
 # Generated artifacts
 output/
+docs/goals/*/.goalbuddy-board/

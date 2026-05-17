@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench.render import render_bundle
+from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
@@ -49,13 +50,15 @@ def render(args: argparse.Namespace) -> int:
 
 
 def preview(args: argparse.Namespace) -> int:
-    payload = {
-        "status": "not-started",
-        "reason": "preview server implementation pending",
-        "root": args.root,
-        "mode": args.mode,
-    }
-    print(json.dumps(payload, ensure_ascii=False))
+    if args.mode == "off":
+        print(json.dumps({"status": "off", "root": args.root, "mode": args.mode}, ensure_ascii=False))
+        return 0
+    try:
+        session = start_preview(Path(args.root), args.mode)
+    except PreviewConfigurationError as exc:
+        print(json.dumps({"status": "failed", "error": str(exc), "root": args.root, "mode": args.mode}, ensure_ascii=False))
+        return 2
+    print(json.dumps(session.to_payload(), ensure_ascii=False))
     return 0
 
 

@@ -1,7 +1,7 @@
 ---
 id: 3
 title: "Milestone 2: HTML Renderer MVP"
-status: バックログ
+status: 完了
 notion_url: ""
 notion_id: ""
 parent_notion_url: ""
@@ -19,21 +19,21 @@ updated: 2026-05-17
 
 ## ゴール条件
 
-- [ ] `render` CLIがfixtureからHTML bundleを生成できる。
+- [x] `render` CLIがfixtureからHTML bundleを生成できる。
   - 検証: `python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/test-render`
-- [ ] `validate` CLIがHTML / manifest / review blockを検証できる。
+- [x] `validate` CLIがHTML / manifest / review blockを検証できる。
   - 検証: `python3 -m scripts.html_review_workbench.cli validate --root output/tmp/test-render`
-- [ ] 生成HTMLが `data-review-block` を持つ。
+- [x] 生成HTMLが `data-review-block` を持つ。
   - 検証: `rg -n "data-review-block" output/tmp/test-render/index.html`
-- [ ] renderer仕様変更が `docs/design.html` と `docs/development-plan.html` に反映されている。
+- [x] renderer仕様変更が `docs/design.html` と `docs/development-plan.html` に反映されている。
 
 ## やること
 
-- [ ] `render.py` をplaceholderから実装する。
-- [ ] `templates/report.html.j2` を実用テンプレートにする。
-- [ ] `templates/style.css` を整理する。
-- [ ] `renderer-manifest.json` に入力hash、生成時刻、renderer versionを残す。
-- [ ] `validate_bundle.py` の最小検証を実装する。
+- [x] `render.py` をplaceholderから実装する。
+- [x] `templates/report.html.j2` を実用テンプレートにする。
+- [x] `templates/style.css` を整理する。
+- [x] `renderer-manifest.json` に入力hash、生成時刻、renderer versionを残す。
+- [x] `validate_bundle.py` の最小検証を実装する。
 
 ## 開発計画・設計同期ルール
 
@@ -76,7 +76,12 @@ updated: 2026-05-17
 - 設計同期: `docs/design.html` と `docs/development-plan.html` にmanifest項目とvalidate範囲を反映。
 - 生成物管理: `output/` をgit管理外にするため `.gitignore` に追加。
 - 検証: `python3 -m unittest discover -s tests`、`python3 -m scripts.html_review_workbench.cli render --model tests/fixtures/minimal_document_model.json --output output/tmp/test-render`、`python3 -m scripts.html_review_workbench.cli validate --root output/tmp/test-render`、`rg -n "data-review-block" output/tmp/test-render/index.html`、`claude plugins validate .` が通過（Claude plugin validate は既存の `CLAUDE.md` warning あり）。
+- 完了: ゴール条件を再検証し、backlogを完了へ更新。
 
 ## 成果物
 
-（完了時に記載）
+- `scripts/html_review_workbench/render.py`: fixtureからreview block付きHTML bundleを生成。
+- `scripts/html_review_workbench/validate_bundle.py`: HTML / manifest / review blockの最小検証を実装。
+- `templates/report.html.j2` / `templates/style.css`: 実用テンプレートとbundle CSSを整備。
+- `tests/test_renderer_bundle.py`: manifest、asset、diagram fallback、`data-review-block`、bundle validationを検証。
+- `docs/design.html` / `docs/development-plan.html`: Renderer MVP仕様と完了条件を同期。

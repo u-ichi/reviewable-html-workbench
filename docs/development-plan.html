@@ -343,9 +343,10 @@
         </ul>
         <h3>完了条件</h3>
         <ul>
-          <li><code>preview --mode auto</code> がURLを返す。</li>
+          <li><code>preview --mode auto</code> がURLとPIDを返す。</li>
           <li>Tailscaleなしのfixture testで <code>127.0.0.1</code> fallbackを確認できる。</li>
           <li><code>0.0.0.0</code> が入力されても拒否される。</li>
+          <li><code>output/tmp/html-preview-sessions/*.json</code> に session manifest が作成される。</li>
         </ul>
       </section>
 

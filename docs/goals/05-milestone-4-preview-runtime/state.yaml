@@ -1,0 +1,49 @@
+backlog:
+  id: 5
+  file: docs/backlog/05-milestone-4-preview-runtime.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/05-milestone-4-preview-runtime/goal.md
+  objective: "Codexから利用できるPreview Runtimeを実装し、Tailscale/localhost URLを安全に提示する"
+completion:
+  status: session_complete
+  goal_done: true
+  backlog_closed: true
+  session_complete: true
+  final_receipt: "docs/goals/05-milestone-4-preview-runtime/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "Preview Runtime 本体と CLI を実装する"
+    status: completed
+    backlog_task: "`preview_server.py` を実装する"
+    verification: "`python3 -m scripts.html_review_workbench.cli preview --root output/tmp/test-render --mode auto`"
+    receipt: "docs/goals/05-milestone-4-preview-runtime/notes/verification-2026-05-17.md"
+  - id: T002
+    title: "Tailscale fallback と 0.0.0.0 拒否を検証する"
+    status: completed
+    backlog_task: "Tailscale IPv4検出、fallback、bind拒否"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "docs/goals/05-milestone-4-preview-runtime/notes/verification-2026-05-17.md"
+  - id: T003
+    title: "session manifest と停止方法を出力する"
+    status: completed
+    backlog_task: "session manifestの読み書きとstop方法"
+    verification: "manifest JSON の root / bind / port / url / pid / status を確認"
+    receipt: "docs/goals/05-milestone-4-preview-runtime/notes/verification-2026-05-17.md"
+  - id: T004
+    title: "設計・開発計画HTMLを同期する"
+    status: completed
+    backlog_task: "Preview Runtime仕様変更の docs 反映"
+    verification: "`rg -n \"Preview Runtime|html-preview-sessions|0.0.0.0\" docs/design.html docs/development-plan.html`"
+    receipt: "docs/goals/05-milestone-4-preview-runtime/notes/verification-2026-05-17.md"
+  - id: T999
+    type: judge
+    title: "backlog close / Session complete gate"
+    status: completed
+    objective: "Goal 実装後に backlog close / commit gate / Session complete 可能範囲まで進める"
+    verification:
+      - "/backlog done 05 --from-goal docs/goals/05-milestone-4-preview-runtime"
+      - "commit approval が必要な場合は approval_wait として board に残す"
+      - "Goal 内の残作業 / Backlog close / Commit / push / Session complete の 4 軸で報告する"
