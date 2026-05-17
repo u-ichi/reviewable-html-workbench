@@ -1,0 +1,3 @@
+display_name: Reviewable Design Doc
+short_description: レビュー可能な設計資料HTMLを作り、コメント反映まで扱う。
+default_prompt: 設計資料をレビュー可能なHTMLで作って

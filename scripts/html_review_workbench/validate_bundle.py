@@ -1,0 +1,1 @@
+"""Bundle validation implementation placeholder."""

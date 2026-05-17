@@ -1,0 +1,1332 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visual HTML Renderer and Reviewable Design Doc Skill Design</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #f0f4f8;
+      --ink: #17202a;
+      --muted: #5d6875;
+      --line: #d8dee8;
+      --accent: #0f766e;
+      --accent-2: #6f4d12;
+      --blue: #28548a;
+      --red: #9b2c2c;
+      --green-bg: #eaf7f3;
+      --blue-bg: #edf5ff;
+      --amber-bg: #fff4df;
+      --red-bg: #fff0f0;
+      --shadow: 0 8px 22px rgba(23, 32, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    header {
+      background: #142333;
+      color: #fff;
+      padding: 34px 40px 30px;
+      border-bottom: 5px solid var(--accent);
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 1060px;
+      color: #dce7f0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 24px;
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 26px 24px 50px;
+      align-items: start;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    nav {
+      position: sticky;
+      top: 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    nav h2 {
+      font-size: 15px;
+      margin: 0 0 8px;
+    }
+
+    nav a {
+      display: block;
+      color: var(--blue);
+      text-decoration: none;
+      padding: 6px 0;
+      font-size: 14px;
+      border-top: 1px solid #eef1f5;
+    }
+
+    section {
+      margin: 0 0 22px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 23px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 17px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    code {
+      background: #eef1f6;
+      border: 1px solid #dbe1ea;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px;
+      background: #17202a;
+      color: #e8eef6;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef1f6;
+      font-weight: 650;
+    }
+
+    .lead {
+      font-size: 16px;
+      color: #263545;
+      max-width: 980px;
+    }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: var(--green-bg);
+      border-radius: 6px;
+    }
+
+    .callout.warning {
+      border-left-color: var(--red);
+      background: var(--red-bg);
+    }
+
+    .callout.note {
+      border-left-color: var(--blue);
+      background: var(--blue-bg);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef1f6;
+      color: #334155;
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+      white-space: nowrap;
+    }
+
+    .diagram {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    .diagram svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-ok {
+      color: #0f6d4f;
+      font-weight: 650;
+    }
+
+    .status-warn {
+      color: #8a4b10;
+      font-weight: 650;
+    }
+
+    .review-panel {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .comment-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+      max-height: 48vh;
+      overflow: auto;
+    }
+
+    .comment-card {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px;
+      background: #fff;
+      font-size: 13px;
+    }
+
+    .comment-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .comment-card blockquote {
+      margin: 6px 0;
+      padding-left: 8px;
+      border-left: 3px solid #d8dee8;
+      color: var(--muted);
+    }
+
+    .comment-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.danger {
+      border-color: #e6b4b4;
+      color: var(--red);
+    }
+
+    #comment-popover {
+      position: fixed;
+      z-index: 50;
+      width: min(360px, calc(100vw - 28px));
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 16px 36px rgba(23, 32, 42, 0.2);
+      padding: 12px;
+      display: none;
+    }
+
+    #comment-popover textarea {
+      width: 100%;
+      min-height: 82px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      resize: vertical;
+    }
+
+    #comment-popover .selected-text {
+      color: var(--muted);
+      font-size: 13px;
+      max-height: 80px;
+      overflow: auto;
+      border-left: 3px solid var(--line);
+      padding-left: 8px;
+      margin-bottom: 8px;
+    }
+
+    [data-review-block]:hover {
+      outline: 2px solid rgba(15, 118, 110, 0.18);
+      outline-offset: 3px;
+    }
+
+    mark.review-highlight {
+      background: #fff1a8;
+      padding: 0 2px;
+    }
+
+    @media (max-width: 1060px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+      }
+    }
+
+    @media (max-width: 760px) {
+      header {
+        padding: 24px 20px;
+      }
+
+      .layout {
+        padding: 18px 14px 36px;
+      }
+
+      section {
+        padding: 18px;
+      }
+
+      .grid,
+      .grid.two {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>HTML出力系 skill 分割設計書</h1>
+    <p>HTML出力を制御する共通レンダラー skill と、レビュー可能な設計資料を作る用途別 skill に分ける設計。既存HTMLの後処理ではなく、HTMLを出す時点の標準レンダリング経路を置き換え、生成後はセッション限定のプレビューURLまで提示する。</p>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section id="summary" data-review-block="summary">
+        <h2>結論</h2>
+        <p class="lead">
+          設計は2つに分ける。<code>visual-html-renderer</code> は、既存のHTML出力制御を置き換える共通レンダラーとして、図・画像・レイアウト・HTML品質・プレビューURL提示を担当する。<code>reviewable-design-doc</code> は、そのレンダラーを使って、レビュー可能な設計資料を作る用途別 skill とする。
+        </p>
+        <div class="callout">
+          重要な境界は、レンダラーが内容判断を作らないこと。図示や画像は入力された主張・根拠・構造を理解しやすくするために使い、設計資料としての論点整理やレビュー導線は <code>reviewable-design-doc</code> 側が担当する。ブラウザを自動で開く責務は持たず、サーバー起動とURL提示までを担当する。
+        </div>
+      </section>
+
+      <section id="goal" data-review-block="goal">
+        <h2>2つの skill への分割</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>visual-html-renderer</h3>
+            <p>既存のHTML出力を制御している機能を置き換える共通レンダラー。HTMLを最終成果物にする skill は、個別にHTMLテンプレートを書くのではなく、このレンダラーへ文書モデルを渡す。</p>
+            <p><span class="tag">共通基盤</span><span class="tag">図示判断</span><span class="tag">HTML品質</span><span class="tag">Preview URL</span></p>
+          </div>
+          <div class="card">
+            <h3>reviewable-design-doc</h3>
+            <p>レビュー可能な設計資料を作る用途別 skill。要求、アーキテクチャ、意思決定、未決事項、レビュー観点を整理し、コメント可能なHTMLとして出力する。</p>
+            <p><span class="tag">用途別</span><span class="tag">設計資料</span><span class="tag">レビュー導線</span></p>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h3>分割理由</h3>
+            <p>HTML出力全般の品質改善と、設計資料固有のレビュー体験を混ぜると責務が広がりすぎる。共通レンダラーと用途別 authoring skill に分けることで、既存のHTML出力系 skill にも横展開できる。</p>
+          </div>
+          <div class="card">
+            <h3>呼び出し関係</h3>
+            <p><code>reviewable-design-doc</code> は本文構成と設計レビュー観点を作り、最終HTML生成は <code>visual-html-renderer</code> に委譲する。他の調査・分析系 skill も同じレンダラーを使える。</p>
+          </div>
+          <div class="card">
+            <h3>完了条件</h3>
+            <p>HTML出力系 skill が共通レンダラー経由で図示つきHTMLを出せること。設計資料 skill はコメント可能な設計HTMLを生成し、レビュー結果をJSONで再利用できること。生成後にクリック可能なプレビューURLが提示されること。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="scope" data-review-block="scope">
+        <h2>スコープ定義</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>skill</th>
+              <th>含める</th>
+              <th>含めない</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>visual-html-renderer</code></td>
+              <td>HTMLレイアウト、CSS、図示候補のレンダリング、画像・SVG・Mermaid・draw.io asset 管理、コメントUI部品、表示検証、セッション中だけ有効なプレビューサーバー起動、Tailscale IP 優先のURL提示。</td>
+              <td>設計内容の決定、主張の追加、要求や意思決定の作成、ブラウザの自動起動、恒久daemon化。</td>
+            </tr>
+            <tr>
+              <td><code>reviewable-design-doc</code></td>
+              <td>設計資料の章立て、要求・制約・アーキテクチャ・意思決定・未決事項・レビュー観点の整理。</td>
+              <td>HTMLの低レベル実装、CSS個別調整、図のレンダリング方式の重複実装。</td>
+            </tr>
+            <tr>
+              <td>共通境界</td>
+              <td>入力内容を読みやすく構造化し、図で補助し、レビュー結果をJSONとして再利用可能にする。</td>
+              <td>外部サービスへの自動投稿、共同編集、認証、リアルタイム同期。</td>
+            </tr>
+            <tr>
+              <td>置き換え対象</td>
+              <td>既存のHTML出力制御、個別HTMLテンプレート、図示なしのプレーンHTML出力。</td>
+              <td>Notion専用出力、Slack短文投稿、既存HTMLの単発修正。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="architecture" data-review-block="architecture">
+        <h2>2層アーキテクチャ</h2>
+        <p>用途別 skill が文書モデルを作り、共通レンダラーがHTML表現を担当する。既存のHTML出力系 skill は、最終出力を直接書かずに <code>visual-html-renderer</code> を呼び出す形へ寄せる。</p>
+        <div class="diagram" aria-label="Visual HTML renderer and reviewable design doc architecture diagram">
+          <svg width="980" height="390" viewBox="0 0 980 390" role="img" aria-labelledby="arch-title arch-desc">
+            <title id="arch-title">Visual HTML renderer and reviewable design doc architecture</title>
+            <desc id="arch-desc">The design document skill creates a document model and passes it to the visual HTML renderer, which produces diagrams, layout, review UI and a preview URL.</desc>
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#28548a"></path>
+              </marker>
+            </defs>
+            <rect x="24" y="34" width="170" height="92" rx="8" fill="#edf5ff" stroke="#b8cee8"></rect>
+            <text x="109" y="64" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">入力</text>
+            <text x="109" y="90" text-anchor="middle" font-size="13" fill="#425466">調査結果 / 設計メモ</text>
+            <text x="109" y="110" text-anchor="middle" font-size="13" fill="#425466">JSON / Markdown</text>
+
+            <rect x="270" y="34" width="180" height="92" rx="8" fill="#eaf7f3" stroke="#aacfc6"></rect>
+            <text x="360" y="64" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">reviewable-design-doc</text>
+            <text x="360" y="90" text-anchor="middle" font-size="13" fill="#425466">要求 / 設計 / 未決</text>
+            <text x="360" y="110" text-anchor="middle" font-size="13" fill="#425466">レビュー観点</text>
+
+            <rect x="530" y="34" width="190" height="92" rx="8" fill="#fff4df" stroke="#e3c98f"></rect>
+            <text x="625" y="64" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">Renderer Contract</text>
+            <text x="625" y="90" text-anchor="middle" font-size="13" fill="#425466">文書モデル</text>
+            <text x="625" y="110" text-anchor="middle" font-size="13" fill="#425466">図示要求 / review mode</text>
+
+            <rect x="786" y="34" width="170" height="92" rx="8" fill="#fff0f0" stroke="#e4b6b6"></rect>
+            <text x="871" y="64" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">visual-html-renderer</text>
+            <text x="871" y="90" text-anchor="middle" font-size="13" fill="#425466">HTML / CSS / 図</text>
+            <text x="871" y="110" text-anchor="middle" font-size="13" fill="#425466">Review UI / Preview URL</text>
+
+            <line x1="194" y1="80" x2="258" y2="80" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+            <line x1="450" y1="80" x2="518" y2="80" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+            <line x1="720" y1="80" x2="774" y2="80" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+
+            <rect x="220" y="190" width="210" height="112" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+            <text x="325" y="222" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">既存HTML出力</text>
+            <text x="325" y="248" text-anchor="middle" font-size="13" fill="#425466">個別テンプレート</text>
+            <text x="325" y="270" text-anchor="middle" font-size="13" fill="#425466">置き換え対象</text>
+
+            <rect x="540" y="190" width="230" height="112" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+            <text x="655" y="222" text-anchor="middle" font-size="15" font-weight="700" fill="#17202a">HTML Bundle</text>
+            <text x="655" y="248" text-anchor="middle" font-size="13" fill="#425466">index.html + assets</text>
+            <text x="655" y="270" text-anchor="middle" font-size="13" fill="#425466">preview session + comments optional</text>
+
+            <line x1="360" y1="126" x2="326" y2="178" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+            <line x1="625" y1="126" x2="422" y2="194" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+            <line x1="871" y1="126" x2="426" y2="226" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+            <line x1="430" y1="246" x2="528" y2="246" stroke="#28548a" stroke-width="2" marker-end="url(#arrow)"></line>
+
+            <rect x="70" y="324" width="840" height="42" rx="8" fill="#f0f4f8" stroke="#d8dee8"></rect>
+            <text x="490" y="350" text-anchor="middle" font-size="14" fill="#425466">検証: レンダラー契約 / 図の非空確認 / Preview URL / コメントJSON再利用</text>
+          </svg>
+        </div>
+      </section>
+
+      <section id="workflow" data-review-block="workflow">
+        <h2>生成フロー</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>visual-html-renderer のフロー</h3>
+            <ol>
+              <li>文書モデルとレンダリングオプションを受け取る。</li>
+              <li>画像・図で説明可能なブロックを抽出する。</li>
+              <li>Mermaid / SVG / draw.io / 画像生成の形式を選ぶ。</li>
+              <li>本文、図、表、callout、CSS、必要な review UI をHTMLへ組み込む。</li>
+              <li>HTML構造、図の非空、モバイル表示、コメントUI部品を検証する。</li>
+              <li>preview が有効なら空きportを選び、<code>tailscale ip -4</code> が返る場合はそのIP、なければ <code>127.0.0.1</code> にbindする。</li>
+              <li>セッション限定サーバーを起動し、URLと停止方法を提示する。ブラウザは自動で開かない。</li>
+            </ol>
+          </div>
+          <div class="card">
+            <h3>reviewable-design-doc のフロー</h3>
+            <ol>
+              <li>設計対象、目的、読者、レビュー観点を整理する。</li>
+              <li>要求、制約、アーキテクチャ、意思決定、代替案、未決事項へ分ける。</li>
+              <li>図示したい論点、レビューコメント必須範囲、preview 要否を指定する。</li>
+              <li><code>visual-html-renderer</code> に文書モデルを渡す。</li>
+              <li>コメントJSONを次の修正・合意形成の入力として扱う。確認が必要な場合は、チャットだけで聞かずHTML上の同じコメントスレッドへ返信を書き戻す。</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="diagram-policy" data-review-block="diagram-policy">
+        <h2>図示判断ポリシー</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>図にする対象</th>
+              <th>推奨形式</th>
+              <th>理由</th>
+              <th>生成時の注意</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>処理順、判断順、承認フロー</td>
+              <td><code>Mermaid flowchart</code> + rendered SVG</td>
+              <td>sourceが読みやすく、差分管理しやすい。</td>
+              <td>本文と矛盾しないよう、ノードは本文の見出しやfield名から生成する。</td>
+            </tr>
+            <tr>
+              <td>責務分離、システム構成、データ流</td>
+              <td>inline SVG または Mermaid</td>
+              <td>HTML内で安定して表示でき、外部CDNに依存しない。</td>
+              <td>複雑すぎる場合は本文側へ分解し、1図1論点にする。</td>
+            </tr>
+            <tr>
+              <td>業務フロー、編集前提の図</td>
+              <td><code>.drawio</code> + exported SVG</td>
+              <td>人間がdraw.ioで編集できる。</td>
+              <td>HTMLはSVGを表示し、draw.ioは編集用assetとして同梱する。</td>
+            </tr>
+            <tr>
+              <td>概念イメージ、比喩的な説明</td>
+              <td>生成画像</td>
+              <td>読者の直感理解を助ける。</td>
+              <td>数値、根拠、関係性の正確さが必要な図には使わない。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warning">
+          図示は「本文の構造を見える化する」用途に限定する。入力に存在しない因果関係、判断、優先順位を図で追加してはいけない。
+        </div>
+      </section>
+
+      <section id="comment-design" data-review-block="comment-design">
+        <h2>範囲選択コメント設計</h2>
+        <p>コメント機能は <code>visual-html-renderer</code> が提供するHTML部品として実装し、<code>reviewable-design-doc</code> が必須オプションとして有効化する。静的ファイル単体で動く <code>standalone</code> mode を標準にし、必要に応じてローカル保存用の <code>review-server</code> mode を追加する。agent が確認したい点は、チャットではなくHTML上の該当コメントスレッドへ返信する。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>standalone mode</h3>
+            <p><code>file://</code> で開ける。コメントは <code>localStorage</code> に保存し、JSON export/import で agent に渡す。</p>
+            <p><span class="tag">標準</span><span class="tag">外部依存なし</span><span class="tag">保存はブラウザ単位</span></p>
+          </div>
+          <div class="card">
+            <h3>review-server mode</h3>
+            <p>Preview Runtime と同じbind方針の小さなサーバーで <code>annotations/comments.json</code> に保存する。Tailscale IP が使える場合はVPN越しのSSH/tmux環境からも同じURLで開ける。</p>
+            <p><span class="tag">任意</span><span class="tag">永続JSON</span><span class="tag">VPN限定可</span></p>
+          </div>
+        </div>
+        <h3>コメント保存データ</h3>
+        <pre><code>{
+  "id": "cmt_20260517_001",
+  "document_id": "html-output-skill-split-design",
+  "block_id": "diagram-policy",
+  "selected_text": "図示は本文の構造を見える化する",
+  "prefix": "注意: ",
+  "suffix": "用途に限定する",
+  "comment": "この制約はSKILL.mdのhard gateに入れる",
+  "status": "needs_agent_review",
+  "created_at": "2026-05-17T00:00:00+09:00",
+  "replies": [
+    {
+      "id": "reply_20260517_001",
+      "author": "codex",
+      "role": "agent",
+      "kind": "clarification_request",
+      "body": "hard gate の対象は visual-html-renderer のみでよいですか。reviewable-design-doc 側にも同じ禁止事項として入れるべきか確認したいです。",
+      "created_at": "2026-05-17T00:05:00+09:00"
+    }
+  ]
+}</code></pre>
+      </section>
+
+      <section id="feedback-ingestion" data-review-block="feedback-ingestion">
+        <h2>レビューコメント取り込み</h2>
+        <p>ユーザーが「レビュー終わったので確認して」「コメントを反映して」と言った場合、<code>reviewable-design-doc</code> は最新の preview session から対象HTML rootを特定し、<code>annotations/comments.json</code> を読み込む。反映できるコメントは設計へ取り込み、確認が必要なコメントは同じHTMLコメントスレッドへ agent reply として書き戻す。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>自動取り込み対象</h3>
+            <p>明確な修正依頼、誤字、章構成の指摘、図示追加の依頼、レビュー観点の不足は、そのまま設計モデルへ反映する。反映後はコメントstatusを <code>addressed</code> にし、agent replyで反映内容を短く残す。</p>
+          </div>
+          <div class="card">
+            <h3>確認が必要な対象</h3>
+            <p>意図が複数に読める指摘、設計判断が分岐する指摘、既存制約と衝突する指摘は、チャットで聞き返すのではなく <code>clarification_request</code> の返信をコメントに追加し、statusを <code>needs_user_reply</code> にする。</p>
+          </div>
+        </div>
+        <h3>処理フロー</h3>
+        <ol>
+          <li>最新の <code>output/tmp/html-preview-sessions/*.json</code> から成果物rootを特定する。</li>
+          <li><code>annotations/comments.json</code> を読み、未処理コメントとユーザー返信を抽出する。</li>
+          <li>コメントを <code>actionable</code>, <code>needs_clarification</code>, <code>blocked</code>, <code>already_addressed</code> に分類する。</li>
+          <li><code>actionable</code> は設計モデルへ反映し、HTMLを再生成する。</li>
+          <li><code>needs_clarification</code> は該当コメントの <code>replies</code> に agent の確認質問を追加する。</li>
+          <li>更新済みHTMLとpreview URLを再提示し、確認待ちコメント数を報告する。</li>
+        </ol>
+        <div class="callout">
+          自動反映と確認返信は同じレビューサイクルで行う。agent がチャット本文に確認質問だけを書いて止まると、HTML上のレビュー文脈から外れるため、確認事項は必ずコメントスレッドにも残す。
+        </div>
+      </section>
+
+      <section id="implementation-packaging" data-review-block="implementation-packaging">
+        <h2>実装・配布方式</h2>
+        <p>この機能は <code>SKILL.md</code> だけで閉じるには処理が厚い。HTML生成、図レンダリング、preview server、コメント保存、レビュー取り込み、agent reply 書き戻し、検証を安定させる必要があるため、専用repoを作り Codex plugin として配布する構成を推奨する。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>推奨: 専用repo + plugin</h3>
+            <p>skill は判断フローと呼び出し規約だけを持ち、実処理は versioned script に寄せる。複数skillから同じ renderer / server / ingestion を呼べるため、既存HTML出力系skillへの横展開に向く。</p>
+            <p><span class="tag">推奨</span><span class="tag">再利用</span><span class="tag">テスト可能</span></p>
+          </div>
+          <div class="card">
+            <h3>非推奨: home/skills 直置きのみ</h3>
+            <p>初期実装は速いが、scriptが増えると skill ごとに重複し、テスト・更新・配布の境界が曖昧になる。今回の規模では試作までに限定する。</p>
+            <p><span class="tag">試作向け</span><span class="tag">長期運用は弱い</span></p>
+          </div>
+        </div>
+        <h3>repo構成案</h3>
+        <pre><code>html-review-workbench/
+  .codex-plugin/
+    plugin.json
+  skills/
+    visual-html-renderer/
+      SKILL.md
+      agents/openai.yaml
+    reviewable-design-doc/
+      SKILL.md
+      agents/openai.yaml
+  scripts/
+    html_review_workbench/
+      cli.py
+      render.py
+      diagram_planner.py
+      preview_server.py
+      comment_store.py
+      ingest_review.py
+      validate_bundle.py
+  templates/
+    report.html.j2
+    review-comments.js
+    style.css
+  tests/
+    test_render.py
+    test_preview_bind.py
+    test_comment_ingestion.py
+    fixtures/
+  pyproject.toml
+  README.md</code></pre>
+        <h3>script責務</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>script</th>
+              <th>責務</th>
+              <th>skillからの使い方</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>render.py</code></td>
+              <td>文書モデルからHTML bundleを生成する。テンプレート適用、asset配置、manifest作成を担当する。</td>
+              <td><code>visual-html-renderer</code> が常に呼ぶ。</td>
+            </tr>
+            <tr>
+              <td><code>diagram_planner.py</code></td>
+              <td>文書モデルのブロックを図示候補へ分類し、Mermaid / SVG / draw.io / 画像生成の要求を正規化する。</td>
+              <td>図示が必要な場合だけ呼ぶ。</td>
+            </tr>
+            <tr>
+              <td><code>preview_server.py</code></td>
+              <td>Tailscale IPv4検出、localhost fallback、空きport選択、session manifest作成、サーバー起動を担当する。</td>
+              <td><code>--preview auto|tailscale|local|off</code> に応じて呼ぶ。</td>
+            </tr>
+            <tr>
+              <td><code>comment_store.py</code></td>
+              <td><code>comments.json</code> の読み書き、thread / reply / status のschema検証、任意パス書き込み防止を担当する。</td>
+              <td>comment UI と review-server から共有する。</td>
+            </tr>
+            <tr>
+              <td><code>ingest_review.py</code></td>
+              <td>レビュー完了発話後にコメントを分類し、設計モデルへ反映する。確認が必要な場合はagent replyをコメントへ書き戻す。</td>
+              <td><code>reviewable-design-doc</code> がレビュー取り込み時に呼ぶ。</td>
+            </tr>
+            <tr>
+              <td><code>validate_bundle.py</code></td>
+              <td>HTML存在、asset参照、図の非空、comment schema、preview bind方針を検証する。</td>
+              <td>両skillの完了前検証として呼ぶ。</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>plugin化の判断</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>観点</th>
+              <th>専用plugin repo</th>
+              <th>home/skills直置き</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>script量</td>
+              <td>厚い処理をpackageとして管理できる。</td>
+              <td>skill配下にscriptが増え、見通しが悪くなる。</td>
+            </tr>
+            <tr>
+              <td>テスト</td>
+              <td>fixtureつき単体テスト、bind検証、コメントschema検証を置ける。</td>
+              <td>手元検証に寄りやすい。</td>
+            </tr>
+            <tr>
+              <td>複数agent利用</td>
+              <td>Codex / Claude 向けのskillを同じ実装に載せやすい。</td>
+              <td>agent別に同期漏れが起きやすい。</td>
+            </tr>
+            <tr>
+              <td>導入速度</td>
+              <td>初期scaffoldは少し重い。</td>
+              <td>最短で試作できる。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          推奨は、専用repoを作って plugin として <code>visual-html-renderer</code> と <code>reviewable-design-doc</code> を同梱する形。最初のMVPだけ既存 <code>home/skills</code> に置く場合でも、script API は plugin repo へ移せる境界で作る。
+        </div>
+      </section>
+
+      <section id="preview-runtime" data-review-block="preview-runtime">
+        <h2>Preview Runtime</h2>
+        <p><code>visual-html-renderer</code> はHTML bundleを作った後、そのセッション中だけ有効なプレビューサーバーを起動し、ユーザーがクリックできるURLを提示する。URLを開くかどうかはユーザーが決めるため、ブラウザの自動起動はしない。</p>
+        <div class="grid two">
+          <div class="card">
+            <h3>責務</h3>
+            <p>成果物ディレクトリをHTTPで配信し、bind address、port、URL、PIDを session manifest に記録する。停止は明示的な終了処理またはセッション終了時に行う。</p>
+          </div>
+          <div class="card">
+            <h3>非責務</h3>
+            <p>恒久daemon化、外部公開、認証つき共有、ブラウザ自動表示は扱わない。必要になった場合は別の公開・共有 skill として切り出す。</p>
+          </div>
+        </div>
+        <h3>bind 方針</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>条件</th>
+              <th>bind address</th>
+              <th>提示URL</th>
+              <th>理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>tailscale ip -4</code> がIPv4を返す</td>
+              <td>Tailscale IPv4</td>
+              <td><code>http://&lt;tailscale-ip&gt;:&lt;port&gt;/index.html</code></td>
+              <td>VPN経由のSSH/tmux接続でも手元ブラウザから開ける。</td>
+            </tr>
+            <tr>
+              <td>Tailscale IPv4 が取れない</td>
+              <td><code>127.0.0.1</code></td>
+              <td><code>http://127.0.0.1:&lt;port&gt;/index.html</code></td>
+              <td>ローカル端末内だけで完結する。</td>
+            </tr>
+            <tr>
+              <td>常時禁止</td>
+              <td><code>0.0.0.0</code></td>
+              <td>提示しない</td>
+              <td>意図しないLAN公開を避ける。</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>起動例</h3>
+        <pre><code># 1. Tailscale IPv4 を優先して検出
+tailscale ip -4
+
+# 2. 空きportを選んで成果物ディレクトリを配信
+python3 -m http.server &lt;port&gt; --bind &lt;bind-address&gt; --directory output/&lt;YYYY-MM-DD&gt;_&lt;slug&gt;
+
+# 3. ユーザーにはURLだけ提示し、ブラウザは開かない
+http://&lt;bind-address&gt;:&lt;port&gt;/index.html</code></pre>
+        <h3>session manifest</h3>
+        <pre><code>output/tmp/html-preview-sessions/&lt;session-id&gt;.json
+{
+  "root": "output/2026-05-17_html-output-skill-split-design",
+  "bind": "100.x.y.z",
+  "port": 43821,
+  "url": "http://100.x.y.z:43821/index.html",
+  "pid": 12345,
+  "created_at": "2026-05-17T00:00:00+09:00",
+  "mode": "tailscale"
+}</code></pre>
+        <div class="callout warning">
+          <code>python3 -m http.server</code> は静的プレビュー用の最小実装に限定する。コメントを <code>comments.json</code> に保存する場合は、書き込み先を成果物ディレクトリ内に制限した <code>review-server.py</code> または <code>preview-server.py</code> を使う。
+        </div>
+      </section>
+
+      <section id="bundle" data-review-block="bundle">
+        <h2>成果物構成</h2>
+        <pre><code>output/&lt;YYYY-MM-DD&gt;_&lt;slug&gt;/
+  index.html
+  renderer-manifest.json
+  assets/
+    style.css
+    review-comments.js
+    diagrams/
+      architecture.mmd
+      architecture.svg
+      workflow.drawio
+      workflow.svg
+      concept.png
+  annotations/
+    comments.json
+    review-cycle-state.json
+  preview-server.py
+  review-server.py
+  README.md
+
+output/tmp/html-preview-sessions/
+  &lt;session-id&gt;.json</code></pre>
+        <table>
+          <thead>
+            <tr>
+              <th>ファイル</th>
+              <th>役割</th>
+              <th>必須</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>index.html</code></td>
+              <td><code>visual-html-renderer</code> が生成するHTML本体。standalone mode ではCSS/JSを埋め込み可。</td>
+              <td><span class="status-ok">必須</span></td>
+            </tr>
+            <tr>
+              <td><code>renderer-manifest.json</code></td>
+              <td>どのskillが、どの文書モデルと図示要求でHTMLを生成したかを残す。</td>
+              <td><span class="status-ok">必須</span></td>
+            </tr>
+            <tr>
+              <td><code>assets/diagrams/*.mmd</code></td>
+              <td>Mermaid source。後から図の意味を検証するために残す。</td>
+              <td><span class="status-warn">図がある場合</span></td>
+            </tr>
+            <tr>
+              <td><code>assets/diagrams/*.svg</code></td>
+              <td>HTMLに表示するレンダリング済み図。</td>
+              <td><span class="status-warn">図がある場合</span></td>
+            </tr>
+            <tr>
+              <td><code>annotations/comments.json</code></td>
+              <td><code>reviewable-design-doc</code> で有効化するコメント保存先。ユーザーコメント、agent reply、status を同じスレッド構造で保持する。</td>
+              <td><span class="status-warn">任意</span></td>
+            </tr>
+            <tr>
+              <td><code>annotations/review-cycle-state.json</code></td>
+              <td>レビュー取り込みの実行時刻、未解決コメント数、確認待ちコメント数、反映済みコメントIDを記録する。</td>
+              <td><span class="status-warn">review mode有効時</span></td>
+            </tr>
+            <tr>
+              <td><code>preview-server.py</code></td>
+              <td>静的プレビューと任意のコメント保存を扱うセッション限定サーバー。bind方針は Preview Runtime に従う。</td>
+              <td><span class="status-warn">preview有効時</span></td>
+            </tr>
+            <tr>
+              <td><code>review-server.py</code></td>
+              <td>コメント保存APIを分ける場合の薄いサーバー。外部公開しない。</td>
+              <td><span class="status-warn">任意</span></td>
+            </tr>
+            <tr>
+              <td><code>output/tmp/html-preview-sessions/*.json</code></td>
+              <td>起動中プレビューのbind address、port、URL、PID、成果物rootを記録する session manifest。</td>
+              <td><span class="status-warn">preview有効時</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="skill-spec" data-review-block="skill-spec">
+        <h2>SKILL.md 草案</h2>
+        <p>実装時はこの設計をもとに <code>home/skills/visual-html-renderer/SKILL.md</code> と <code>home/skills/reviewable-design-doc/SKILL.md</code> を作る。ルール・スキル文書の変更になるため、適用前には変更案提示と承認が必要。</p>
+        <h3>visual-html-renderer</h3>
+        <pre><code>---
+name: visual-html-renderer
+description: |
+  HTMLを最終成果物にする時の共通レンダラー。文書モデルを受け取り、説明に有効な図・画像・表現を使ってHTMLを生成し、セッション限定のプレビューURLを提示する。
+  MANDATORY TRIGGERS: HTMLレンダラー, HTML出力を共通化, 図示つきHTML, visual HTML renderer。
+  DO NOT TRIGGER: 設計内容そのものの作成、Notion投稿、Slack短文投稿、既存HTMLの軽微修正。
+codex_description: |
+  図・画像・表現を使う共通HTMLレンダラー。HTML出力制御を置き換え、文書モデルからHTML bundleとpreview URLを生成する。
+argument-hint: "[document-model.json または rendering brief] [--preview auto|tailscale|local|off]"
+---
+
+# visual-html-renderer
+
+## 役割
+HTML出力系 skill の共通レンダラーとして、既存の個別HTML生成ロジックを置き換える。
+
+## 実装方針
+重い処理は plugin repo の scripts/html_review_workbench/ に置き、SKILL.md は入力確認、呼び出し順、ガード、検証手順に集中する。
+
+## 基本手順
+1. 文書モデルとレンダリングオプションを受け取る。
+2. 図示・画像化した方が理解しやすいブロックを抽出する。
+3. Mermaid / SVG / draw.io / 画像生成のどれを使うか決める。
+4. HTML、CSS、図、必要な review UI 部品を生成する。
+5. HTML構造、図の非空、responsive表示を検証する。
+6. preview が有効なら空きportを選び、Tailscale IPv4が取れる場合はそのIP、なければ127.0.0.1でサーバーを起動する。
+7. URL、PID、停止方法を提示し、session manifest に記録する。
+
+## ガード
+- レンダラーは内容判断を作らない。
+- 図示は入力された構造を補助する目的に限定する。
+- ブラウザを自動で開かない。URL提示までを責務とする。
+- 0.0.0.0 にはbindしない。
+- サーバーはセッション限定で起動し、恒久daemonにしない。
+- 外部サービスへ投稿・アップロードする場合は別途承認ゲートを通す。</code></pre>
+        <h3>reviewable-design-doc</h3>
+        <pre><code>---
+name: reviewable-design-doc
+description: |
+  要求・設計・アーキテクチャ・未決事項を整理し、レビュー可能な設計資料HTMLを生成する。
+  MANDATORY TRIGGERS: レビュー可能な設計資料, 設計資料をHTMLで, design doc, reviewable design doc, レビュー終わったので確認して, コメントを反映して。
+  DO NOT TRIGGER: 汎用HTMLレンダリングだけ、Notion投稿だけ、既存HTMLの見た目修正だけ。
+codex_description: |
+  レビュー可能な設計資料HTMLを作る。要求、設計、未決事項、レビュー観点を整理し、visual-html-rendererで出力する。
+argument-hint: "[設計対象または入力ファイル] [--review-mode standalone|review-server]"
+---
+
+# reviewable-design-doc
+
+## 役割
+設計資料としてレビューできる構造を作り、最終HTML生成は visual-html-renderer に渡す。
+
+## 実装方針
+設計文書の構造化とレビュー取り込み判断を担当する。HTML生成、preview server、comment store の低レベル処理は plugin repo の共通scriptに委譲する。
+
+## 基本手順
+1. 設計対象、読者、レビュー目的、完了条件を整理する。
+2. 要求、制約、アーキテクチャ、代替案、意思決定、未決事項へ分解する。
+3. レビュー観点とコメントしてほしい範囲を明示する。
+4. 図示要求と review mode を含む文書モデルを作る。
+5. visual-html-renderer を使ってHTML bundleとpreview URLを生成する。
+6. コメントJSONを次回修正の入力として扱える形で保存する。
+7. レビュー完了後は comments.json を読み込み、明確な指摘は設計へ反映する。
+8. 確認が必要な指摘は、該当コメントスレッドに agent reply を追加してHTMLを再生成する。
+
+## ガード
+- 設計として未確定の内容は確定事項と分けて書く。
+- レビューコメント機能は必須で有効化する。
+- 確認が必要な場合、チャットだけで聞き返さずHTMLコメントへ返信する。
+- HTML低レベル実装をこのskillに重複実装しない。</code></pre>
+      </section>
+
+      <section id="implementation" data-review-block="implementation">
+        <h2>実装設計</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>部品</th>
+              <th>担当skill</th>
+              <th>実装方針</th>
+              <th>検証</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Document Model</td>
+              <td><code>reviewable-design-doc</code></td>
+              <td>設計資料を、requirements / constraints / architecture / decisions / open_questions / review_points に分解する。</td>
+              <td>章ごとに見出し、要旨、根拠が欠けていないか確認する。</td>
+            </tr>
+            <tr>
+              <td>Diagram Planner</td>
+              <td><code>visual-html-renderer</code></td>
+              <td>図示候補を <code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類する。</td>
+              <td>図ごとに「本文のどの箇所を可視化したか」を保持する。</td>
+            </tr>
+            <tr>
+              <td>Renderer</td>
+              <td><code>visual-html-renderer</code></td>
+              <td>自己完結HTMLを標準にし、必要時だけ外部asset分離にする。</td>
+              <td>ブラウザで開いてCSS/JS/図が欠落しないことを確認する。</td>
+            </tr>
+            <tr>
+              <td>Preview Runtime</td>
+              <td><code>visual-html-renderer</code></td>
+              <td>成果物ディレクトリ用のセッション限定HTTPサーバーを起動する。Tailscale IPv4が取れる場合はそのIP、取れない場合は <code>127.0.0.1</code> にbindし、URLとPIDを manifest に残す。</td>
+              <td>提示URLで <code>index.html</code> が返ること、<code>0.0.0.0</code> にbindしていないこと、ブラウザを自動起動していないことを確認する。</td>
+            </tr>
+            <tr>
+              <td>Comment Client</td>
+              <td><code>visual-html-renderer</code></td>
+              <td>Selection APIで選択範囲を取得し、block ID、選択テキスト、前後文脈、コメント、返信スレッド、statusを保存する。</td>
+              <td>コメント作成、agent reply表示、再読込、export JSON が動くことを確認する。</td>
+            </tr>
+            <tr>
+              <td>Review Server</td>
+              <td><code>visual-html-renderer</code></td>
+              <td>任意でコメント保存APIを追加し、JSON保存だけを扱う。bind方針は Preview Runtime と共有する。</td>
+              <td>保存先が成果物ディレクトリ内であること、任意パス書き込みができないことを確認する。</td>
+            </tr>
+            <tr>
+              <td>Design Review Contract</td>
+              <td><code>reviewable-design-doc</code></td>
+              <td>何をレビューしてほしいか、どの判断が未決か、どのコメントが修正対象かを明示する。</td>
+              <td>レビュー観点がHTML内に表示され、コメントJSONから修正対象へ戻れることを確認する。</td>
+            </tr>
+            <tr>
+              <td>Feedback Ingestion</td>
+              <td><code>reviewable-design-doc</code></td>
+              <td>レビュー完了発話を受けたら <code>comments.json</code> を読み込み、明確な指摘は設計へ反映し、確認が必要な指摘には同じコメントスレッドへ agent reply を追加する。</td>
+              <td>反映済みコメント、確認待ちコメント、ブロックコメントがstatusで区別され、更新HTMLに返信が表示されることを確認する。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="verification" data-review-block="verification">
+        <h2>検証計画</h2>
+        <ol>
+          <li><strong>Renderer contract 検証:</strong> <code>visual-html-renderer</code> が文書モデルからHTML bundleを生成できる。</li>
+          <li><strong>図検証:</strong> 図がある場合、source と表示用SVG/PNGが両方存在し、空でない。</li>
+          <li><strong>Design doc 検証:</strong> <code>reviewable-design-doc</code> が要求、制約、意思決定、未決事項、レビュー観点を分離できる。</li>
+          <li><strong>コメント検証:</strong> 範囲選択からコメント登録、agent reply、一覧表示、JSON export が成功する。</li>
+          <li><strong>レビュー取り込み検証:</strong> 「レビュー終わったので確認して」発話から <code>comments.json</code> を読み、明確な指摘を反映し、確認が必要な指摘へHTMLコメント返信を書き戻せる。</li>
+          <li><strong>Preview Runtime 検証:</strong> Tailscale IPv4 がある場合はそのIP、ない場合は <code>127.0.0.1</code> のURLを提示し、<code>0.0.0.0</code> にbindしていない。</li>
+          <li><strong>境界検証:</strong> レンダラーが入力にない判断をHTMLや図で追加していない。ブラウザ自動起動や恒久daemon化も行っていない。</li>
+        </ol>
+      </section>
+
+      <section id="rollout" data-review-block="rollout">
+        <h2>段階的な作り方</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>段階</th>
+              <th>作るもの</th>
+              <th>完了条件</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Phase 0</td>
+              <td>専用repo / plugin scaffold。<code>.codex-plugin/plugin.json</code>、2つのskill、共通script package、fixture testを置く。</td>
+              <td>pluginとして読み込める最小構成があり、script CLIの入出力契約が固定される。</td>
+            </tr>
+            <tr>
+              <td>Phase 1</td>
+              <td><code>visual-html-renderer</code> の最小版。自己完結HTMLテンプレート、図示枠、responsive CSS。</td>
+              <td>既存HTML出力の代替として、同じ入力から図示つきHTMLを生成できる。</td>
+            </tr>
+            <tr>
+              <td>Phase 2</td>
+              <td><code>visual-html-renderer</code> の図示強化。Mermaid source保存、SVGレンダリング、draw.io optional export。</td>
+              <td>図のsourceと表示結果が成果物内に残り、HTMLから参照できる。</td>
+            </tr>
+            <tr>
+              <td>Phase 3</td>
+              <td><code>visual-html-renderer</code> の Preview Runtime。Tailscale IPv4優先bind、fallback localhost、URL提示、session manifest。</td>
+              <td>SSH/tmux環境でも提示URLをクリックして開ける。ブラウザ自動起動や <code>0.0.0.0</code> bind がない。</td>
+            </tr>
+            <tr>
+              <td>Phase 4</td>
+              <td><code>reviewable-design-doc</code> の最小版。設計資料構造、レビュー観点、standaloneコメント。</td>
+              <td>レビュー可能な設計資料HTMLを生成し、preview URLまで提示できる。</td>
+            </tr>
+            <tr>
+              <td>Phase 5</td>
+              <td><code>review-server</code> mode と <code>comments.json</code> 永続保存。</td>
+              <td>コメントをagentが次作業の入力として読める。</td>
+            </tr>
+            <tr>
+              <td>Phase 6</td>
+              <td>レビュー取り込みと agent reply。レビュー完了発話、コメント分類、設計反映、確認質問のコメント返信。</td>
+              <td>確認が必要な指摘に対し、チャットだけでなくHTMLコメント上にagent返信が残る。</td>
+            </tr>
+            <tr>
+              <td>Phase 7</td>
+              <td>既存の調査・設計系skillから <code>visual-html-renderer</code> を呼び出すよう移行。</td>
+              <td>HTML出力系 skill が個別テンプレートではなく共通レンダラーを使う。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <nav aria-label="ページ内ナビゲーション">
+      <h2>目次</h2>
+      <a href="#summary">結論</a>
+      <a href="#goal">2つの skill への分割</a>
+      <a href="#scope">スコープ定義</a>
+      <a href="#architecture">2層アーキテクチャ</a>
+      <a href="#workflow">生成フロー</a>
+      <a href="#diagram-policy">図示判断ポリシー</a>
+      <a href="#comment-design">範囲選択コメント設計</a>
+      <a href="#feedback-ingestion">レビューコメント取り込み</a>
+      <a href="#implementation-packaging">実装・配布方式</a>
+      <a href="#preview-runtime">Preview Runtime</a>
+      <a href="#bundle">成果物構成</a>
+      <a href="#skill-spec">SKILL.md 草案</a>
+      <a href="#implementation">実装設計</a>
+      <a href="#verification">検証計画</a>
+      <a href="#rollout">段階的な作り方</a>
+
+      <div class="review-panel" aria-label="コメント">
+        <h2>コメント</h2>
+        <p class="small">本文を選択するとコメント入力が出ます。このページでは prototype として localStorage に保存します。</p>
+        <div class="comment-actions">
+          <button id="export-comments" type="button">JSON表示</button>
+          <button id="clear-comments" class="danger" type="button">削除</button>
+        </div>
+        <div id="comment-list" class="comment-list" aria-live="polite"></div>
+      </div>
+    </nav>
+  </div>
+
+  <div id="comment-popover" role="dialog" aria-label="コメント入力">
+    <div class="selected-text" id="selected-text"></div>
+    <textarea id="comment-input" placeholder="コメントを入力"></textarea>
+    <div class="comment-actions">
+      <button id="save-comment" class="primary" type="button">保存</button>
+      <button id="cancel-comment" type="button">閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const storageKey = "html-output-skill-split-design-comments";
+      const popover = document.getElementById("comment-popover");
+      const selectedText = document.getElementById("selected-text");
+      const commentInput = document.getElementById("comment-input");
+      const saveButton = document.getElementById("save-comment");
+      const cancelButton = document.getElementById("cancel-comment");
+      const exportButton = document.getElementById("export-comments");
+      const clearButton = document.getElementById("clear-comments");
+      const commentList = document.getElementById("comment-list");
+
+      let activeSelection = null;
+
+      function loadComments() {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey) || "[]");
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      function saveComments(comments) {
+        localStorage.setItem(storageKey, JSON.stringify(comments, null, 2));
+      }
+
+      function renderComments() {
+        const comments = loadComments();
+        commentList.innerHTML = "";
+        if (comments.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "small";
+          empty.textContent = "まだコメントはありません。";
+          commentList.appendChild(empty);
+          return;
+        }
+
+        comments.forEach((comment) => {
+          const card = document.createElement("div");
+          card.className = "comment-card";
+          const title = document.createElement("strong");
+          title.textContent = comment.block_id;
+          const quote = document.createElement("blockquote");
+          quote.textContent = comment.selected_text;
+          const body = document.createElement("p");
+          body.textContent = comment.comment;
+          const meta = document.createElement("p");
+          meta.className = "small";
+          meta.textContent = comment.created_at;
+          card.append(title, quote, body, meta);
+          commentList.appendChild(card);
+        });
+      }
+
+      function nearestReviewBlock(node) {
+        if (!node) return null;
+        const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+        return element ? element.closest("[data-review-block]") : null;
+      }
+
+      document.addEventListener("mouseup", () => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) return;
+
+        const text = selection.toString().trim();
+        if (!text) return;
+
+        const block = nearestReviewBlock(selection.anchorNode);
+        if (!block || !block.contains(nearestReviewBlock(selection.focusNode) || selection.focusNode)) {
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        activeSelection = {
+          document_id: "html-output-skill-split-design",
+          block_id: block.dataset.reviewBlock,
+          selected_text: text.slice(0, 600),
+          prefix: "",
+          suffix: ""
+        };
+
+        selectedText.textContent = activeSelection.selected_text;
+        commentInput.value = "";
+        popover.style.left = `${Math.min(rect.left, window.innerWidth - 380)}px`;
+        popover.style.top = `${Math.min(rect.bottom + 10, window.innerHeight - 210)}px`;
+        popover.style.display = "block";
+        commentInput.focus();
+      });
+
+      saveButton.addEventListener("click", () => {
+        const commentText = commentInput.value.trim();
+        if (!activeSelection || !commentText) return;
+
+        const comments = loadComments();
+        comments.push({
+          id: `cmt_${Date.now()}`,
+          ...activeSelection,
+          comment: commentText,
+          created_at: new Date().toISOString()
+        });
+        saveComments(comments);
+        activeSelection = null;
+        popover.style.display = "none";
+        window.getSelection()?.removeAllRanges();
+        renderComments();
+      });
+
+      cancelButton.addEventListener("click", () => {
+        activeSelection = null;
+        popover.style.display = "none";
+      });
+
+      exportButton.addEventListener("click", () => {
+        const json = JSON.stringify(loadComments(), null, 2);
+        const exportWindow = window.open("", "_blank", "width=720,height=640");
+        if (!exportWindow) return;
+        exportWindow.document.write(`<pre>${json.replace(/[&<>]/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;"
+        })[char])}</pre>`);
+        exportWindow.document.close();
+      });
+
+      clearButton.addEventListener("click", () => {
+        localStorage.removeItem(storageKey);
+        renderComments();
+      });
+
+      renderComments();
+    })();
+  </script>
+</body>
+</html>

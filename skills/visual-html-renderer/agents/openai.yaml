@@ -1,0 +1,3 @@
+display_name: Visual HTML Renderer
+short_description: 図示つきHTML生成とPreview Runtimeを扱う共通レンダラー。
+default_prompt: 図示つきHTMLレポートを生成して

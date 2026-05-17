@@ -1,0 +1,21 @@
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Thumbnails
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

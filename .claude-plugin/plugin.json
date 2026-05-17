@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "reviewable-html-workbench",
+  "version": "0.1.0",
+  "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
+  "author": {
+    "name": "u1"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "html",
+    "review",
+    "design-doc",
+    "agent-skill",
+    "preview"
+  ],
+  "skills": "./skills/"
+}

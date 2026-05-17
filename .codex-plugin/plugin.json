@@ -1,0 +1,38 @@
+{
+  "name": "reviewable-html-workbench",
+  "version": "0.1.0",
+  "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
+  "author": {
+    "name": "u1",
+    "email": "",
+    "url": ""
+  },
+  "homepage": "",
+  "repository": "",
+  "license": "UNLICENSED",
+  "keywords": [
+    "html",
+    "review",
+    "design-doc",
+    "agent-skill",
+    "preview"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Reviewable HTML Workbench",
+    "shortDescription": "Create reviewable HTML docs and process comments.",
+    "longDescription": "Generate visual HTML documents, start local or Tailscale preview servers, capture review comments, reply from agents, and apply feedback back into design documents.",
+    "developerName": "u1",
+    "category": "Productivity",
+    "capabilities": [
+      "Write",
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "設計資料をレビュー可能なHTMLで作って",
+      "HTMLレビューコメントを確認して反映して",
+      "図示つきHTMLレポートを生成して"
+    ],
+    "brandColor": "#2563EB"
+  }
+}
