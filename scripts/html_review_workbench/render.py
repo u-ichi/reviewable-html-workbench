@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench import __version__
+from scripts.html_review_workbench.diagram_planner import PlannedDiagram, plan_diagrams, write_diagram_sources
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,7 +27,9 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     assets_dir = output_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
 
-    body_html, review_blocks = _render_blocks(model["blocks"])
+    diagrams = plan_diagrams(model["blocks"])
+    diagram_outputs = write_diagram_sources(output_dir, diagrams)
+    body_html, review_blocks = _render_blocks(model["blocks"], diagrams)
     html = _render_template(
         {
             "title": escape(model["title"]),
@@ -56,7 +59,9 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
         "outputs": {
             "index": "index.html",
             "assets": ["assets/style.css"],
+            "diagrams": diagram_outputs,
         },
+        "diagrams": [diagram.to_manifest() for diagram in diagrams.values()],
         "review_blocks": review_blocks,
     }
     (output_dir / "renderer-manifest.json").write_text(
@@ -79,30 +84,34 @@ def _render_optional_summary(summary: object) -> str:
     return f'<p class="document-summary">{escape(summary)}</p>'
 
 
-def _render_blocks(blocks: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+def _render_blocks(
+    blocks: list[dict[str, Any]],
+    diagrams: dict[str, PlannedDiagram],
+) -> tuple[str, list[dict[str, Any]]]:
     html_parts: list[str] = []
     review_blocks: list[dict[str, Any]] = []
     for block in blocks:
         block_id = block["id"]
         block_type = block["type"]
         review_required = bool(block.get("review_required", False))
-        html_parts.append(_render_block(block, review_required))
+        html_parts.append(_render_block(block, review_required, diagrams.get(block_id)))
         review_blocks.append(
             {
                 "id": block_id,
                 "type": block_type,
                 "review_required": review_required,
+                **_review_block_diagram_metadata(diagrams.get(block_id)),
             }
         )
     return "\n".join(html_parts), review_blocks
 
 
-def _render_block(block: dict[str, Any], review_required: bool) -> str:
+def _render_block(block: dict[str, Any], review_required: bool, diagram: PlannedDiagram | None) -> str:
     block_id = escape(block["id"], quote=True)
     block_type = escape(block["type"], quote=True)
     review_attr = "true" if review_required else "false"
     title_html = _render_block_title(block.get("title"))
-    content_html = _render_block_content(block)
+    content_html = _render_block_content(block, diagram)
     return (
         f'<section class="review-block review-block-{block_type}" '
         f'id="{block_id}" data-review-block="{block_id}" '
@@ -119,13 +128,35 @@ def _render_block_title(title: object) -> str:
     return f"<h2>{escape(title)}</h2>"
 
 
-def _render_block_content(block: dict[str, Any]) -> str:
-    content = block["content"]
+def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None) -> str:
+    content = block.get("content", "")
     block_type = block["type"]
     if block_type == "html":
         return f'<div class="block-content">{content}</div>'
     if block_type == "callout":
         return f'<div class="block-content callout">{escape(content)}</div>'
-    if block_type == "diagram":
-        return f'<pre class="block-content diagram-source">{escape(content)}</pre>'
+    if diagram is not None:
+        return _render_diagram_fallback(diagram)
     return f'<p class="block-content">{escape(content)}</p>'
+
+
+def _render_diagram_fallback(diagram: PlannedDiagram) -> str:
+    source_path = escape(diagram.relative_path, quote=True)
+    kind = escape(diagram.kind, quote=True)
+    source = escape(diagram.source)
+    return (
+        '<figure class="block-content diagram-fallback" '
+        f'data-diagram-kind="{kind}" data-diagram-source="{source_path}">\n'
+        f'  <figcaption>Mermaid source: <code>{source_path}</code></figcaption>\n'
+        f'  <pre class="diagram-source"><code>{source}</code></pre>\n'
+        "</figure>"
+    )
+
+
+def _review_block_diagram_metadata(diagram: PlannedDiagram | None) -> dict[str, str]:
+    if diagram is None:
+        return {}
+    return {
+        "diagram_kind": diagram.kind,
+        "diagram_source": diagram.relative_path,
+    }

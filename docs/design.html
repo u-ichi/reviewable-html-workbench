@@ -604,6 +604,9 @@
         <div class="callout warning">
           図示は「本文の構造を見える化する」用途に限定する。入力に存在しない因果関係、判断、優先順位を図で追加してはいけない。
         </div>
+        <div class="callout">
+          Renderer MVPでは <code>type: "diagram"</code> ブロックを <code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類し、Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。HTML上では外部レンダリングに依存せず、source保存先と <code>&lt;pre&gt;</code> fallbackを表示する。
+        </div>
       </section>
 
       <section id="comment-design" data-review-block="comment-design">

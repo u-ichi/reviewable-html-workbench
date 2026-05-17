@@ -87,6 +87,12 @@ h1 {
   border-radius: 6px;
 }
 
+.diagram-fallback figcaption {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (max-width: 640px) {
   .document-header {
     padding-top: 28px;

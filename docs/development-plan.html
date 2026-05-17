@@ -313,13 +313,19 @@
 
       <section id="m3">
         <h2>Milestone 3: Diagram Planner</h2>
-        <p><span class="status warn">Deferred</span> 図示した方が理解しやすい内容を、本文から分離して図示要求として扱えるようにする。</p>
+        <p><span class="status ok">Goal</span> 図示した方が理解しやすい内容を、本文から分離して図示要求として扱えるようにする。</p>
         <h3>作業</h3>
         <ul>
           <li><code>diagram_planner.py</code> を実装する。</li>
           <li><code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> の分類を定義する。</li>
           <li>Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。</li>
+          <li>HTMLにはMermaidを直接renderできない環境向けのfallbackを表示する。</li>
           <li>画像生成は任意扱いにし、外部送信が発生する場合は承認ゲートを通す。</li>
+        </ul>
+        <h3>完了条件</h3>
+        <ul>
+          <li><code>tests/test_renderer_bundle.py</code> で図示分類、source保存、fallback表示、manifest連携を検証できる。</li>
+          <li><code>validate</code> がmanifest上のdiagram asset存在を検証できる。</li>
         </ul>
       </section>
 
@@ -510,10 +516,8 @@
       <section id="next">
         <h2>当面の次タスク</h2>
         <ol>
-          <li><code>docs/backlog/01-milestone-0-codex-foundation.md</code> から着手する。</li>
-          <li>Milestone 0で <code>.github/workflows/test.yml</code> を追加する。</li>
-          <li>Milestone 1で <code>schemas/</code> ディレクトリを作り、<code>document-model</code>、<code>comments</code>、<code>preview-session</code> の3つのschemaを追加する。</li>
-          <li>Milestone 2で <code>render.py</code> と <code>validate_bundle.py</code> をplaceholderから実装へ進める。</li>
+          <li>Milestone 4で Preview Runtime を実装し、Tailscale IPv4優先、<code>127.0.0.1</code> fallback、<code>0.0.0.0</code> 拒否を検証する。</li>
+          <li>Milestone 5でコメントUIと <code>comments.json</code> 保存を実装する。</li>
         </ol>
       </section>
     </main>

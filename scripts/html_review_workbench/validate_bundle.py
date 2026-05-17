@@ -74,6 +74,13 @@ def _validate_manifest(manifest: dict[str, object], root: Path, html: str, error
                     errors.append(f"manifest asset missing: {asset}")
         else:
             errors.append("manifest outputs.assets must be a list")
+        diagrams = outputs.get("diagrams", [])
+        if isinstance(diagrams, list):
+            for diagram in diagrams:
+                if isinstance(diagram, str) and not (root / diagram).is_file():
+                    errors.append(f"manifest diagram missing: {diagram}")
+        else:
+            errors.append("manifest outputs.diagrams must be a list")
 
     review_blocks = manifest.get("review_blocks")
     if not isinstance(review_blocks, list) or not review_blocks:
