@@ -17,9 +17,13 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         visual = (ROOT / "skills/visual-html-renderer/SKILL.md").read_text(encoding="utf-8")
         reviewable = (ROOT / "skills/reviewable-design-doc/SKILL.md").read_text(encoding="utf-8")
 
+        self.assertIn("python3 -m scripts.html_review_workbench.cli build-model", visual)
+        self.assertIn("python3 -m scripts.html_review_workbench.cli attach-image", visual)
         self.assertIn("python3 -m scripts.html_review_workbench.cli render", visual)
         self.assertIn("python3 -m scripts.html_review_workbench.cli validate", visual)
         self.assertIn("python3 -m scripts.html_review_workbench.cli preview", visual)
+        self.assertLess(visual.index("cli build-model"), visual.index("cli attach-image"))
+        self.assertLess(visual.index("cli attach-image"), visual.index("cli render"))
         self.assertLess(visual.index("cli render"), visual.index("cli validate"))
         self.assertLess(visual.index("cli validate"), visual.index("cli preview"))
 
@@ -27,6 +31,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("python3 -m scripts.html_review_workbench.cli validate", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli preview", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli ingest-review", reviewable)
+        self.assertLess(reviewable.index("cli build-model"), reviewable.index("cli render"))
         self.assertLess(reviewable.index("cli render"), reviewable.index("cli validate"))
         self.assertLess(reviewable.index("cli validate"), reviewable.index("cli preview"))
         self.assertLess(reviewable.index("cli preview"), reviewable.index("cli ingest-review"))
@@ -36,12 +41,37 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         reviewable = _read_simple_yaml(ROOT / "skills/reviewable-design-doc/agents/openai.yaml")
 
         self.assertEqual(visual["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
-        self.assertEqual(visual["workflow"], ["render", "validate", "preview"])
+        self.assertEqual(visual["workflow"], ["build-model", "attach-image", "render", "validate", "preview"])
+        self.assertIn("html出力して", visual["trigger_examples"])
+        self.assertIn("HTMLにして", visual["trigger_examples"])
+        self.assertIn("HTMLで出して", visual["trigger_examples"])
         self.assertIn("図示つきHTML", visual["trigger_examples"])
 
         self.assertEqual(reviewable["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
-        self.assertEqual(reviewable["workflow"], ["render", "validate", "preview", "ingest-review"])
+        self.assertEqual(reviewable["workflow"], ["build-model", "render", "validate", "preview", "ingest-review"])
         self.assertIn("コメントを反映して", reviewable["trigger_examples"])
+
+    def test_visual_skill_handles_natural_html_output_request_without_model_argument(self) -> None:
+        visual = (ROOT / "skills/visual-html-renderer/SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("html出力して", visual)
+        self.assertIn("文書モデルが未指定の場合", visual)
+        self.assertIn("HTML情報設計", visual)
+        self.assertIn("一時入力ファイルが必要な場合も `.md` は使わない", visual)
+        self.assertIn("content planner + visual planner", visual)
+        self.assertIn("attach-image", visual)
+        self.assertIn("render` → `validate` → `preview", visual)
+        self.assertIn("返却JSONの `url`", visual)
+        self.assertIn("親PIDを監視", visual)
+
+    def test_reviewable_design_doc_builds_model_and_reports_preview_url(self) -> None:
+        reviewable = (ROOT / "skills/reviewable-design-doc/SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("最初から `document-model.json` を作る", reviewable)
+        self.assertIn("`.md` を作らない", reviewable)
+        self.assertIn("`.md` 原稿をHTMLへ変換する作業ではない", reviewable)
+        self.assertIn("返却JSONの `url`", reviewable)
+        self.assertIn("親PIDを監視", reviewable)
 
     def test_same_fixture_keeps_artifact_structure_across_skill_workflows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

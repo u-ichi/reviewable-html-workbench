@@ -1,0 +1,43 @@
+backlog:
+  id: 9
+  file: docs/backlog/09-milestone-8-codex-plugin-packaging.md
+  notion_id: ""
+  notion_url: ""
+  source: canonical
+goal:
+  file: docs/goals/09-milestone-8-codex-plugin-packaging/goal.md
+  objective: "Codex pluginとして配布・導入できる形にし、base repo管理方式との統合方針を決める"
+completion:
+  status: session_complete
+  goal_done: true
+  backlog_closed: true
+  session_complete: true
+  final_receipt: "docs/goals/09-milestone-8-codex-plugin-packaging/notes/verification-2026-05-17.md"
+tasks:
+  - id: T001
+    title: "Codex plugin manifestと導入手順を最終化する"
+    status: completed
+    backlog_task: "`.codex-plugin/plugin.json`を最終化し、Codex marketplace登録手順を作る"
+    verification: "`python3 -m json.tool .codex-plugin/plugin.json >/dev/null`"
+    receipt: "json validation passed; tests.test_project_layout passed; marketplace re-registered; ~/.codex/skills symlinks materialized; trigger checks returned reviewable-html-workbench namespace"
+  - id: T002
+    title: "base repo管理方式との優先順位と衝突を検証する"
+    status: completed
+    backlog_task: "`home/skills`とplugin repoの同名skill優先順位、`bin/build-codex-skills.sh`生成物との衝突有無を確認する"
+    verification: "`python3 -m unittest discover -s tests`"
+    receipt: "base repo home/skills, home/generated/codex-skills, ~/.agents/skills, ~/.codex/skills に同名skillなし; build-codex-skills.sh は base repo home/skills 入力"
+  - id: T003
+    title: "統合方針とrelease手順を設計資料へ反映する"
+    status: completed
+    backlog_task: "base repoの`install.sh`に含めるか個別導入に分けるか決め、versioning/release tag手順とともに設計/計画HTMLへ反映する"
+    verification: "`rg -n \"Codex plugin|marketplace|version\" docs/design.html docs/development-plan.html`"
+    receipt: "docs/goals/09-milestone-8-codex-plugin-packaging/notes/verification-2026-05-17.md"
+  - id: T999
+    type: judge
+    title: "backlog close / Session complete gate"
+    status: completed
+    objective: "Goal実装後にbacklog close / commit gate / Session complete可能範囲まで進める"
+    verification:
+      - "/backlog done 09 --from-goal docs/goals/09-milestone-8-codex-plugin-packaging"
+      - "commit approval が必要な場合は approval_wait として board に残す"
+      - "Goal内の残作業 / Backlog close / Commit / push / Session complete の4軸で報告する"

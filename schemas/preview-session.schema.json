@@ -47,6 +47,17 @@
       "type": "integer",
       "minimum": 1
     },
+    "owner_pid": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "owner_session": {
+      "type": "string",
+      "minLength": 1
+    },
     "created_at": {
       "type": "string",
       "minLength": 1

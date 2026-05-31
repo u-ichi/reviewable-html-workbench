@@ -101,8 +101,15 @@ class IngestReviewTest(unittest.TestCase):
             model = json.loads(model_path.read_text(encoding="utf-8"))
             self.assertEqual(model["blocks"][0]["content"], "A minimal section for review workflow checks.")
             self.assertEqual(result.payload["model_updates"]["applied"], 1)
+            self.assertEqual(result.payload["summary"]["replies_added"], 1)
+            comments = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
+            applied = _find_thread(comments, "cmt-replace")
+            self.assertEqual(applied["status"], "resolved")
+            self.assertEqual(applied["replies"][0]["role"], "agent")
+            self.assertEqual(applied["replies"][0]["kind"], "implementation_note")
             state = json.loads((root / "annotations/review-cycle-state.json").read_text(encoding="utf-8"))
             self.assertEqual(state["summary"]["model_updates_applied"], 1)
+            self.assertEqual(state["classifications"][0]["status_after"], "resolved")
 
 
 def _write_comments(root: Path, threads: list[dict[str, object]]) -> None:

@@ -12,21 +12,33 @@ from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench.comment_store import CommentStoreError
+from scripts.html_review_workbench.image_assets import ImageAssetError, attach_image_to_model
 from scripts.html_review_workbench.ingest_review import ReviewIngestionError, ingest_review as run_ingest_review
+from scripts.html_review_workbench.model_builder import ModelBuildError, build_model_from_source
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
 COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
+    "build-model": {
+        "purpose": "Build a document model from natural content.",
+        "required_options": ("--output",),
+        "optional_options": ("--text", "--input", "--title", "--document-id"),
+    },
     "render": {
         "purpose": "Generate an HTML bundle from a document model.",
         "required_options": ("--model", "--output"),
     },
+    "attach-image": {
+        "purpose": "Attach a generated image asset to an image block in a document model.",
+        "required_options": ("--model", "--block-id", "--image"),
+        "optional_options": ("--output",),
+    },
     "preview": {
         "purpose": "Start or describe a session-scoped preview runtime.",
         "required_options": ("--root",),
-        "optional_options": ("--mode",),
+        "optional_options": ("--mode", "--owner-session", "--owner-pid"),
     },
     "ingest-review": {
         "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
@@ -45,9 +57,50 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def build_model(args: argparse.Namespace) -> int:
+    try:
+        result = build_model_from_source(
+            output_path=Path(args.output),
+            text=args.text,
+            input_path=Path(args.input) if args.input else None,
+            title=args.title,
+            document_id=args.document_id,
+        )
+    except (OSError, ModelBuildError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(result.path)
+    return 0
+
+
 def render(args: argparse.Namespace) -> int:
     index_path = render_bundle(Path(args.model), Path(args.output))
     print(index_path)
+    return 0
+
+
+def attach_image(args: argparse.Namespace) -> int:
+    try:
+        result = attach_image_to_model(
+            model_path=Path(args.model),
+            block_id=args.block_id,
+            image_path=Path(args.image),
+            output_path=Path(args.output) if args.output else None,
+        )
+    except (OSError, ImageAssetError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "model": str(result.model_path),
+                "block_id": result.block_id,
+                "source_path": result.source_path,
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
@@ -56,7 +109,12 @@ def preview(args: argparse.Namespace) -> int:
         print(json.dumps({"status": "off", "root": args.root, "mode": args.mode}, ensure_ascii=False))
         return 0
     try:
-        session = start_preview(Path(args.root), args.mode)
+        session = start_preview(
+            Path(args.root),
+            args.mode,
+            owner_session=args.owner_session,
+            owner_pid=args.owner_pid,
+        )
     except PreviewConfigurationError as exc:
         print(json.dumps({"status": "failed", "error": str(exc), "root": args.root, "mode": args.mode}, ensure_ascii=False))
         return 2
@@ -90,6 +148,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="html-review-workbench")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    build_model_parser = subparsers.add_parser(
+        "build-model",
+        help=str(COMMAND_CONTRACT["build-model"]["purpose"]),
+        description=str(COMMAND_CONTRACT["build-model"]["purpose"]),
+    )
+    build_model_parser.add_argument("--text")
+    build_model_parser.add_argument("--input")
+    build_model_parser.add_argument("--output", required=True)
+    build_model_parser.add_argument("--title")
+    build_model_parser.add_argument("--document-id")
+    build_model_parser.set_defaults(func=build_model)
+
     render_parser = subparsers.add_parser(
         "render",
         help=str(COMMAND_CONTRACT["render"]["purpose"]),
@@ -99,6 +169,17 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser.add_argument("--output", required=True)
     render_parser.set_defaults(func=render)
 
+    attach_image_parser = subparsers.add_parser(
+        "attach-image",
+        help=str(COMMAND_CONTRACT["attach-image"]["purpose"]),
+        description=str(COMMAND_CONTRACT["attach-image"]["purpose"]),
+    )
+    attach_image_parser.add_argument("--model", required=True)
+    attach_image_parser.add_argument("--block-id", required=True)
+    attach_image_parser.add_argument("--image", required=True)
+    attach_image_parser.add_argument("--output")
+    attach_image_parser.set_defaults(func=attach_image)
+
     preview_parser = subparsers.add_parser(
         "preview",
         help=str(COMMAND_CONTRACT["preview"]["purpose"]),
@@ -106,6 +187,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     preview_parser.add_argument("--root", required=True)
     preview_parser.add_argument("--mode", choices=["auto", "tailscale", "local", "off"], default="auto")
+    preview_parser.add_argument("--owner-session")
+    preview_parser.add_argument("--owner-pid", type=int)
     preview_parser.set_defaults(func=preview)
 
     ingest_parser = subparsers.add_parser(

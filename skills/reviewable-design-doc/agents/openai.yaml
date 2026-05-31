@@ -10,6 +10,7 @@ trigger_examples:
   - コメントを反映して
 entrypoint: python3 -m scripts.html_review_workbench.cli
 workflow:
+  - build-model
   - render
   - validate
   - preview

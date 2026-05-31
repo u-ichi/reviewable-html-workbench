@@ -85,16 +85,23 @@ def ingest_review(
         classified["status_after"] = thread["status"]
         classifications.append(classified)
 
-    store.write(payload)
-
     model_update_result: dict[str, Any] = {"applied": 0, "skipped": []}
     resolved_model_path = None
     if model_path is not None:
         resolved_model_path = model_path.resolve()
         if apply_model:
             model_update_result = apply_limited_model_updates(resolved_model_path, classifications)
+            applied_reply_count = add_implementation_replies(
+                payload,
+                model_update_result.get("applied_comment_ids", []),
+                classifications,
+                agent_author=agent_author,
+            )
+            replies_added += applied_reply_count
         else:
             model_update_result = {"applied": 0, "skipped": ["model updates require --apply-model"]}
+
+    store.write(payload)
 
     state = build_review_cycle_state(
         document_id=str(payload["document_id"]),
@@ -204,6 +211,7 @@ def apply_limited_model_updates(model_path: Path, classifications: list[dict[str
         raise ReviewIngestionError("document model must contain a blocks array")
 
     applied = 0
+    applied_comment_ids: list[str] = []
     skipped: list[dict[str, str]] = []
     for item in classifications:
         if item["classification"] != "actionable":
@@ -227,10 +235,57 @@ def apply_limited_model_updates(model_path: Path, classifications: list[dict[str
             continue
         block["content"] = content.replace(old, new, 1)
         applied += 1
+        applied_comment_ids.append(item["comment_id"])
 
     if applied:
         model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return {"applied": applied, "skipped": skipped}
+    return {"applied": applied, "applied_comment_ids": applied_comment_ids, "skipped": skipped}
+
+
+def add_implementation_replies(
+    payload: dict[str, Any],
+    applied_comment_ids: object,
+    classifications: list[dict[str, Any]],
+    *,
+    agent_author: str,
+) -> int:
+    if not isinstance(applied_comment_ids, list):
+        return 0
+    applied_ids = {comment_id for comment_id in applied_comment_ids if isinstance(comment_id, str)}
+    if not applied_ids:
+        return 0
+    replacements = {
+        item["comment_id"]: item.get("replacement")
+        for item in classifications
+        if item["comment_id"] in applied_ids
+    }
+    replies_added = 0
+    for thread in payload["comments"]:
+        if thread["id"] not in applied_ids:
+            continue
+        if not _has_agent_implementation_reply(thread):
+            replacement = replacements.get(thread["id"])
+            thread["replies"].append(
+                make_reply(
+                    author=agent_author,
+                    role="agent",
+                    kind="implementation_note",
+                    body=implementation_reply_body(replacement),
+                )
+            )
+            replies_added += 1
+        thread["status"] = "resolved"
+        for item in classifications:
+            if item["comment_id"] == thread["id"]:
+                item["status_after"] = "resolved"
+                item["reply_added"] = True
+    return replies_added
+
+
+def implementation_reply_body(replacement: object) -> str:
+    if isinstance(replacement, dict) and replacement.get("old") and replacement.get("new"):
+        return f"Applied replacement: {replacement['old']} -> {replacement['new']}"
+    return "Applied this review comment."
 
 
 def extract_replacement(thread: dict[str, Any]) -> dict[str, str] | None:

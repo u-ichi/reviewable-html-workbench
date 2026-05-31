@@ -32,11 +32,12 @@
 5. **pluginとして検証する**
    - Claude: `claude plugins validate .`
    - Codex: `.codex-plugin/plugin.json` と `skills/*/SKILL.md` の構造検証
+   - Codex marketplace: `python3 -m json.tool .agents/plugins/marketplace.json >/dev/null`
    - 共通: `python3 -m unittest discover -s tests`
 
 6. **ローカル導入して実使用する**
    - Claude: `claude --plugin-dir /path/to/reviewable-html-workbench`
-   - Codex: plugin marketplace または plugin dir から読み込む
+   - Codex: `codex plugin marketplace add /path/to/reviewable-html-workbench` で repo-local marketplace を登録する。path に空白があり失敗する場合は、空白を含まない symlink 経由で登録する。
 
 7. **実出力を見て直す**
    - HTML表示

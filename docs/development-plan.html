@@ -338,17 +338,21 @@
         <ul>
           <li><code>preview_server.py</code> を実装する。</li>
           <li>空きport選択を実装する。</li>
+          <li><code>HTML_REVIEW_WORKBENCH_TAILSCALE_IP</code> がある場合はそのIPv4を優先する。</li>
           <li><code>tailscale ip -4</code> が成功した場合はTailscale IPv4にbindする。</li>
           <li>Tailscale IPv4が取れない場合は <code>127.0.0.1</code> にbindする。</li>
           <li><code>0.0.0.0</code> bindを拒否する。</li>
-          <li><code>output/tmp/html-preview-sessions/*.json</code> にsession manifestを書く。</li>
+          <li>成果物の <code>annotations/preview-session-*.json</code> にsession manifestを書く。</li>
+          <li>preview server が起動元 agent の親PIDを監視し、親プロセス終了時に自動終了するようにする。</li>
         </ul>
         <h3>完了条件</h3>
         <ul>
-          <li><code>preview --mode auto</code> がURLとPIDを返す。</li>
+          <li><code>preview --mode auto</code> がURL、PID、owner PIDを返す。</li>
+          <li>sandbox外で取得したTailscale IPv4を環境変数で渡せる。</li>
           <li>Tailscaleなしのfixture testで <code>127.0.0.1</code> fallbackを確認できる。</li>
           <li><code>0.0.0.0</code> が入力されても拒否される。</li>
-          <li><code>output/tmp/html-preview-sessions/*.json</code> に session manifest が作成される。</li>
+          <li>成果物の <code>annotations/preview-session-*.json</code> に session manifest が作成される。</li>
+          <li>起動元親PIDが終了するとpreview serverが自動終了する。</li>
         </ul>
       </section>
 
@@ -435,10 +439,10 @@
         <p><span class="status ok">Goal</span> Codex CLIでpluginとして読み込める。あわせて、既存のbase repo管理方式へどう組み込むかを決める。</p>
         <ul>
           <li>Codex: <code>.codex-plugin/plugin.json</code> と <code>skills/</code> の構成を検証する。</li>
-          <li>Codex marketplace登録方法をdocs化する。</li>
+          <li>Codex marketplace登録方法を <code>docs/codex-plugin-packaging.md</code> にdocs化する。</li>
           <li>Codex側でpluginを有効化し、2 skill が実際に発火することを確認する。</li>
-          <li>base repoの <code>home/skills</code> / <code>home/generated/codex-skills</code> 管理とplugin管理のどちらを正本にするか決める。</li>
-          <li>plugin versioningとrelease tag手順を決める。</li>
+          <li>base repoの <code>home/skills</code> / <code>home/generated/codex-skills</code> 管理とplugin管理のどちらを管理元にするか決める。</li>
+          <li>plugin versioningとrelease tag手順を <code>docs/codex-plugin-packaging.md</code> に固定する。</li>
         </ul>
         <h3>base repo 管理方式との統合検討</h3>
         <p>現在のbase repoは、共通skillを <code>home/skills/&lt;name&gt;</code> に置き、Codexへは <code>home/generated/codex-skills/</code> 経由で <code>~/.agents/skills/</code> にsymlink配布する。plugin化する場合、この既存経路と衝突しない導入方式をCodex側で先に決める。Claude側の <code>~/.claude/skills</code> / plugin install 方針はMilestone 10で扱う。</p>
@@ -459,7 +463,7 @@
             <tr>
               <td>外部plugin repoとして管理</td>
               <td>このrepoを正本にし、Codexはmarketplace entryで参照する。Claude連携は最後に追加する。</td>
-              <td>今回の推奨。scriptが厚く、versioningとテストをrepo単位で持てる。</td>
+              <td>採用。scriptが厚く、versioningとテストをrepo単位で持てる。base repo側には同名skillを置かない。</td>
             </tr>
             <tr>
               <td>hybrid adapter</td>
@@ -470,11 +474,16 @@
         </table>
         <h3>統合時の確認項目</h3>
         <ul>
-          <li><code>home/skills</code> とplugin repoの同名skillがCodexで同時に有効化された時の優先順位を確認する。</li>
-          <li><code>bin/build-codex-skills.sh</code> が生成する <code>home/generated/codex-skills</code> と、Codex pluginのskill discoveryが衝突しないことを確認する。</li>
-          <li>base repoの <code>install.sh</code> にCodex marketplace登録やplugin installを含めるか、個別導入手順に分けるか決める。</li>
-          <li>既存skillからこのpluginを呼ぶ場合、直接script呼び出しではなくskill境界経由にするかを決める。</li>
+          <li>現時点では <code>home/skills</code>、<code>home/generated/codex-skills</code>、live <code>~/.agents/skills</code> / <code>~/.codex/skills</code> に同名skillは存在しない。</li>
+          <li><code>bin/build-codex-skills.sh</code> はbase repoの <code>home/skills</code> だけを入力にするため、このplugin repoをその配下へコピーしない限り生成物とは衝突しない。</li>
+          <li>base repoの <code>install.sh</code> にはCodex marketplace登録やplugin installを含めず、個別導入手順に分ける。</li>
+          <li>既存skillからこのpluginを呼ぶ場合は、直接script呼び出しではなくplugin skill境界経由にする。</li>
         </ul>
+        <h3>採用する登録方式</h3>
+        <p>このrepoは plugin root と repo-local marketplace root を兼ねる。<code>.agents/plugins/marketplace.json</code> は <code>reviewable-html-workbench-local</code> marketplace を定義し、plugin entry は <code>source.path: "./plugins/reviewable-html-workbench"</code> を参照する。<code>plugins/reviewable-html-workbench</code> はrepo rootへのsymlinkで、Codex marketplace loaderの既存パターンに合わせるために置く。導入は <code>codex plugin marketplace add /path/to/reviewable-html-workbench</code> で行う。</p>
+        <p>marketplace policy は <code>INSTALLED_BY_DEFAULT</code> とする。<code>AVAILABLE</code> のままだと marketplace 登録後もplugin cacheが作られず、skill discovery に載らない。</p>
+        <p>repo path に空白が含まれる環境では、Codex CLIのsource判定がgit source側へ倒れる場合がある。その場合は空白を含まないsymlinkを作り、<code>codex plugin marketplace add /private/tmp/reviewable-html-workbench</code> のようにsymlink pathを渡す。</p>
+        <p>base repoの <code>install.sh</code> には含めない。Codex全プロジェクトに強制配布すると同名skillの二重登録リスクが高いため、まずは個別導入とし、必要になった場合だけbase repo側へ薄いadapterを追加する。</p>
       </section>
 
       <section id="m9">

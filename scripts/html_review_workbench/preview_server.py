@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import argparse
+import os
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import subprocess
 import sys
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -18,10 +21,10 @@ from typing import Callable, Literal
 from urllib.parse import urlparse
 
 from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError, empty_comments
+from scripts.html_review_workbench.preview_host_resolve import detect_tailscale_ipv4
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SESSION_MANIFEST_DIR = ROOT / "output" / "tmp" / "html-preview-sessions"
 PreviewMode = Literal["auto", "tailscale", "local"]
 ResolvedMode = Literal["tailscale", "local"]
 
@@ -39,9 +42,11 @@ class PreviewSession:
     port: int
     url: str
     pid: int
+    owner_pid: int | None
     created_at: str
     mode: ResolvedMode
     status: str
+    owner_session: str
     manifest: str
     stop_command: str
     process: subprocess.Popen[bytes] | None
@@ -55,9 +60,11 @@ class PreviewSession:
             "port": self.port,
             "url": self.url,
             "pid": self.pid,
+            "owner_pid": self.owner_pid,
             "created_at": self.created_at,
             "mode": self.mode,
             "status": self.status,
+            "owner_session": self.owner_session,
             "manifest": self.manifest,
             "stop_command": self.stop_command,
         }
@@ -69,7 +76,12 @@ class PreviewSession:
         return payload
 
 
-def start_preview(root: Path, mode: PreviewMode = "auto") -> PreviewSession:
+def start_preview(
+    root: Path,
+    mode: PreviewMode = "auto",
+    owner_session: str | None = None,
+    owner_pid: int | None = None,
+) -> PreviewSession:
     root = root.resolve()
     if not root.is_dir():
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
@@ -77,6 +89,8 @@ def start_preview(root: Path, mode: PreviewMode = "auto") -> PreviewSession:
     bind, resolved_mode = resolve_bind(mode)
     port = pick_free_port(bind)
     session_id = uuid.uuid4().hex
+    owner_session = owner_session or current_owner_session() or "unknown"
+    owner_pid = owner_pid or current_agent_pid()
     created_at = datetime.now(timezone.utc).isoformat()
 
     process = subprocess.Popen(
@@ -88,14 +102,19 @@ def start_preview(root: Path, mode: PreviewMode = "auto") -> PreviewSession:
             str(port),
             "--bind",
             bind,
+            "--owner-session",
+            owner_session,
+            "--owner-pid",
+            str(owner_pid or 0),
             str(root),
         ],
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
     url = f"http://{bind}:{port}/index.html"
-    manifest_path = SESSION_MANIFEST_DIR / f"{session_id}.json"
+    manifest_path = root / "annotations" / f"preview-session-{session_id}.json"
     session = PreviewSession(
         schema_version="1.0",
         session_id=session_id,
@@ -104,15 +123,34 @@ def start_preview(root: Path, mode: PreviewMode = "auto") -> PreviewSession:
         port=port,
         url=url,
         pid=process.pid,
+        owner_pid=owner_pid,
         created_at=created_at,
         mode=resolved_mode,
         status="running",
+        owner_session=owner_session,
         manifest=str(manifest_path),
-        stop_command=f"kill {process.pid}",
+        stop_command=f"bin/kill-review-preview.sh {process.pid}",
         process=process,
     )
     write_session_manifest(manifest_path, session)
     return session
+
+
+def current_owner_session(environ: dict[str, str] | None = None) -> str | None:
+    if environ is None:
+        environ = os.environ
+    for key in ("CODEX_THREAD_ID", "CLAUDE_SESSION_ID", "CODEX_COMPANION_SESSION_ID", "SESSION_ID"):
+        value = environ.get(key)
+        if value:
+            return value
+    return None
+
+
+def current_agent_pid() -> int | None:
+    parent_pid = os.getppid()
+    if parent_pid <= 1:
+        return None
+    return parent_pid
 
 
 def resolve_bind(
@@ -135,29 +173,6 @@ def resolve_bind(
             return _validate_bind(tailscale_ip), "tailscale"
         return "127.0.0.1", "local"
     raise PreviewConfigurationError(f"unsupported preview mode: {mode}")
-
-
-def detect_tailscale_ipv4() -> str | None:
-    try:
-        result = subprocess.run(
-            ["tailscale", "ip", "-4"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return None
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.splitlines():
-        candidate = line.strip()
-        if candidate:
-            try:
-                return _validate_bind(candidate)
-            except PreviewConfigurationError:
-                continue
-    return None
 
 
 def pick_free_port(bind: str) -> int:
@@ -233,13 +248,15 @@ class ReviewPreviewHandler(SimpleHTTPRequestHandler):
         return urlparse(self.path).path
 
 
-def serve(root: Path, bind: str, port: int) -> None:
+def serve(root: Path, bind: str, port: int, owner_pid: int | None = None) -> None:
     bind = _validate_bind(bind)
     root = root.resolve()
     if not root.is_dir():
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
     handler = partial(ReviewPreviewHandler, root=root)
     with ThreadingHTTPServer((bind, port), handler) as server:
+        if owner_pid and owner_pid > 1:
+            _start_owner_watchdog(server, owner_pid)
         server.serve_forever()
 
 
@@ -254,10 +271,34 @@ def _content_length(handler: SimpleHTTPRequestHandler) -> int:
     return length
 
 
+def _start_owner_watchdog(server: ThreadingHTTPServer, owner_pid: int, interval_seconds: float = 2.0) -> None:
+    def watch() -> None:
+        while True:
+            if not _pid_is_alive(owner_pid):
+                server.shutdown()
+                return
+            time.sleep(interval_seconds)
+
+    thread = threading.Thread(target=watch, name="preview-owner-watchdog", daemon=True)
+    thread.start()
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="preview_server")
     parser.add_argument("--serve", type=int, metavar="PORT")
     parser.add_argument("--bind", default="127.0.0.1")
+    parser.add_argument("--owner-session", default="unknown")
+    parser.add_argument("--owner-pid", type=int)
     parser.add_argument("root", nargs="?")
     return parser
 
@@ -267,7 +308,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.serve is None or args.root is None:
         parser.error("--serve PORT and root are required")
-    serve(Path(args.root), args.bind, args.serve)
+    serve(Path(args.root), args.bind, args.serve, owner_pid=args.owner_pid)
     return 0
 
 

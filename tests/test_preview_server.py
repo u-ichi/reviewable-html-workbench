@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import time
 import tempfile
 import unittest
@@ -13,6 +16,11 @@ from scripts.html_review_workbench.preview_server import (
     resolve_bind,
     start_preview,
 )
+from scripts.html_review_workbench.preview_host_resolve import (
+    ENV_TAILSCALE_BIN,
+    ENV_TAILSCALE_IP,
+    detect_tailscale_ipv4,
+)
 
 
 class PreviewServerTest(unittest.TestCase):
@@ -21,6 +29,37 @@ class PreviewServerTest(unittest.TestCase):
 
         self.assertEqual(bind, "127.0.0.1")
         self.assertEqual(mode, "local")
+
+    def test_auto_mode_uses_tailscale_ip_from_environment(self) -> None:
+        bind, mode = resolve_bind(
+            "auto",
+            tailscale_ip_getter=lambda: detect_tailscale_ipv4(environ={ENV_TAILSCALE_IP: "100.64.12.34"}),
+        )
+
+        self.assertEqual(bind, "100.64.12.34")
+        self.assertEqual(mode, "tailscale")
+
+    def test_tailscale_detector_uses_configured_binary(self) -> None:
+        def fake_runner(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            self.assertEqual(args, ["/tmp/fake-tailscale", "ip", "-4"])
+            return subprocess.CompletedProcess(args, 0, stdout="100.64.55.66\n", stderr="")
+
+        self.assertEqual(
+            detect_tailscale_ipv4(environ={ENV_TAILSCALE_BIN: "/tmp/fake-tailscale"}, runner=fake_runner),
+            "100.64.55.66",
+        )
+
+    def test_tailscale_detector_ignores_invalid_environment_ip(self) -> None:
+        def fake_runner(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(args, 0, stdout="100.64.55.66\n", stderr="")
+
+        self.assertEqual(
+            detect_tailscale_ipv4(
+                environ={ENV_TAILSCALE_IP: "0.0.0.0", ENV_TAILSCALE_BIN: "/tmp/fake-tailscale"},
+                runner=fake_runner,
+            ),
+            "100.64.55.66",
+        )
 
     def test_tailscale_mode_rejects_unsafe_wildcard_bind(self) -> None:
         with self.assertRaisesRegex(PreviewConfigurationError, "0.0.0.0"):
@@ -40,8 +79,10 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertEqual(session.bind, "127.0.0.1")
                 self.assertEqual(session.mode, "local")
                 self.assertGreater(session.pid, 0)
+                self.assertEqual(session.owner_pid, os.getppid())
                 self.assertTrue(session.url.startswith("http://127.0.0.1:"))
-                self.assertIn("kill ", session.stop_command)
+                self.assertEqual(session.stop_command, f"bin/kill-review-preview.sh {session.pid}")
+                self.assertEqual(Path(session.manifest).parent, (root / "annotations").resolve())
 
                 manifest = json.loads(Path(session.manifest).read_text(encoding="utf-8"))
                 self.assertEqual(manifest["schema_version"], "1.0")
@@ -51,11 +92,33 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertEqual(manifest["port"], session.port)
                 self.assertEqual(manifest["url"], session.url)
                 self.assertEqual(manifest["pid"], session.pid)
+                self.assertEqual(manifest["owner_pid"], os.getppid())
+                self.assertEqual(manifest["owner_session"], session.owner_session)
                 self.assertEqual(manifest["status"], "running")
             finally:
                 self.assertIsNotNone(session.process)
                 session.process.terminate()
                 session.process.wait(timeout=5)
+
+    def test_preview_server_exits_when_owner_pid_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+            session = start_preview(root, "local", owner_pid=owner.pid)
+            try:
+                _wait_until_preview_ready(session.url)
+                owner.terminate()
+                owner.wait(timeout=5)
+                self.assertIsNotNone(session.process)
+                session.process.wait(timeout=7)
+            finally:
+                if owner.poll() is None:
+                    owner.terminate()
+                    owner.wait(timeout=5)
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
 
     def test_preview_server_reads_and_writes_comments_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

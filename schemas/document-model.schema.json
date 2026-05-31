@@ -76,6 +76,7 @@
               "callout",
               "table",
               "diagram",
+              "image",
               "html"
             ]
           },
@@ -102,6 +103,56 @@
               },
               "source": {
                 "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "diagram_kind": {
+            "type": "string",
+            "enum": [
+              "flow",
+              "architecture",
+              "matrix",
+              "timeline",
+              "concept"
+            ]
+          },
+          "diagram_source": {
+            "type": "string"
+          },
+          "image": {
+            "type": "object",
+            "required": [
+              "prompt",
+              "alt",
+              "generation_status"
+            ],
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "caption": {
+                "type": "string"
+              },
+              "generation_status": {
+                "type": "string",
+                "enum": [
+                  "requested",
+                  "generated"
+                ]
+              },
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "generated_at": {
+                "type": "string",
+                "minLength": 1
               }
             },
             "additionalProperties": false

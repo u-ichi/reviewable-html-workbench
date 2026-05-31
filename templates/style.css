@@ -152,6 +152,37 @@ h1 {
   margin: 0;
 }
 
+.block-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.block-content th,
+.block-content td {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.block-content th {
+  background: #f1f5f9;
+}
+
+.block-content pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  background: #101828;
+  color: #eef2ff;
+  border-radius: 6px;
+}
+
+.block-content pre code,
+.diagram-source code {
+  color: #f8fafc;
+}
+
 .callout {
   padding: 14px 16px;
   background: var(--callout);
@@ -170,6 +201,47 @@ h1 {
   margin: 0 0 10px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.mermaid-diagram {
+  margin: 0;
+}
+
+.diagram-preview {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  margin: 0 0 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.diagram-edge {
+  stroke: #64748b;
+  stroke-width: 2;
+}
+
+.diagram-node {
+  fill: #ffffff;
+  stroke: #2563eb;
+  stroke-width: 2;
+}
+
+.diagram-label {
+  fill: #17202a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.diagram-preview-empty {
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
 }
 
 .sample-visual {
@@ -206,6 +278,30 @@ h1 {
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid var(--line);
   border-radius: 6px;
+}
+
+.generated-image {
+  margin: 0;
+}
+
+.generated-image img {
+  display: block;
+  width: min(720px, 100%);
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.generated-image img:hover {
+  border-color: var(--accent);
+}
+
+.generated-image figcaption {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .review-comments-root {

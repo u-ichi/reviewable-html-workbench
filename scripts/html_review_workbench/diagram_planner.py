@@ -59,10 +59,13 @@ def write_diagram_sources(output_dir: Path, diagrams: dict[str, PlannedDiagram])
 
 
 def _is_diagram_candidate(block: dict[str, Any]) -> bool:
-    return block.get("type") == "diagram" or isinstance(block.get("diagram_source"), str)
+    return block.get("type") == "diagram" or isinstance(block.get("diagram_source"), str) or isinstance(block.get("diagram"), dict)
 
 
 def _diagram_source(block: dict[str, Any]) -> str:
+    diagram = block.get("diagram")
+    if isinstance(diagram, dict) and isinstance(diagram.get("source"), str):
+        return diagram["source"]
     source = block.get("diagram_source", block.get("content", ""))
     return source if isinstance(source, str) else ""
 

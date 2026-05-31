@@ -19,10 +19,31 @@ class ProjectLayoutTest(unittest.TestCase):
             self.assertEqual(payload["name"], "reviewable-html-workbench")
             self.assertEqual(payload["skills"], "./skills/")
 
+    def test_codex_marketplace_entry_points_to_plugin_root(self) -> None:
+        path = ROOT / ".agents" / "plugins" / "marketplace.json"
+        self.assertTrue(path.exists())
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["name"], "reviewable-html-workbench-local")
+
+        plugins = payload["plugins"]
+        self.assertEqual(len(plugins), 1)
+        plugin = plugins[0]
+        self.assertEqual(plugin["name"], "reviewable-html-workbench")
+        self.assertEqual(plugin["source"], {"source": "local", "path": "./plugins/reviewable-html-workbench"})
+        self.assertEqual(plugin["policy"]["installation"], "INSTALLED_BY_DEFAULT")
+        self.assertEqual(plugin["policy"]["authentication"], "ON_INSTALL")
+        self.assertEqual(plugin["category"], "Productivity")
+
+        plugin_link = ROOT / "plugins" / "reviewable-html-workbench"
+        self.assertTrue(plugin_link.exists())
+        self.assertEqual(plugin_link.resolve(), ROOT)
+
     def test_codex_manifest_documents_required_interface(self) -> None:
         payload = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
         for field in ["name", "version", "description", "author", "license", "keywords", "skills", "interface"]:
             self.assertIn(field, payload)
+        self.assertEqual(payload["repository"], "https://github.com/u-ichi/reviewable-html-workbench")
+        self.assertEqual(payload["homepage"], "https://github.com/u-ichi/reviewable-html-workbench")
 
         interface = payload["interface"]
         for field in [
@@ -49,14 +70,27 @@ class ProjectLayoutTest(unittest.TestCase):
             self.assertIn("Triggers:", text)
             self.assertIn("使用しない場面:", text)
 
+    def test_review_preview_kill_helper_has_narrow_permission_allow(self) -> None:
+        settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        allow = settings["permissions"]["allow"]
+
+        self.assertIn("Bash(bin/kill-review-preview.sh)", allow)
+        self.assertIn("Bash(bin/kill-review-preview.sh *)", allow)
+        self.assertIn("Bash(./bin/kill-review-preview.sh)", allow)
+        self.assertIn("Bash(./bin/kill-review-preview.sh *)", allow)
+        self.assertNotIn("Bash(kill *)", allow)
+        self.assertNotIn("Bash(pkill *)", allow)
+
     def test_cli_module_exists(self) -> None:
         self.assertTrue((ROOT / "scripts" / "html_review_workbench" / "cli.py").exists())
 
     def test_cli_subcommand_contract_is_stable(self) -> None:
         self.assertEqual(
             set(cli.COMMAND_CONTRACT),
-            {"render", "preview", "ingest-review", "validate"},
+            {"build-model", "attach-image", "render", "preview", "ingest-review", "validate"},
         )
+        self.assertEqual(cli.COMMAND_CONTRACT["build-model"]["required_options"], ("--output",))
+        self.assertEqual(cli.COMMAND_CONTRACT["attach-image"]["required_options"], ("--model", "--block-id", "--image"))
         self.assertEqual(cli.COMMAND_CONTRACT["render"]["required_options"], ("--model", "--output"))
         self.assertEqual(cli.COMMAND_CONTRACT["preview"]["required_options"], ("--root",))
         self.assertEqual(cli.COMMAND_CONTRACT["ingest-review"]["required_options"], ("--root",))

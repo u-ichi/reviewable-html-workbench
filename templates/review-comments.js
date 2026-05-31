@@ -22,14 +22,16 @@
     selectionRect: null,
     serverWritable: false,
     ignoreSelectionChange: false,
+    threadPinned: false,
   };
 
   const ui = createUi();
   document.body.appendChild(ui.root);
 
-  document.addEventListener("selectionchange", captureSelection);
-  document.addEventListener("keyup", captureSelection);
-  document.addEventListener("mouseup", captureSelection);
+  document.addEventListener("selectionchange", scheduleSelectionCapture);
+  document.addEventListener("keyup", scheduleSelectionCapture);
+  document.addEventListener("mouseup", scheduleSelectionCapture);
+  document.addEventListener("pointerup", scheduleSelectionCapture);
   document.addEventListener("scroll", hideFloatingUi, true);
   document.addEventListener("click", handleDocumentClick);
   ui.toolbar.addEventListener("mousedown", preserveDocumentSelection);
@@ -129,6 +131,23 @@
     }
   }
 
+  function scheduleSelectionCapture(event) {
+    if (shouldIgnoreSelectionCaptureEvent(event)) {
+      return;
+    }
+    window.setTimeout(captureSelection, 0);
+  }
+
+  function shouldIgnoreSelectionCaptureEvent(event) {
+    if (!event?.target) {
+      return false;
+    }
+    if (ui.root.contains(event.target)) {
+      return true;
+    }
+    return Boolean(event.target.closest?.("mark[data-comment-highlight], [data-comment-badge]"));
+  }
+
   function captureSelection() {
     if (state.ignoreSelectionChange) {
       return;
@@ -151,7 +170,7 @@
       ui.toolbar.hidden = true;
       return;
     }
-    const block = closestReviewBlock(range.commonAncestorContainer);
+    const block = reviewBlockForRange(range);
     if (!block) {
       setSelected(null);
       return;
@@ -263,8 +282,9 @@
     badge.dataset.commentBadge = thread.id || "";
     badge.textContent = "Comment";
     badge.addEventListener("click", (event) => {
+      event.preventDefault();
       event.stopPropagation();
-      openThreadPopover(thread, badge.getBoundingClientRect());
+      openThreadPopover(thread, badge.getBoundingClientRect(), { focusReply: true });
     });
     block.appendChild(badge);
   }
@@ -350,14 +370,19 @@
     mark.setAttribute("aria-label", thread.comment || "Review comment");
     mark.tabIndex = 0;
     mark.addEventListener("click", (event) => {
+      event.preventDefault();
       event.stopPropagation();
-      openThreadPopover(thread, mark.getBoundingClientRect());
+      openThreadPopover(thread, mark.getBoundingClientRect(), { focusReply: true });
     });
     mark.addEventListener("mouseenter", () => {
-      openThreadPopover(thread, mark.getBoundingClientRect());
+      if (!state.threadPinned) {
+        openThreadPopover(thread, mark.getBoundingClientRect());
+      }
     });
     mark.addEventListener("focus", () => {
-      openThreadPopover(thread, mark.getBoundingClientRect());
+      if (!state.threadPinned) {
+        openThreadPopover(thread, mark.getBoundingClientRect());
+      }
     });
     return mark;
   }
@@ -390,9 +415,11 @@
     return `<ul class="review-comment-replies">${replies}</ul>`;
   }
 
-  function openThreadPopover(thread, rect) {
+  function openThreadPopover(thread, rect, options = {}) {
+    const focusReply = Boolean(options.focusReply);
     state.selected = null;
     state.selectionRect = null;
+    state.threadPinned = focusReply || state.threadPinned;
     clearDocumentSelectionWithoutClosingPopover();
     ui.threadLocation.textContent = thread.block_id;
     ui.threadBody.innerHTML = [
@@ -443,6 +470,14 @@
     ui.threadPopover.hidden = false;
     ui.composer.hidden = true;
     ui.toolbar.hidden = true;
+    if (focusReply) {
+      window.setTimeout(() => {
+        const replyEditor = ui.threadBody.querySelector("[data-thread-reply]");
+        if (replyEditor instanceof HTMLTextAreaElement) {
+          replyEditor.focus();
+        }
+      }, 0);
+    }
   }
 
   function enterCommentEditMode(display, editor) {
@@ -525,8 +560,38 @@
     if (event.target.closest?.("mark[data-comment-highlight]")) {
       return;
     }
+    if (captureImageBlockClick(event)) {
+      return;
+    }
     closeComposer();
     closeThreadPopover();
+  }
+
+  function captureImageBlockClick(event) {
+    const image = event.target.closest?.('[data-block-type="image"] img');
+    if (!image) {
+      return false;
+    }
+    const block = image.closest("[data-review-block]");
+    if (!block) {
+      return false;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    clearDocumentSelectionForNonTextTarget();
+    const title = block.querySelector("h2")?.textContent?.trim();
+    const caption = block.querySelector("figcaption")?.textContent?.trim();
+    setSelected(
+      {
+        blockId: block.dataset.reviewBlock,
+        selectedText: image.getAttribute("alt") || title || caption || "Image",
+        prefix: "",
+        suffix: caption || "",
+        anchor: null,
+      },
+      image.getBoundingClientRect(),
+    );
+    return true;
   }
 
   function preserveDocumentSelection(event) {
@@ -540,9 +605,14 @@
 
   function closeThreadPopover() {
     ui.threadPopover.hidden = true;
+    state.threadPinned = false;
   }
 
   function clearDocumentSelectionWithoutClosingPopover() {
+    clearDocumentSelectionForNonTextTarget();
+  }
+
+  function clearDocumentSelectionForNonTextTarget() {
     state.ignoreSelectionChange = true;
     window.getSelection()?.removeAllRanges();
     window.setTimeout(() => {
@@ -641,6 +711,19 @@
   function closestReviewBlock(node) {
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     return element?.closest("[data-review-block]");
+  }
+
+  function reviewBlockForRange(range) {
+    const commonBlock = closestReviewBlock(range.commonAncestorContainer);
+    if (commonBlock) {
+      return commonBlock;
+    }
+    const startBlock = closestReviewBlock(range.startContainer);
+    const endBlock = closestReviewBlock(range.endContainer);
+    if (startBlock && startBlock === endBlock) {
+      return startBlock;
+    }
+    return startBlock || endBlock;
   }
 
   function closestCommentHighlight(node) {

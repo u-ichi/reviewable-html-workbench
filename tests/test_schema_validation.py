@@ -51,6 +51,13 @@ class SchemaValidationTest(unittest.TestCase):
 
         self.assertIn("$.bind", {error.path for error in errors})
 
+    def test_numeric_bounds_validate_without_runtime_type_errors(self) -> None:
+        schema = {"type": "object", "properties": {"start": {"type": "integer", "minimum": 0}}}
+
+        errors = validate({"start": 2}, schema)
+
+        self.assertEqual(errors, [])
+
 
 def _read_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))

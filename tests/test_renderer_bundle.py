@@ -21,9 +21,12 @@ class RendererBundleTest(unittest.TestCase):
 
             self.assertTrue(index_path.exists())
             html = index_path.read_text(encoding="utf-8")
+            css = (output_dir / "assets/style.css").read_text(encoding="utf-8")
             self.assertIn('data-review-block="overview"', html)
             self.assertIn("assets/style.css", html)
             self.assertIn("assets/review-comments.js", html)
+            self.assertIn(".block-content pre code", css)
+            self.assertIn("color: #f8fafc", css)
 
             manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["document"]["id"], "minimal-design-doc")
@@ -73,6 +76,7 @@ class RendererBundleTest(unittest.TestCase):
             self.assertTrue(diagram_path.exists())
             self.assertEqual(diagram_path.read_text(encoding="utf-8").strip(), model["blocks"][0]["content"])
             self.assertIn('data-diagram-kind="flow"', html)
+            self.assertIn("diagram-preview", html)
             self.assertIn("assets/diagrams/system-flow.mmd", html)
             self.assertEqual(manifest["outputs"]["diagrams"], ["assets/diagrams/system-flow.mmd"])
             self.assertEqual(manifest["review_blocks"][1]["diagram_kind"], "flow")

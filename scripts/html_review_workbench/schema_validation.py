@@ -42,9 +42,9 @@ def _validate_value(value: Any, schema: dict[str, Any], path: str, errors: list[
     if isinstance(value, int) and not isinstance(value, bool):
         minimum = schema.get("minimum")
         maximum = schema.get("maximum")
-        if isinstance(minimum, int | float) and value < minimum:
+        if isinstance(minimum, (int, float)) and value < minimum:
             errors.append(ValidationError(path, f"expected value >= {minimum}"))
-        if isinstance(maximum, int | float) and value > maximum:
+        if isinstance(maximum, (int, float)) and value > maximum:
             errors.append(ValidationError(path, f"expected value <= {maximum}"))
 
     if isinstance(value, list):
@@ -88,7 +88,7 @@ def _matches_type(value: Any, expected_type: str | list[str]) -> bool:
     if expected_type == "integer":
         return isinstance(value, int) and not isinstance(value, bool)
     if expected_type == "number":
-        return (isinstance(value, int | float) and not isinstance(value, bool))
+        return (isinstance(value, (int, float)) and not isinstance(value, bool))
     if expected_type == "boolean":
         return isinstance(value, bool)
     if expected_type == "null":
