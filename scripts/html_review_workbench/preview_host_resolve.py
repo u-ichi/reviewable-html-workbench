@@ -25,6 +25,10 @@ def detect_tailscale_ipv4(
     if explicit_ip is not None:
         return explicit_ip
 
+    ifconfig_ip = _detect_tailscale_ipv4_from_ifconfig(runner=runner, timeout=timeout)
+    if ifconfig_ip is not None:
+        return ifconfig_ip
+
     tailscale_bin = env.get(ENV_TAILSCALE_BIN, "tailscale").strip()
     if not tailscale_bin:
         return None
@@ -44,6 +48,37 @@ def detect_tailscale_ipv4(
     return _first_valid_ipv4(result.stdout.splitlines())
 
 
+def _detect_tailscale_ipv4_from_ifconfig(
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    timeout: float = 2,
+) -> str | None:
+    try:
+        result = runner(
+            ["ifconfig"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return _first_valid_tailscale_ipv4_from_ifconfig(result.stdout.splitlines())
+
+
+def _first_valid_tailscale_ipv4_from_ifconfig(lines: Iterable[str]) -> str | None:
+    for line in lines:
+        fields = line.strip().split()
+        for index, field in enumerate(fields):
+            if field == "inet" and index + 1 < len(fields):
+                candidate = fields[index + 1]
+                if _is_safe_tailscale_ipv4(candidate):
+                    return candidate
+    return None
+
+
 def _first_valid_ipv4(lines: Iterable[str]) -> str | None:
     for line in lines:
         candidate = line.strip()
@@ -60,6 +95,13 @@ def _is_safe_ipv4(candidate: str) -> bool:
     except OSError:
         return False
     return candidate.count(".") == 3
+
+
+def _is_safe_tailscale_ipv4(candidate: str) -> bool:
+    if not _is_safe_ipv4(candidate):
+        return False
+    octets = candidate.split(".")
+    return octets[0] == "100" and 64 <= int(octets[1]) <= 127
 
 
 def main() -> int:

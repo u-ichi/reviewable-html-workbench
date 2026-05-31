@@ -12,6 +12,7 @@ trigger_examples:
   - 図示つきHTML
   - visual HTML renderer
 entrypoint: python3 -m scripts.html_review_workbench.cli
+working_directory: plugin_root
 workflow:
   - build-model
   - attach-image

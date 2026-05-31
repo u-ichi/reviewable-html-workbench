@@ -41,6 +41,13 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 ## CodexでのCLI呼び出し
 
 HTML生成時は、`visual-html-renderer` と同じ共通CLI入口を使う。
+CLI実行前に、この `SKILL.md` の配置から renderer repo root を決める。
+`skills/reviewable-design-doc/SKILL.md` の2階層上が renderer repo root であり、
+そこに `scripts/html_review_workbench/cli.py` が存在することを確認する。
+すべての `python3 -m scripts.html_review_workbench.cli ...` は renderer repo root を
+作業ディレクトリにして実行する。現在のチャットやworkspaceのcwdをrepo rootとして扱わない。
+cwdに `scripts/html_review_workbench/cli.py` が無い場合は、代替HTMLを作らず、
+renderer repo rootへ移動してCLIを実行する。
 
 ```bash
 python3 -m scripts.html_review_workbench.cli build-model \

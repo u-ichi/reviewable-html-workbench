@@ -9,6 +9,7 @@ trigger_examples:
   - レビュー終わったので確認して
   - コメントを反映して
 entrypoint: python3 -m scripts.html_review_workbench.cli
+working_directory: plugin_root
 workflow:
   - build-model
   - render

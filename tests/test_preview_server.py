@@ -41,6 +41,8 @@ class PreviewServerTest(unittest.TestCase):
 
     def test_tailscale_detector_uses_configured_binary(self) -> None:
         def fake_runner(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            if args == ["ifconfig"]:
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
             self.assertEqual(args, ["/tmp/fake-tailscale", "ip", "-4"])
             return subprocess.CompletedProcess(args, 0, stdout="100.64.55.66\n", stderr="")
 
@@ -49,8 +51,34 @@ class PreviewServerTest(unittest.TestCase):
             "100.64.55.66",
         )
 
+    def test_tailscale_detector_prefers_ifconfig_before_cli(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_runner(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            calls.append(args)
+            if args == ["ifconfig"]:
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout="\n".join(
+                        [
+                            "en0: flags=8863<UP>",
+                            "\tinet 192.168.1.8 netmask 0xffffff00 broadcast 192.168.1.255",
+                            "utun8: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST>",
+                            "\tinet 100.92.198.57 --> 100.92.198.57 netmask 0xffffffff",
+                        ]
+                    ),
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(args, 0, stdout="100.64.55.66\n", stderr="")
+
+        self.assertEqual(detect_tailscale_ipv4(runner=fake_runner), "100.92.198.57")
+        self.assertEqual(calls, [["ifconfig"]])
+
     def test_tailscale_detector_ignores_invalid_environment_ip(self) -> None:
         def fake_runner(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            if args == ["ifconfig"]:
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
             return subprocess.CompletedProcess(args, 0, stdout="100.64.55.66\n", stderr="")
 
         self.assertEqual(

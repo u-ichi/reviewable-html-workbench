@@ -22,6 +22,10 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("python3 -m scripts.html_review_workbench.cli render", visual)
         self.assertIn("python3 -m scripts.html_review_workbench.cli validate", visual)
         self.assertIn("python3 -m scripts.html_review_workbench.cli preview", visual)
+        self.assertIn("renderer repo root", visual)
+        self.assertIn("作業ディレクトリにして実行する", visual)
+        self.assertIn("現在のチャットやworkspaceのcwdをrepo rootとして扱わない", visual)
+        self.assertIn("代替HTMLを作らず", visual)
         self.assertLess(visual.index("cli build-model"), visual.index("cli attach-image"))
         self.assertLess(visual.index("cli attach-image"), visual.index("cli render"))
         self.assertLess(visual.index("cli render"), visual.index("cli validate"))
@@ -31,6 +35,10 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("python3 -m scripts.html_review_workbench.cli validate", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli preview", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli ingest-review", reviewable)
+        self.assertIn("renderer repo root", reviewable)
+        self.assertIn("作業ディレクトリにして実行する", reviewable)
+        self.assertIn("現在のチャットやworkspaceのcwdをrepo rootとして扱わない", reviewable)
+        self.assertIn("代替HTMLを作らず", reviewable)
         self.assertLess(reviewable.index("cli build-model"), reviewable.index("cli render"))
         self.assertLess(reviewable.index("cli render"), reviewable.index("cli validate"))
         self.assertLess(reviewable.index("cli validate"), reviewable.index("cli preview"))
@@ -41,6 +49,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         reviewable = _read_simple_yaml(ROOT / "skills/reviewable-design-doc/agents/openai.yaml")
 
         self.assertEqual(visual["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
+        self.assertEqual(visual["working_directory"], "plugin_root")
         self.assertEqual(visual["workflow"], ["build-model", "attach-image", "render", "validate", "preview"])
         self.assertIn("html出力して", visual["trigger_examples"])
         self.assertIn("HTMLにして", visual["trigger_examples"])
@@ -48,6 +57,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("図示つきHTML", visual["trigger_examples"])
 
         self.assertEqual(reviewable["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
+        self.assertEqual(reviewable["working_directory"], "plugin_root")
         self.assertEqual(reviewable["workflow"], ["build-model", "render", "validate", "preview", "ingest-review"])
         self.assertIn("コメントを反映して", reviewable["trigger_examples"])
 
