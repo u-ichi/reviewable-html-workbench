@@ -24,12 +24,16 @@ body {
 
 .document-header,
 .document-content {
-  width: min(920px, calc(100vw - 32px));
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 .document-header {
-  padding: 40px 0 24px;
+  padding-top: 40px;
+  padding-bottom: 24px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -52,7 +56,8 @@ h1 {
 }
 
 .document-content {
-  padding: 28px 0 56px;
+  padding-top: 28px;
+  padding-bottom: 56px;
 }
 
 .review-block {
@@ -148,14 +153,27 @@ h1 {
   line-height: 1.3;
 }
 
+.review-block h3 {
+  margin: 18px 0 8px;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+a {
+  overflow-wrap: anywhere;
+}
+
 .block-content {
   margin: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .block-content table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 .block-content th,
@@ -164,6 +182,8 @@ h1 {
   border: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .block-content th {
@@ -508,6 +528,12 @@ h1 {
 @media (max-width: 640px) {
   .document-header {
     padding-top: 28px;
+  }
+
+  .document-header,
+  .document-content {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   h1 {

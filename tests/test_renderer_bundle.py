@@ -27,6 +27,9 @@ class RendererBundleTest(unittest.TestCase):
             self.assertIn("assets/review-comments.js", html)
             self.assertIn(".block-content pre code", css)
             self.assertIn("color: #f8fafc", css)
+            self.assertIn("max-width: none", css)
+            self.assertIn("table-layout: fixed", css)
+            self.assertIn("overflow-wrap: anywhere", css)
 
             manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["document"]["id"], "minimal-design-doc")
