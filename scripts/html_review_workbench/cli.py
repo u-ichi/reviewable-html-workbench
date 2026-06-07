@@ -31,7 +31,7 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "required_options": ("--model", "--output"),
     },
     "attach-image": {
-        "purpose": "Attach a generated image asset to an image block in a document model.",
+        "purpose": "Attach a generated image asset to an image-capable block in a document model.",
         "required_options": ("--model", "--block-id", "--image"),
         "optional_options": ("--output",),
     },

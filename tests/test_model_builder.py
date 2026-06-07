@@ -40,6 +40,9 @@ class ModelBuilderTest(unittest.TestCase):
         block = model["blocks"][0]
         self.assertEqual(block["type"], "diagram")
         self.assertIn("flowchart TD", block["diagram_source"])
+        self.assertEqual(block["image"]["generation_status"], "requested")
+        self.assertIn("Mermaid source", block["image"]["prompt"])
+        self.assertIn("white background", block["image"]["prompt"])
 
     def test_build_model_creates_image_block_requiring_generation(self) -> None:
         model = build_model("画面イメージとしてレビューUIのスクリーンショット風画像を入れる。", title="Screen")
@@ -48,6 +51,8 @@ class ModelBuilderTest(unittest.TestCase):
         self.assertEqual(block["type"], "image")
         self.assertEqual(block["image"]["generation_status"], "requested")
         self.assertIn("prompt", block["image"])
+        self.assertIn("business document", block["image"]["prompt"])
+        self.assertIn("do not invent", block["image"]["prompt"])
 
     def test_structured_content_wins_over_image_keyword(self) -> None:
         table_model = build_model("比較\nStep | Tool\nbuild | imagegen", title="Comparison")
@@ -137,6 +142,34 @@ class ModelBuilderTest(unittest.TestCase):
             self.assertIn('<figure class="block-content generated-image">', html)
             self.assertIn("<img", html)
             self.assertTrue((bundle_dir / result.source_path).is_file())
+
+    def test_attach_image_enables_rendering_generated_diagram_image(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            model_path = tmp_dir / "document-model.json"
+            bundle_dir = tmp_dir / "bundle"
+            image_path = tmp_dir / "generated-diagram.png"
+            image_path.write_bytes(_minimal_png_bytes())
+            model = build_model("処理フロー\nInput -> Planner -> HTML", title="Flow", document_id="flow")
+            model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+            block = model["blocks"][0]
+
+            result = attach_image_to_model(
+                model_path=model_path,
+                block_id=block["id"],
+                image_path=image_path,
+            )
+            render_bundle(result.model_path, bundle_dir)
+
+            html = (bundle_dir / "index.html").read_text(encoding="utf-8")
+            manifest = json.loads((bundle_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
+            self.assertIn('<figure class="block-content generated-image">', html)
+            self.assertIn("<img", html)
+            self.assertNotIn("diagram-preview", html)
+            self.assertTrue((bundle_dir / result.source_path).is_file())
+            self.assertEqual(manifest["outputs"]["diagrams"], [f"assets/diagrams/{block['id']}.mmd"])
+            self.assertEqual(manifest["outputs"]["images"], [result.source_path])
+            self.assertTrue(validate_bundle(bundle_dir).ok)
 
     def test_heading_source_becomes_html_sections_without_literal_markers(self) -> None:
         source = """# actas で tmux からの別 pane 相談を実現できるか

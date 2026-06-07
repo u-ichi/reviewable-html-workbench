@@ -32,6 +32,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertLess(visual.index("cli validate"), visual.index("cli preview"))
 
         self.assertIn("python3 -m scripts.html_review_workbench.cli render", reviewable)
+        self.assertIn("python3 -m scripts.html_review_workbench.cli attach-image", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli validate", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli preview", reviewable)
         self.assertIn("python3 -m scripts.html_review_workbench.cli ingest-review", reviewable)
@@ -39,6 +40,8 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("作業ディレクトリにして実行する", reviewable)
         self.assertIn("現在のチャットやworkspaceのcwdをrepo rootとして扱わない", reviewable)
         self.assertIn("代替HTMLを作らず", reviewable)
+        self.assertLess(reviewable.index("cli build-model"), reviewable.index("cli attach-image"))
+        self.assertLess(reviewable.index("cli attach-image"), reviewable.index("cli render"))
         self.assertLess(reviewable.index("cli build-model"), reviewable.index("cli render"))
         self.assertLess(reviewable.index("cli render"), reviewable.index("cli validate"))
         self.assertLess(reviewable.index("cli validate"), reviewable.index("cli preview"))
@@ -58,7 +61,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
 
         self.assertEqual(reviewable["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
         self.assertEqual(reviewable["working_directory"], "plugin_root")
-        self.assertEqual(reviewable["workflow"], ["build-model", "render", "validate", "preview", "ingest-review"])
+        self.assertEqual(reviewable["workflow"], ["build-model", "attach-image", "render", "validate", "preview", "ingest-review"])
         self.assertIn("コメントを反映して", reviewable["trigger_examples"])
 
     def test_visual_skill_handles_natural_html_output_request_without_model_argument(self) -> None:

@@ -33,7 +33,7 @@ def attach_image_to_model(
         raise ImageAssetError(f"image file not found: {image_path}")
     target_model_path = output_path or model_path
     model = json.loads(model_path.read_text(encoding="utf-8"))
-    block = _find_image_block(model, block_id)
+    block = _find_image_target_block(model, block_id)
 
     model_assets_dir = target_model_path.parent / "assets" / "images"
     model_assets_dir.mkdir(parents=True, exist_ok=True)
@@ -59,13 +59,13 @@ def attach_image_to_model(
     )
 
 
-def _find_image_block(model: dict[str, Any], block_id: str) -> dict[str, Any]:
+def _find_image_target_block(model: dict[str, Any], block_id: str) -> dict[str, Any]:
     for block in model.get("blocks", []):
         if block.get("id") == block_id:
-            if block.get("type") != "image":
-                raise ImageAssetError(f"block is not an image block: {block_id}")
+            if block.get("type") not in {"image", "diagram"}:
+                raise ImageAssetError(f"block does not accept generated image assets: {block_id}")
             return block
-    raise ImageAssetError(f"image block not found: {block_id}")
+    raise ImageAssetError(f"image-capable block not found: {block_id}")
 
 
 def _asset_filename(block_id: str, image_path: Path) -> str:

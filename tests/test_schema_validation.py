@@ -51,6 +51,28 @@ class SchemaValidationTest(unittest.TestCase):
 
         self.assertIn("$.bind", {error.path for error in errors})
 
+    def test_diagram_block_can_request_generated_image(self) -> None:
+        schema = _read_json(ROOT / "schemas/document-model.schema.json")
+        fixture = _read_json(ROOT / "tests/fixtures/minimal_document_model.json")
+        fixture["blocks"][0] = {
+            "id": "system-flow",
+            "type": "diagram",
+            "title": "System Flow",
+            "content": "flowchart TD\n  A[Input] --> B[Output]",
+            "diagram_source": "flowchart TD\n  A[Input] --> B[Output]",
+            "image": {
+                "prompt": "Generate a clean business diagram.",
+                "alt": "System Flow diagram",
+                "caption": "System Flow",
+                "generation_status": "requested",
+            },
+            "review_required": True,
+        }
+
+        errors = validate(fixture, schema)
+
+        self.assertEqual(errors, [])
+
     def test_numeric_bounds_validate_without_runtime_type_errors(self) -> None:
         schema = {"type": "object", "properties": {"start": {"type": "integer", "minimum": 0}}}
 

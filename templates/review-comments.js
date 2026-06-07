@@ -568,7 +568,7 @@
   }
 
   function captureImageBlockClick(event) {
-    const image = event.target.closest?.('[data-block-type="image"] img');
+    const image = event.target.closest?.(".generated-image img");
     if (!image) {
       return false;
     }

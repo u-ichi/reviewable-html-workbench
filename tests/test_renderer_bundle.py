@@ -85,6 +85,49 @@ class RendererBundleTest(unittest.TestCase):
             self.assertEqual(manifest["review_blocks"][1]["diagram_kind"], "flow")
             self.assertTrue(validate_bundle(output_dir).ok)
 
+    def test_render_bundle_uses_generated_image_for_diagram_when_available(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "diagram-image-doc",
+            "title": "Diagram Image Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "system-flow",
+                    "type": "diagram",
+                    "title": "System Flow",
+                    "content": "flowchart TD\n  A[Input] --> B[Output]",
+                    "diagram_source": "flowchart TD\n  A[Input] --> B[Output]",
+                    "image": {
+                        "prompt": "Generate a clean business diagram.",
+                        "alt": "System Flow diagram",
+                        "caption": "System Flow",
+                        "generation_status": "generated",
+                        "source_path": "generated-diagram.png",
+                    },
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            output_dir = tmp_dir / "bundle"
+            model_path = tmp_dir / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            (tmp_dir / "generated-diagram.png").write_bytes(_minimal_png_bytes())
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
+
+            self.assertIn('<figure class="block-content generated-image">', html)
+            self.assertIn('src="assets/images/generated-diagram.png"', html)
+            self.assertNotIn("diagram-preview", html)
+            self.assertEqual(manifest["outputs"]["diagrams"], ["assets/diagrams/system-flow.mmd"])
+            self.assertEqual(manifest["outputs"]["images"], ["assets/images/generated-diagram.png"])
+            self.assertTrue(validate_bundle(output_dir).ok)
+
     def test_plan_diagrams_classifies_supported_kinds(self) -> None:
         blocks = [
             {"id": "flow", "type": "diagram", "content": "flowchart LR\nA-->B"},
@@ -101,6 +144,18 @@ class RendererBundleTest(unittest.TestCase):
         self.assertEqual(plans["matrix"].kind, "matrix")
         self.assertEqual(plans["timeline"].kind, "timeline")
         self.assertEqual(plans["concept"].kind, "concept")
+
+
+def _minimal_png_bytes() -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        b"\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+        b"\x90wS\xde"
+        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe"
+        b"\xdc\xccY\xe7"
+        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
 
 
 if __name__ == "__main__":

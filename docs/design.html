@@ -577,14 +577,14 @@
           <tbody>
             <tr>
               <td>処理順、判断順、承認フロー</td>
-              <td><code>Mermaid flowchart</code> + rendered SVG</td>
-              <td>sourceが読みやすく、差分管理しやすい。</td>
-              <td>本文と矛盾しないよう、ノードは本文の見出しやfield名から生成する。</td>
+              <td><code>Mermaid flowchart</code> + 生成画像</td>
+              <td>sourceを保存して構造を検証しつつ、HTML上では読みやすい清書済み画像を表示できる。</td>
+              <td>ノード、ラベル、矢印方向を保持し、sourceに無い判断や関係を追加しない。</td>
             </tr>
             <tr>
               <td>責務分離、システム構成、データ流</td>
-              <td>inline SVG または Mermaid</td>
-              <td>HTML内で安定して表示でき、外部CDNに依存しない。</td>
+              <td>Mermaid source + 生成画像</td>
+              <td>構造はsourceで残し、表示は白背景の資料向け画像にできる。</td>
               <td>複雑すぎる場合は本文側へ分解し、1図1論点にする。</td>
             </tr>
             <tr>
@@ -594,10 +594,10 @@
               <td>HTMLはSVGを表示し、draw.ioは編集用assetとして同梱する。</td>
             </tr>
             <tr>
-              <td>概念イメージ、比喩的な説明</td>
+              <td>概念イメージ、画面イメージ、比喩的な説明</td>
               <td>生成画像</td>
               <td>読者の直感理解を助ける。</td>
-              <td>数値、根拠、関係性の正確さが必要な図には使わない。</td>
+              <td>白背景、十分な余白、資料向けの見た目を基本にし、入力に無い数値・根拠・公式ロゴ・UIラベルを作らない。</td>
             </tr>
           </tbody>
         </table>
@@ -605,7 +605,7 @@
           図示は「本文の構造を見える化する」用途に限定する。入力に存在しない因果関係、判断、優先順位を図で追加してはいけない。
         </div>
         <div class="callout">
-          Renderer MVPでは <code>type: "diagram"</code> ブロックを <code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類し、Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。HTML上では外部レンダリングに依存せず、source保存先と <code>&lt;pre&gt;</code> fallbackを表示する。
+          Renderer MVPでは <code>type: "diagram"</code> ブロックを <code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類し、Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。HTML上では生成画像を主表示にし、画像が未添付の場合だけsource保存先と <code>&lt;pre&gt;</code> fallbackを表示する。
         </div>
       </section>
 

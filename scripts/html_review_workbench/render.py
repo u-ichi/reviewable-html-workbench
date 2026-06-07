@@ -152,6 +152,8 @@ def _render_block_title(title: object) -> str:
 def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None, image_src: str | None) -> str:
     content = block.get("content", "")
     block_type = block["type"]
+    if image_src is not None:
+        return _render_image(block, image_src)
     if block_type == "html":
         return f'<div class="block-content">{content}</div>'
     if block_type == "callout":
@@ -182,12 +184,19 @@ def _prepare_image_assets(blocks: list[dict[str, Any]], model_dir: Path, output_
     outputs: dict[str, str] = {}
     images_dir = output_dir / "assets" / "images"
     for block in blocks:
-        if block.get("type") != "image":
+        block_type = block.get("type")
+        if block_type not in {"image", "diagram"}:
+            continue
+        image = block.get("image")
+        if not isinstance(image, dict):
+            if block_type == "image":
+                raise ValueError(f"image block requires generated image.source_path before render: {block['id']}")
             continue
         block_id = block["id"]
-        image = block.get("image")
-        if not isinstance(image, dict) or not image.get("source_path"):
-            raise ValueError(f"image block requires generated image.source_path before render: {block_id}")
+        if not image.get("source_path"):
+            if block_type == "image":
+                raise ValueError(f"image block requires generated image.source_path before render: {block_id}")
+            continue
         source = Path(str(image["source_path"]))
         source_path = source if source.is_absolute() else model_dir / source
         if not source_path.is_file():

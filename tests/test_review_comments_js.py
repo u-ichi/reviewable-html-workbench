@@ -39,7 +39,7 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
     def test_image_block_click_creates_commentable_selection(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
 
-        self.assertIn('event.target.closest?.(\'[data-block-type="image"] img\')', script)
+        self.assertIn('event.target.closest?.(".generated-image img")', script)
         self.assertIn("clearDocumentSelectionForNonTextTarget()", script)
         self.assertIn('selectedText: image.getAttribute("alt")', script)
         self.assertIn("image.getBoundingClientRect()", script)

@@ -17,6 +17,8 @@ DEFAULT_DOCUMENT_ID = "html-output"
 IMAGE_KEYWORDS = ("image", "photo", "screenshot", "logo", "画像", "写真", "スクリーンショット", "ロゴ", "画面")
 DIAGRAM_KEYWORDS = ("flow", "workflow", "dependency", "architecture", "構成", "依存", "流れ", "処理フロー", "ワークフロー")
 CALLOUT_KEYWORDS = ("important", "note", "warning", "決定", "注意", "重要", "前提")
+PROMPT_CONTENT_LIMIT = 900
+PROMPT_DIAGRAM_LIMIT = 1400
 
 
 class ModelBuildError(ValueError):
@@ -271,7 +273,7 @@ def image_block(block_id: str, title: str, content: str) -> dict[str, Any]:
         "content": content,
         "review_required": True,
         "image": {
-            "prompt": content[:800],
+            "prompt": image_generation_prompt(title, content),
             "alt": title,
             "caption": content[:160],
             "generation_status": "requested",
@@ -288,8 +290,54 @@ def diagram_block(block_id: str, title: str, content: str) -> dict[str, Any]:
         "content": source,
         "diagram_kind": "flow",
         "diagram_source": source,
+        "image": {
+            "prompt": diagram_image_generation_prompt(title, source),
+            "alt": f"{title} diagram",
+            "caption": title,
+            "generation_status": "requested",
+        },
         "review_required": True,
     }
+
+
+def image_generation_prompt(title: str, content: str) -> str:
+    return _join_prompt_lines(
+        [
+            "Create a polished explanatory image for a reviewable HTML report.",
+            f"Title/context: {title}",
+            "Content to visualize:",
+            _limited_prompt_text(content, PROMPT_CONTENT_LIMIT),
+            "Style requirements: white background, clean business document aesthetic, generous whitespace, clear hierarchy, Japanese Gothic or clean sans-serif typography only when text is needed.",
+            "Accuracy requirements: keep text minimal and accurate; do not invent metrics, facts, brand names, official logos, UI labels, or relationships not present in the content.",
+            "If this is a screen or UI concept, render it as a mockup instead of a real screenshot. No watermark.",
+        ]
+    )
+
+
+def diagram_image_generation_prompt(title: str, source: str) -> str:
+    return _join_prompt_lines(
+        [
+            "Create a polished business infographic image from this Mermaid source for a reviewable HTML report.",
+            f"Title/context: {title}",
+            "Preserve every node, label, arrow direction, grouping, and relationship in the Mermaid source.",
+            "Use a white background, clean Japanese business-document styling, Japanese Gothic or clean sans-serif typography, balanced spacing, and readable labels.",
+            "Do not add nodes, facts, relationships, metrics, brand marks, icons, or decorative elements that are not implied by the Mermaid source.",
+            "Render the diagram as a finished image; do not show raw Mermaid syntax in the image.",
+            "Mermaid source:",
+            _limited_prompt_text(source, PROMPT_DIAGRAM_LIMIT),
+        ]
+    )
+
+
+def _join_prompt_lines(lines: list[str]) -> str:
+    return "\n".join(line.strip() for line in lines if line.strip())
+
+
+def _limited_prompt_text(value: str, limit: int) -> str:
+    text = value.strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
 
 
 def should_use_diagram(content: str) -> bool:
