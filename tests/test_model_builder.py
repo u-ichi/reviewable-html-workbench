@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ModelBuilderTest(unittest.TestCase):
-    def test_build_model_from_text_creates_table_block(self) -> None:
+    def test_build_model_from_text_creates_source_capture_draft(self) -> None:
         model = build_model(
             "比較\nOption | Cost | Speed\nA | Low | Fast\nB | High | Slow",
             title="Comparison",
@@ -25,51 +25,38 @@ class ModelBuilderTest(unittest.TestCase):
         )
 
         self.assertEqual(model["document_id"], "comparison")
+        self.assertEqual(model["metadata"]["planner"], "source-capture-draft")
+        self.assertTrue(model["metadata"]["final_model_required"])
         self.assertEqual(model["blocks"][0]["type"], "html")
-        self.assertIn("<table>", model["blocks"][0]["content"])
+        self.assertEqual(model["blocks"][0]["title"], "Source capture draft")
+        self.assertIn("<pre><code>", model["blocks"][0]["content"])
+        self.assertIn("Option | Cost | Speed", model["blocks"][0]["content"])
+        self.assertNotIn("<table>", model["blocks"][0]["content"])
 
-    def test_build_model_creates_ordered_list_block(self) -> None:
+    def test_build_model_does_not_convert_markdown_lists(self) -> None:
         model = build_model("手順\n1. Gather input\n2. Build model\n3. Render HTML", title="Steps")
 
         self.assertEqual(model["blocks"][0]["type"], "html")
-        self.assertIn("<ol>", model["blocks"][0]["content"])
+        self.assertIn("1. Gather input", model["blocks"][0]["content"])
+        self.assertNotIn("<ol>", model["blocks"][0]["content"])
 
-    def test_build_model_creates_diagram_block_for_flow(self) -> None:
+    def test_build_model_does_not_infer_diagram_block_for_flow(self) -> None:
         model = build_model("処理フロー\nInput -> Planner -> HTML", title="Flow")
 
         block = model["blocks"][0]
-        self.assertEqual(block["type"], "diagram")
-        self.assertIn("flowchart TD", block["diagram_source"])
-        self.assertEqual(block["image"]["generation_status"], "requested")
-        self.assertIn("Mermaid source", block["image"]["prompt"])
-        self.assertIn("white background", block["image"]["prompt"])
+        self.assertEqual(block["type"], "html")
+        self.assertIn("Input -&gt; Planner -&gt; HTML", block["content"])
+        self.assertNotIn("diagram_source", block)
+        self.assertNotIn("image", block)
 
-    def test_build_model_creates_image_block_requiring_generation(self) -> None:
+    def test_build_model_does_not_infer_image_block(self) -> None:
         model = build_model("画面イメージとしてレビューUIのスクリーンショット風画像を入れる。", title="Screen")
 
         block = model["blocks"][0]
-        self.assertEqual(block["type"], "image")
-        self.assertEqual(block["image"]["generation_status"], "requested")
-        self.assertIn("prompt", block["image"])
-        self.assertIn("business document", block["image"]["prompt"])
-        self.assertIn("do not invent", block["image"]["prompt"])
-
-    def test_structured_content_wins_over_image_keyword(self) -> None:
-        table_model = build_model("比較\nStep | Tool\nbuild | imagegen", title="Comparison")
-        flow_model = build_model("処理フロー\nInput -> imagegen -> HTML", title="Flow")
-
-        self.assertEqual(table_model["blocks"][0]["type"], "html")
-        self.assertIn("<table>", table_model["blocks"][0]["content"])
-        self.assertEqual(flow_model["blocks"][0]["type"], "diagram")
-
-    def test_callout_priority_wins_over_visual_keywords(self) -> None:
-        model = build_model("注意事項\n重要: 入力内容に応じて表現方法を選ぶ。", title="Caution")
-
-        block = model["blocks"][0]
-        self.assertEqual(block["type"], "callout")
+        self.assertEqual(block["type"], "html")
         self.assertNotIn("image", block)
 
-    def test_generated_html_escapes_unsafe_input(self) -> None:
+    def test_source_capture_draft_escapes_unsafe_input(self) -> None:
         model = build_model("<script>alert(1)</script>\n<button onclick='x'>Run</button>", title="Unsafe")
 
         content = model["blocks"][0]["content"]
@@ -88,7 +75,9 @@ class ModelBuilderTest(unittest.TestCase):
 
             self.assertEqual(result.path, output_path)
             payload = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["blocks"][0]["type"], "callout")
+            self.assertEqual(payload["metadata"]["planner"], "source-capture-draft")
+            self.assertEqual(payload["blocks"][0]["type"], "html")
+            self.assertIn("決定事項", payload["blocks"][0]["content"])
 
     def test_cli_build_model_accepts_stdin_and_full_pipeline_validates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -119,7 +108,8 @@ class ModelBuilderTest(unittest.TestCase):
 
             self.assertTrue(result.ok, result.errors)
             html = (bundle_dir / "index.html").read_text(encoding="utf-8")
-            self.assertIn("diagram-preview", html)
+            self.assertIn("Source capture draft", html)
+            self.assertIn("Client -&gt; API -&gt; Database", html)
 
     def test_attach_image_enables_rendering_generated_image(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -128,7 +118,7 @@ class ModelBuilderTest(unittest.TestCase):
             bundle_dir = tmp_dir / "bundle"
             image_path = tmp_dir / "generated.png"
             image_path.write_bytes(_minimal_png_bytes())
-            model = build_model("画面イメージとしてレビューUIのスクリーンショット風画像を生成して配置する。", title="Screen", document_id="screen")
+            model = _image_model()
             model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
 
             result = attach_image_to_model(
@@ -150,7 +140,7 @@ class ModelBuilderTest(unittest.TestCase):
             bundle_dir = tmp_dir / "bundle"
             image_path = tmp_dir / "generated-diagram.png"
             image_path.write_bytes(_minimal_png_bytes())
-            model = build_model("処理フロー\nInput -> Planner -> HTML", title="Flow", document_id="flow")
+            model = _diagram_model()
             model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
             block = model["blocks"][0]
 
@@ -171,7 +161,7 @@ class ModelBuilderTest(unittest.TestCase):
             self.assertEqual(manifest["outputs"]["images"], [result.source_path])
             self.assertTrue(validate_bundle(bundle_dir).ok)
 
-    def test_heading_source_becomes_html_sections_without_literal_markers(self) -> None:
+    def test_markdown_source_remains_capture_draft_without_mechanical_conversion(self) -> None:
         source = """# actas で tmux からの別 pane 相談を実現できるか
 
 ## 結論
@@ -200,13 +190,63 @@ agmsg-tmux-send --to right "相談内容"
         model_html = "\n".join(block["title"] + "\n" + block["content"] for block in model["blocks"])
 
         self.assertEqual(model["title"], "actas で tmux からの別 pane 相談を実現できるか")
-        self.assertEqual([block["title"] for block in model["blocks"]], ["結論", "評価", "具体例"])
-        self.assertNotIn("# actas", model_html)
-        self.assertNotIn("## 評価", model_html)
-        self.assertNotIn("```", model_html)
-        self.assertIn("<ol>", model_html)
-        self.assertIn("<table>", model_html)
-        self.assertIn("<pre><code>", model_html)
+        self.assertEqual([block["title"] for block in model["blocks"]], ["Source capture draft"])
+        self.assertIn("# actas", model_html)
+        self.assertIn("## 評価", model_html)
+        self.assertIn("```text", model_html)
+        self.assertNotIn("<ol>", model_html)
+        self.assertNotIn("<table>", model_html)
+
+
+def _image_model() -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "document_id": "screen",
+        "title": "Screen",
+        "generated_at": "2026-05-17T00:00:00+09:00",
+        "blocks": [
+            {
+                "id": "screen-image",
+                "type": "image",
+                "title": "Screen",
+                "content": "レビューUIの画面イメージ",
+                "review_required": True,
+                "image": {
+                    "prompt": "Generate a clean review UI mockup.",
+                    "alt": "Screen mockup",
+                    "caption": "レビューUIの画面イメージ",
+                    "generation_status": "requested",
+                },
+            }
+        ],
+    }
+
+
+def _diagram_model() -> dict[str, object]:
+    source = "flowchart TD\n  Input[Input] --> Planner[Planner]\n  Planner --> HTML[HTML]"
+    return {
+        "schema_version": "1.0",
+        "document_id": "flow",
+        "title": "Flow",
+        "generated_at": "2026-05-17T00:00:00+09:00",
+        "blocks": [
+            {
+                "id": "flow-diagram",
+                "type": "diagram",
+                "title": "Flow",
+                "content": source,
+                "diagram_kind": "flow",
+                "diagram_source": source,
+                "review_required": True,
+                "image": {
+                    "prompt": "Generate a clean business diagram from the Mermaid source.",
+                    "alt": "Flow diagram",
+                    "caption": "Flow",
+                    "generation_status": "requested",
+                },
+            }
+        ],
+    }
 
 
 def _minimal_png_bytes() -> bytes:

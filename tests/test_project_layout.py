@@ -87,11 +87,12 @@ class ProjectLayoutTest(unittest.TestCase):
     def test_cli_subcommand_contract_is_stable(self) -> None:
         self.assertEqual(
             set(cli.COMMAND_CONTRACT),
-            {"build-model", "attach-image", "render", "preview", "ingest-review", "validate"},
+            {"build-model", "attach-image", "render", "check-model", "preview", "ingest-review", "validate"},
         )
         self.assertEqual(cli.COMMAND_CONTRACT["build-model"]["required_options"], ("--output",))
         self.assertEqual(cli.COMMAND_CONTRACT["attach-image"]["required_options"], ("--model", "--block-id", "--image"))
         self.assertEqual(cli.COMMAND_CONTRACT["render"]["required_options"], ("--model", "--output"))
+        self.assertEqual(cli.COMMAND_CONTRACT["check-model"]["required_options"], ("--model",))
         self.assertEqual(cli.COMMAND_CONTRACT["preview"]["required_options"], ("--root",))
         self.assertEqual(cli.COMMAND_CONTRACT["ingest-review"]["required_options"], ("--root",))
         self.assertEqual(cli.COMMAND_CONTRACT["validate"]["required_options"], ("--root",))

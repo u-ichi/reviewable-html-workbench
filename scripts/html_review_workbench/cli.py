@@ -15,6 +15,7 @@ from scripts.html_review_workbench.comment_store import CommentStoreError
 from scripts.html_review_workbench.image_assets import ImageAssetError, attach_image_to_model
 from scripts.html_review_workbench.ingest_review import ReviewIngestionError, ingest_review as run_ingest_review
 from scripts.html_review_workbench.model_builder import ModelBuildError, build_model_from_source
+from scripts.html_review_workbench.model_quality import check_model_quality
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
 from scripts.html_review_workbench.validate_bundle import validate_bundle
@@ -29,6 +30,10 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
     "render": {
         "purpose": "Generate an HTML bundle from a document model.",
         "required_options": ("--model", "--output"),
+    },
+    "check-model": {
+        "purpose": "Check whether a document model is ready for final HTML rendering.",
+        "required_options": ("--model",),
     },
     "attach-image": {
         "purpose": "Attach a generated image asset to an image-capable block in a document model.",
@@ -77,6 +82,12 @@ def render(args: argparse.Namespace) -> int:
     index_path = render_bundle(Path(args.model), Path(args.output))
     print(index_path)
     return 0
+
+
+def check_model(args: argparse.Namespace) -> int:
+    result = check_model_quality(Path(args.model))
+    print(json.dumps(result.to_payload(), ensure_ascii=False))
+    return 0 if result.ok else 1
 
 
 def attach_image(args: argparse.Namespace) -> int:
@@ -168,6 +179,14 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser.add_argument("--model", required=True)
     render_parser.add_argument("--output", required=True)
     render_parser.set_defaults(func=render)
+
+    check_model_parser = subparsers.add_parser(
+        "check-model",
+        help=str(COMMAND_CONTRACT["check-model"]["purpose"]),
+        description=str(COMMAND_CONTRACT["check-model"]["purpose"]),
+    )
+    check_model_parser.add_argument("--model", required=True)
+    check_model_parser.set_defaults(func=check_model)
 
     attach_image_parser = subparsers.add_parser(
         "attach-image",

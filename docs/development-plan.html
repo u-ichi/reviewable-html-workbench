@@ -258,15 +258,15 @@
         <ul>
           <li><code>.codex-plugin/plugin.json</code> を優先して整える。<code>.claude-plugin/plugin.json</code> は存在だけ維持し、本格対応は最後に回す。</li>
           <li><code>skills/*/SKILL.md</code> のdescriptionを実使用トリガーに合わせて調整する。</li>
-          <li><code>scripts/html_review_workbench.cli</code> のsubcommand契約を固定する。</li>
+          <li><code>scripts/html_review_workbench.cli</code> のsubcommand公開仕様を固定する。</li>
           <li><code>docs/design.html</code> と <code>docs/development-flow.md</code> を現行仕様に同期する。</li>
           <li>GitHub Actionsで unittest、Codex manifest JSON syntax check、plugin構成check を実行する。</li>
         </ul>
-        <h3>固定した契約</h3>
+        <h3>固定した公開仕様</h3>
         <ul>
           <li><code>.github/workflows/test.yml</code> は <code>main</code> push と pull request で unittest、plugin manifest JSON syntax check、CLI help check を実行する。</li>
           <li><code>.codex-plugin/plugin.json</code> は <code>interface</code> の表示名、説明、capabilities、defaultPrompt、brandColor を必須fieldとしてテストで確認する。</li>
-          <li><code>scripts.html_review_workbench.cli</code> は <code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> の4 subcommandを公開契約として持つ。</li>
+          <li><code>scripts.html_review_workbench.cli</code> は <code>check-model</code>、<code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> の5 subcommandを公開仕様として持つ。</li>
           <li><code>skills/*/SKILL.md</code> は Codex が発火判断に使えるように、Triggers と使用しない場面をdescriptionに含める。</li>
         </ul>
         <h3>完了条件</h3>
@@ -420,15 +420,15 @@
         <h2>Milestone 7: Codex Skill Integration</h2>
         <p><span class="status ok">Goal</span> Codex上で2つのskillが共通scriptを使って一連のworkflowを実行できる。</p>
         <ul>
-          <li><code>visual-html-renderer</code> から <code>render</code>, <code>validate</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
-          <li><code>reviewable-design-doc</code> から <code>render</code>, <code>ingest-review</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
+          <li><code>visual-html-renderer</code> から <code>check-model</code>, <code>render</code>, <code>validate</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
+          <li><code>reviewable-design-doc</code> から <code>check-model</code>, <code>render</code>, <code>ingest-review</code>, <code>preview</code> を呼ぶ手順を確定する。</li>
           <li>Codex pluginとしてのskill discovery、trigger、CLI呼び出し、成果物配置を確認する。</li>
           <li><code>agents/openai.yaml</code> をSKILL.mdと同期する。</li>
         </ul>
         <h3>Codex統合で固定する順序</h3>
         <ul>
-          <li><code>visual-html-renderer</code> は <code>python3 -m scripts.html_review_workbench.cli render</code> → <code>validate</code> → <code>preview</code> の順に共通CLIを呼ぶ。</li>
-          <li><code>reviewable-design-doc</code> は同じ <code>render</code> → <code>validate</code> → <code>preview</code> に加え、レビュー完了後に <code>ingest-review</code> を呼ぶ。</li>
+          <li><code>visual-html-renderer</code> は、raw textやMarkdown変換結果ではなく、HTML表現を前提に直接設計した文書モデルを <code>check-model</code> → <code>render</code> → <code>validate</code> → <code>preview</code> の順に共通CLIへ渡す。</li>
+          <li><code>reviewable-design-doc</code> は同じ <code>check-model</code> → <code>render</code> → <code>validate</code> → <code>preview</code> に加え、レビュー完了後に <code>ingest-review</code> を呼ぶ。</li>
           <li><code>agents/openai.yaml</code> は trigger例、default prompt、共通CLI entrypoint、workflow順をSKILL.mdと同期する。</li>
           <li><code>tests/test_codex_skill_integration.py</code> で同じfixtureから同じHTML bundle構造が出ること、reviewable workflowだけが <code>annotations/review-cycle-state.json</code> を追加することを検証する。</li>
         </ul>
@@ -445,7 +445,7 @@
           <li>plugin versioningとrelease tag手順を <code>docs/codex-plugin-packaging.md</code> に固定する。</li>
         </ul>
         <h3>base repo 管理方式との統合検討</h3>
-        <p>現在のbase repoは、共通skillを <code>home/skills/&lt;name&gt;</code> に置き、Codexへは <code>home/generated/codex-skills/</code> 経由で <code>~/.agents/skills/</code> にsymlink配布する。plugin化する場合、この既存経路と衝突しない導入方式をCodex側で先に決める。Claude側の <code>~/.claude/skills</code> / plugin install 方針はMilestone 10で扱う。</p>
+        <p>現在のbase repoは、共通skillを <code>home/skills/&lt;name&gt;</code> に置き、Codexへは <code>home/generated/codex-skills/</code> 経由で <code>~/.agents/skills/</code> にcopy配布する。plugin化する場合、この既存経路と衝突しない導入方式をCodex側で先に決める。Claude側の <code>~/.claude/skills</code> / plugin install 方針はMilestone 10で扱う。</p>
         <table>
           <thead>
             <tr>
@@ -457,24 +457,24 @@
           <tbody>
             <tr>
               <td>base repo 管理へ取り込み</td>
-              <td><code>home/skills/visual-html-renderer</code> と <code>home/skills/reviewable-design-doc</code> を正本にし、scriptはbase repo配下に置く。</td>
+              <td><code>home/skills/visual-html-renderer</code> と <code>home/skills/reviewable-design-doc</code> を管理元にし、scriptはbase repo配下に置く。</td>
               <td>Codex全プロジェクトへ即時展開したい場合に向く。plugin repoとしての独立性は下がる。</td>
             </tr>
             <tr>
               <td>外部plugin repoとして管理</td>
-              <td>このrepoを正本にし、Codexはmarketplace entryで参照する。Claude連携は最後に追加する。</td>
+              <td>このrepoを管理元にし、Codexはmarketplace entryで参照する。Claude連携は最後に追加する。</td>
               <td>採用。scriptが厚く、versioningとテストをrepo単位で持てる。base repo側には同名skillを置かない。</td>
             </tr>
             <tr>
               <td>hybrid adapter</td>
-              <td>base repo側には薄いadapter skillだけ置き、実処理と正本skillはこのplugin repoを参照する。</td>
+              <td>base repo側には薄いadapter skillだけ置き、実処理と管理元skillはこのplugin repoを参照する。</td>
               <td>移行期に向く。二重定義を避けるためadapterの責務を明文化する必要がある。</td>
             </tr>
           </tbody>
         </table>
         <h3>統合時の確認項目</h3>
         <ul>
-          <li>現時点では <code>home/skills</code>、<code>home/generated/codex-skills</code>、live <code>~/.agents/skills</code> / <code>~/.codex/skills</code> に同名skillは存在しない。</li>
+          <li>plugin skill は marketplace cache のcopy配置で扱い、<code>home/skills</code>、<code>home/generated/codex-skills</code>、live <code>~/.agents/skills</code> / <code>~/.codex/skills</code> に同名skillを置かない。</li>
           <li><code>bin/build-codex-skills.sh</code> はbase repoの <code>home/skills</code> だけを入力にするため、このplugin repoをその配下へコピーしない限り生成物とは衝突しない。</li>
           <li>base repoの <code>install.sh</code> にはCodex marketplace登録やplugin installを含めず、個別導入手順に分ける。</li>
           <li>既存skillからこのpluginを呼ぶ場合は、直接script呼び出しではなくplugin skill境界経由にする。</li>
@@ -527,7 +527,7 @@
           <li><code>claude plugins validate .</code> を通す。</li>
           <li><code>claude --plugin-dir &lt;repo&gt;</code> で手元起動する。</li>
           <li>Claude側のskill discovery、slash command、CLI呼び出し差分を確認する。</li>
-          <li>base repoの <code>~/.claude/skills</code> symlink配布と plugin install のどちらを正本にするか決める。</li>
+          <li>base repoの <code>~/.claude/skills</code> copy配布と plugin install のどちらを管理元にするか決める。</li>
           <li>Codexで確立したfixtureと実出力評価をClaudeでも再実行する。</li>
         </ul>
       </section>

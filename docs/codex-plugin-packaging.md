@@ -25,13 +25,8 @@ codex plugin marketplace add /private/tmp/reviewable-html-workbench
 - `reviewable-design-doc`
 
 この操作は `~/.codex` 側の marketplace 設定と plugin cache を更新する。作業 agent が実行する場合は、ユーザー承認を取ってから実行する。
-
-Codex CLI v0.130.0 のローカル marketplace では、`marketplace add` だけでは `~/.codex/skills` へ skill が materialize されない場合がある。その場合は plugin repo の skill を symlink する。
-
-```bash
-ln -sfn "/path/to/reviewable-html-workbench/skills/visual-html-renderer" ~/.codex/skills/visual-html-renderer
-ln -sfn "/path/to/reviewable-html-workbench/skills/reviewable-design-doc" ~/.codex/skills/reviewable-design-doc
-```
+`~/.codex/skills` 直下へ手動 symlink を作らない。plugin skill は `~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/skills/` の copy された実体を読み込み元にする。
+古い `~/.codex/skills/visual-html-renderer` / `~/.codex/skills/reviewable-design-doc` symlink が残っている場合は、plugin cache 更新後に撤去して重複読み込みを避ける。
 
 検証済みの発火名は次の通り。
 
@@ -59,7 +54,7 @@ codex plugin marketplace upgrade reviewable-html-workbench-local
 - 現時点では base repo の `home/skills` / `home/generated/codex-skills`、および live `~/.agents/skills` / `~/.codex/skills` に `visual-html-renderer` と `reviewable-design-doc` の同名 skill は置かない。
 - `bin/build-codex-skills.sh` は base repo の `home/skills` から `home/generated/codex-skills` を生成する経路なので、この plugin repo をその配下へコピーしない限り生成物とは衝突しない。
 - marketplace policy は `INSTALLED_BY_DEFAULT` にする。`AVAILABLE` だけでは `codex plugin marketplace add` 後に `~/.codex/plugins/cache` へ plugin 実体が作られず、skill discovery に載らない。
-- 現行CLIで skill materialization が走らない場合も、`~/.codex/skills` の symlink は plugin repo を参照し、base repo の `home/generated/codex-skills` とは分離する。
+- plugin skill は marketplace cache の copy 配置で扱う。`~/.codex/skills` の手動 symlink は使わない。
 
 ## release / versioning
 

@@ -730,12 +730,12 @@
       minimal_preview_session.json
   pyproject.toml
   README.md</code></pre>
-        <h3>Data Contract</h3>
+        <h3>Data Public Specification</h3>
         <table>
           <thead>
             <tr>
               <th>schema</th>
-              <th>正本にするデータ</th>
+              <th>基準データ</th>
               <th>後続実装での使い方</th>
             </tr>
           </thead>
@@ -743,17 +743,17 @@
             <tr>
               <td><code>schemas/document-model.schema.json</code></td>
               <td><code>document-model.json</code>。文書ID、タイトル、生成時刻、review settings、本文block配列を持つ。</td>
-              <td><code>render.py</code> がHTML bundleを生成する入力契約にする。</td>
+              <td><code>render.py</code> がHTML bundleを生成する入力仕様にする。</td>
             </tr>
             <tr>
               <td><code>schemas/comments.schema.json</code></td>
               <td><code>annotations/comments.json</code>。コメントthread、status、ユーザー/agent/system replyを保持する。</td>
-              <td><code>comment_store.py</code> と <code>ingest_review.py</code> の読み書き契約にする。</td>
+              <td><code>comment_store.py</code> と <code>ingest_review.py</code> の読み書き仕様にする。</td>
             </tr>
             <tr>
               <td><code>schemas/preview-session.schema.json</code></td>
               <td><code>output/tmp/html-preview-sessions/*.json</code>。root、bind、port、URL、PID、mode、statusを記録する。</td>
-              <td><code>preview_server.py</code> が起動中previewを追跡するmanifest契約にする。</td>
+              <td><code>preview_server.py</code> が起動中previewを追跡するmanifest仕様にする。</td>
             </tr>
           </tbody>
         </table>
@@ -770,6 +770,16 @@
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td><code>model_quality.py</code></td>
+              <td>source-capture draft、未対応block type、raw textに近いHTML block、危険なscript/event handler、callout内HTML、未添付の図・画像参照を検出する。</td>
+              <td><code>check-model</code> として <code>render</code> 前に呼ぶ。</td>
+            </tr>
+            <tr>
+              <td><code>model_builder.py</code></td>
+              <td>入力原稿を保存用のsource-capture draftにする。最終HTML向けの章立て・表・リスト・注記・図・コード表示はagentが文書モデルとして直接設計する。</td>
+              <td>既存原稿の退避が必要な場合だけ使い、出力前に必ずagentが最終文書モデルへ作り直す。</td>
+            </tr>
             <tr>
               <td><code>render.py</code></td>
               <td>文書モデルからHTML bundleを生成する。テンプレート適用、CSS asset配置、入力hash・生成時刻・renderer version・review block一覧を含むmanifest作成を担当する。</td>
@@ -1083,21 +1093,21 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
       </section>
 
       <section id="codex-foundation" data-review-block="codex-foundation">
-        <h2>Codex基盤契約</h2>
-        <p>Milestone 0 では、pluginとして開発を継続できる最低限の契約をコードとテストで固定する。以後のMilestoneはこの契約を破らず、必要な拡張だけを追加する。</p>
+        <h2>Codex基盤公開仕様</h2>
+        <p>Milestone 0 では、pluginとして開発を継続できる最低限の公開仕様をコードとテストで固定する。以後のMilestoneはこの公開仕様を破らず、必要な拡張だけを追加する。</p>
         <div class="grid two">
           <div class="card">
             <h3>Codex manifest</h3>
             <p><code>.codex-plugin/plugin.json</code> は <code>name</code>、<code>version</code>、<code>description</code>、<code>repository</code>、<code>homepage</code>、<code>skills</code>、<code>interface</code> を持つ。<code>interface</code> には表示名、短い説明、長い説明、capabilities、defaultPrompt、brandColor を明示する。</p>
           </div>
           <div class="card">
-            <h3>CLI contract</h3>
-            <p><code>scripts.html_review_workbench.cli</code> は <code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> を公開subcommandとして固定する。各skillはこの入口を呼び、低レベル実装へ直接依存しない。</p>
+            <h3>CLI public specification</h3>
+            <p><code>scripts.html_review_workbench.cli</code> は <code>check-model</code>、<code>render</code>、<code>preview</code>、<code>ingest-review</code>、<code>validate</code> を公開subcommandとして固定する。各skillはこの入口を呼び、低レベル実装へ直接依存しない。</p>
           </div>
         </div>
         <h3>CIで確認すること</h3>
         <ul>
-          <li><code>python3 -m unittest discover -s tests</code> でplugin構成、Codex manifest必須field、skill description、CLI契約を確認する。</li>
+          <li><code>python3 -m unittest discover -s tests</code> でplugin構成、Codex manifest必須field、skill description、CLI公開仕様を確認する。</li>
           <li><code>python3 -m json.tool .codex-plugin/plugin.json >/dev/null</code> と <code>python3 -m json.tool .claude-plugin/plugin.json >/dev/null</code> でmanifest JSON syntaxを確認する。</li>
           <li><code>python3 -m json.tool .agents/plugins/marketplace.json >/dev/null</code> でrepo-local marketplace entryを確認する。</li>
           <li><code>python3 -m scripts.html_review_workbench.cli --help >/dev/null</code> でCLI entrypointが壊れていないことを確認する。</li>
@@ -1115,12 +1125,12 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
           <tbody>
             <tr>
               <td><code>visual-html-renderer</code></td>
-              <td><code>render</code> → <code>validate</code> → <code>preview</code></td>
+              <td><code>check-model</code> → <code>render</code> → <code>validate</code> → <code>preview</code></td>
               <td>最小document model fixtureからHTML bundleを生成し、previewは検証時に <code>--mode off</code> で副作用を抑える。</td>
             </tr>
             <tr>
               <td><code>reviewable-design-doc</code></td>
-              <td><code>render</code> → <code>validate</code> → <code>preview</code> → <code>ingest-review</code></td>
+              <td><code>check-model</code> → <code>render</code> → <code>validate</code> → <code>preview</code> → <code>ingest-review</code></td>
               <td>同じdocument model fixtureから同じHTML bundle構造を生成し、コメントfixtureから <code>annotations/review-cycle-state.json</code> を追加生成する。</td>
             </tr>
           </tbody>
@@ -1308,7 +1318,7 @@ argument-hint: "[設計対象または入力ファイル] [--review-mode standal
       <a href="#preview-runtime">Preview Runtime</a>
       <a href="#bundle">成果物構成</a>
       <a href="#skill-spec">SKILL.md 草案</a>
-      <a href="#codex-foundation">Codex基盤契約</a>
+      <a href="#codex-foundation">Codex基盤公開仕様</a>
       <a href="#implementation">実装設計</a>
       <a href="#verification">検証計画</a>
       <a href="#backlog-operation">backlog運用</a>

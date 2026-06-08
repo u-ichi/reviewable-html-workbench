@@ -6,13 +6,14 @@
 
 ## 開発の進め方
 
-1. **契約を決める**
+1. **公開仕様を決める**
    - 文書モデルschema
    - comments.json schema
    - preview session manifest schema
    - script CLIの入出力
 
 2. **scriptを先に作る**
+   - `check-model`
    - `render`
    - `preview`
    - `validate`
@@ -26,8 +27,9 @@
    - 確認が必要なコメントにはagent replyが追記される
 
 4. **skillを薄く接続する**
-   - `visual-html-renderer` はHTML生成とpreview URL提示まで
-   - `reviewable-design-doc` は設計構造化とレビュー取り込みまで
+   - `visual-html-renderer` はレンダリング能力を前提に文書モデルを直接設計し、HTML生成とpreview URL提示まで進める
+   - `reviewable-design-doc` は設計構造化、文書モデル設計、レビュー取り込みまで進める
+   - raw text / Markdown の機械変換結果を最終HTMLにしない
 
 5. **pluginとして検証する**
    - Claude: `claude plugins validate .`
@@ -40,6 +42,7 @@
    - Codex: `codex plugin marketplace add /path/to/reviewable-html-workbench` で repo-local marketplace を登録する。path に空白があり失敗する場合は、空白を含まない symlink 経由で登録する。
 
 7. **実出力を見て直す**
+   - `check-model` の失敗理由
    - HTML表示
    - range selection comment
    - comments.json取り込み

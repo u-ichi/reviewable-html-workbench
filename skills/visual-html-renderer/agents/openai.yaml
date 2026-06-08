@@ -14,8 +14,8 @@ trigger_examples:
 entrypoint: python3 -m scripts.html_review_workbench.cli
 working_directory: plugin_root
 workflow:
-  - build-model
   - attach-image
+  - check-model
   - render
   - validate
   - preview
