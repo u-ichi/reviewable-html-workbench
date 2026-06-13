@@ -1,6 +1,6 @@
 {
   "name": "reviewable-html-workbench",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
   "author": {
     "name": "u1",
@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/u-ichi/reviewable-html-workbench",
   "repository": "https://github.com/u-ichi/reviewable-html-workbench",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "keywords": [
     "html",
     "review",

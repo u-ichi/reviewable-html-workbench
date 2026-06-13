@@ -271,12 +271,40 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
 .prose ul, .prose ol { margin: 0; padding-left: 22px; max-width: 72ch; }
 .prose li + li { margin-top: 6px; }
 .prose strong { font-weight: 650; }
+.prose p:has(> strong:only-child) {
+  font-weight: 580;
+  line-height: 1.82;
+}
+.prose p:has(> strong:only-child) strong {
+  font-weight: inherit;
+}
+.block-content > p:has(> strong:only-child) {
+  border-left: 3px solid var(--line-2);
+  padding-left: var(--sp-4);
+  margin-top: var(--sp-4);
+}
 .prose code:not(pre code) {
   font-family: var(--font-mono); font-size: .86em; background: var(--paper-2);
   border: 1px solid var(--line-1); border-radius: var(--r-xs); padding: 1px 5px;
   color: color-mix(in srgb, var(--ink) 88%, var(--brand));
 }
 .lead-note { font-size: var(--fs-lead); line-height: 1.55; color: var(--ink-2); }
+.decision-panel {
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  padding: var(--pad-card) var(--sp-5);
+  margin: var(--sp-5) 0;
+}
+.decision-panel > *:first-child { margin-top: 0; }
+.decision-panel > *:last-child { margin-bottom: 0; }
+
+.lead {
+  font-size: var(--fs-lead);
+  line-height: 1.55;
+}
+.lead strong { font-weight: inherit; }
 
 .document-header {
   margin-bottom: var(--sp-6);
@@ -365,6 +393,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   top: 0;
   z-index: 2;
   background: var(--paper-2);
+  border-top: 1px solid var(--line-1);
   color: var(--ink-2);
   font-size: 11px;
   font-weight: 650;
@@ -378,6 +407,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   z-index: 1;
   min-width: 168px;
   background: var(--paper);
+  border-left: 1px solid var(--line-1);
   border-right: 1px solid var(--line-2);
   box-shadow: 1px 0 0 var(--line-1);
   font-weight: 600;
@@ -608,7 +638,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .is-focus .toc, .is-focus .cmt-rail { display: none; }
 .is-focus .doc-shell { max-width: 1480px; }
 .is-focus .paper { padding: var(--sp-7) clamp(28px, 5vw, 76px) var(--sp-8); }
-.is-focus .prose p, .is-focus .prose ul, .is-focus .prose ol, .is-focus .doc-deck { max-width: 92ch; }
+.is-focus .prose p, .is-focus .prose ul, .is-focus .prose ol, .is-focus .doc-deck { max-width: none; }
 /* big blocks use the full width gained by hiding the rails */
 .is-focus .table-wrap, .is-focus .code, .is-focus .figure, .is-focus .diagram-fallback, .is-focus .summary, .is-focus .meta-grid { max-width: none; }
 .is-focus .cx { background: transparent; border-bottom: 0; cursor: default; }
