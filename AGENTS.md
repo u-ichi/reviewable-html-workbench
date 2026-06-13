@@ -50,3 +50,13 @@ python3 -m scripts.html_review_workbench.cli --help
 - コメントの確認質問はチャットだけで返さず、HTMLのコメントスレッドへ agent reply として書き戻す。
 - Preview Runtime は Tailscale IPv4 を優先し、fallback は `127.0.0.1`。`0.0.0.0` bindは禁止。
 - 外部アップロード型の図式レンダラーは承認なしに使わない。
+- git commit 時は必ず `.claude-plugin/plugin.json` と `.codex-plugin/plugin.json` の
+  `version` フィールドを semver に従って更新する。バージョン更新なしの commit は禁止。
+
+  | 変更種別 | bump | 例 |
+  |----------|------|----|
+  | バグ修正・表示改善・リファクタ・ドキュメント修正 | patch (0.2.0 → 0.2.1) | CSS 修正、テスト追加 |
+  | 新機能・新 skill 追加・既存機能の拡張 | minor (0.2.0 → 0.3.0) | 新しい skill、テンプレート追加 |
+  | 破壊的変更・既存 skill の入出力仕様変更 | major (0.2.0 → 1.0.0) | skill の引数変更、既存テンプレート構造の破壊 |
+
+  迷ったら patch 側に倒す。
