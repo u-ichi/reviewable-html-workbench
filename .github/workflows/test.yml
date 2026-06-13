@@ -28,3 +28,16 @@ jobs:
 
       - name: Check CLI contract
         run: python3 -m scripts.html_review_workbench.cli --help >/dev/null
+
+      - name: Check version consistency
+        run: |
+          pyproject_version="$(grep -E '^version = ' pyproject.toml | sed -E 's/^version = "([^"]+)"/\1/')"
+          claude_plugin_version="$(python3 -c 'import json; print(json.load(open(".claude-plugin/plugin.json", encoding="utf-8"))["version"])')"
+          codex_plugin_version="$(python3 -c 'import json; print(json.load(open(".codex-plugin/plugin.json", encoding="utf-8"))["version"])')"
+          if [ "$pyproject_version" != "$claude_plugin_version" ] || [ "$pyproject_version" != "$codex_plugin_version" ]; then
+            echo "Version mismatch:"
+            echo "pyproject.toml: $pyproject_version"
+            echo ".claude-plugin/plugin.json: $claude_plugin_version"
+            echo ".codex-plugin/plugin.json: $codex_plugin_version"
+            exit 1
+          fi
