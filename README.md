@@ -30,9 +30,18 @@ The plugin includes two skills. `visual-html-renderer` creates, validates, rende
 
 ### Claude Code
 
-From this repository:
+Add the GitHub repository as a plugin marketplace and install:
 
 ```bash
+claude plugin marketplace add u-ichi/reviewable-html-workbench
+claude plugin install reviewable-html-workbench
+```
+
+Alternatively, clone the repository and install locally:
+
+```bash
+git clone https://github.com/u-ichi/reviewable-html-workbench.git
+cd reviewable-html-workbench
 claude plugins install .
 ```
 
@@ -44,13 +53,18 @@ claude --plugin-dir /path/to/reviewable-html-workbench
 
 ### Codex CLI
 
-Register this repository as a local plugin marketplace:
+Add the GitHub repository as a plugin marketplace:
 
 ```bash
-codex plugin marketplace add /path/to/reviewable-html-workbench
+codex plugin marketplace add u-ichi/reviewable-html-workbench
 ```
 
-Some Codex builds may expose the same workflow through `codex plugin add`; use the marketplace command above when working with this repository's `.agents/plugins/marketplace.json`.
+Or clone and register locally:
+
+```bash
+git clone https://github.com/u-ichi/reviewable-html-workbench.git
+codex plugin marketplace add ./reviewable-html-workbench
+```
 
 ## Quick Start
 
@@ -176,6 +190,17 @@ Reviewable HTML Workbench は、Claude Code / Codex CLI 向けの HTML レビュ
 
 - `visual-html-renderer`: HTML生成、図示、Preview Runtime、bundle検証。
 - `reviewable-design-doc`: レビュー可能な設計資料作成、コメント取り込み、agent返信、設計反映。
+
+インストール:
+
+```bash
+# Claude Code（GitHub から直接）
+claude plugin marketplace add u-ichi/reviewable-html-workbench
+claude plugin install reviewable-html-workbench
+
+# Codex CLI（GitHub から直接）
+codex plugin marketplace add u-ichi/reviewable-html-workbench
+```
 
 テストは次のコマンドで実行します。
 
