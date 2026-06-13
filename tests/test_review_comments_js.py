@@ -20,7 +20,10 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "captureImageBlockClick",
             "clearDocumentSelectionForNonTextTarget",
             "reviewBlockForRange",
-            "openThreadPopover",
+            "renderCommentCards",
+            "positionCards",
+            "activate",
+            "threadCardState",
             "normalizeThreadStatus",
         ]:
             self.assertIn(f"function {function_name}", script)
@@ -31,7 +34,7 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('document.addEventListener("pointerup", scheduleSelectionCapture)', script)
         self.assertIn("shouldIgnoreSelectionCaptureEvent(event)", script)
         self.assertIn("ui.root.contains(event.target)", script)
-        self.assertIn('mark[data-comment-highlight], [data-comment-badge]', script)
+        self.assertIn('.cx[data-comment], [data-comment-badge]', script)
         self.assertIn("window.setTimeout(captureSelection, 0)", script)
         self.assertIn("closestReviewBlock(range.startContainer)", script)
         self.assertIn("closestReviewBlock(range.endContainer)", script)
@@ -44,15 +47,17 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('selectedText: image.getAttribute("alt")', script)
         self.assertIn("image.getBoundingClientRect()", script)
 
-    def test_comment_click_pins_thread_and_focuses_reply_editor(self) -> None:
+    def test_comment_click_links_highlight_and_margin_card(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
 
-        self.assertIn("threadPinned: false", script)
-        self.assertIn("openThreadPopover(thread, mark.getBoundingClientRect(), { focusReply: true })", script)
-        self.assertIn("openThreadPopover(thread, badge.getBoundingClientRect(), { focusReply: true })", script)
-        self.assertIn("if (!state.threadPinned)", script)
-        self.assertIn('ui.threadBody.querySelector("[data-thread-reply]")', script)
-        self.assertIn("replyEditor.focus()", script)
+        self.assertIn('className = "cx"', script)
+        self.assertIn('highlight.dataset.comment = thread.id || ""', script)
+        self.assertIn('highlight.dataset.state = threadCardState(thread)', script)
+        self.assertIn('card.className = "cmt"', script)
+        self.assertIn('card.dataset.cstate = cardState', script)
+        self.assertIn('card.dataset.for = thread.id || ""', script)
+        self.assertIn('document.querySelectorAll(".cx.is-active, .cmt.is-active")', script)
+        self.assertIn("card.scrollIntoView({ behavior: \"smooth\", block: \"nearest\" })", script)
 
     def test_review_comments_js_does_not_mix_ingestion_classification_into_ui_status(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")

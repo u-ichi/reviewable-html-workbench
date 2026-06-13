@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from scripts.html_review_workbench.diagram_planner import plan_diagrams
-from scripts.html_review_workbench.render import render_bundle
+from scripts.html_review_workbench.render import _render_toc, render_bundle
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
@@ -25,10 +25,17 @@ class RendererBundleTest(unittest.TestCase):
             self.assertIn('data-review-block="overview"', html)
             self.assertIn("assets/style.css", html)
             self.assertIn("assets/review-comments.js", html)
-            self.assertIn(".block-content pre code", css)
-            self.assertIn("color: #f8fafc", css)
+            self.assertIn('<section class="review-block" id="overview"', html)
+            self.assertNotIn("review-block-section", html)
+            self.assertIn('<section class="summary">', html)
+            self.assertIn('Smallest document model used to exercise renderer fixtures.', html)
+            self.assertIn('<li><a href="#overview">Overview</a></li>', html)
+            self.assertIn(".code-body", css)
+            self.assertIn(".prose code:not(pre code)", css)
+            self.assertIn("--code-ink:    #d7d3c8", css)
             self.assertIn("max-width: none", css)
-            self.assertIn("table-layout: fixed", css)
+            self.assertIn(".table-scroll { overflow-x: auto; }", css)
+            self.assertIn("table.cmp { border-collapse: separate; border-spacing: 0; width: 100%;", css)
             self.assertIn("overflow-wrap: anywhere", css)
 
             manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
@@ -38,6 +45,20 @@ class RendererBundleTest(unittest.TestCase):
             self.assertEqual(manifest["review_blocks"][0]["id"], "document-header")
             self.assertEqual(manifest["review_blocks"][1]["id"], "overview")
             self.assertRegex(manifest["input"]["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_render_toc_uses_block_titles(self) -> None:
+        toc = _render_toc(
+            [
+                {"id": "overview", "title": "Overview"},
+                {"id": "details", "title": "Details & Risks"},
+                {"id": "untitled", "content": "No title"},
+            ]
+        )
+
+        self.assertEqual(
+            toc,
+            '<ol>\n<li><a href="#overview">Overview</a></li>\n<li><a href="#details">Details &amp; Risks</a></li>\n</ol>',
+        )
 
     def test_validate_bundle_checks_manifest_and_review_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -79,11 +100,39 @@ class RendererBundleTest(unittest.TestCase):
             self.assertTrue(diagram_path.exists())
             self.assertEqual(diagram_path.read_text(encoding="utf-8").strip(), model["blocks"][0]["content"])
             self.assertIn('data-diagram-kind="flow"', html)
-            self.assertIn("diagram-preview", html)
+            self.assertIn("diagram-fallback", html)
             self.assertIn("assets/diagrams/system-flow.mmd", html)
             self.assertEqual(manifest["outputs"]["diagrams"], ["assets/diagrams/system-flow.mmd"])
             self.assertEqual(manifest["review_blocks"][1]["diagram_kind"], "flow")
             self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_render_bundle_uses_updated_callout_markup(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "callout-doc",
+            "title": "Callout Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "callout",
+                    "type": "callout",
+                    "title": "Note",
+                    "content": "Use <plain> text.",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('<div class="callout info">', html)
+            self.assertIn('<div class="co-ico">i</div>', html)
+            self.assertIn('<div><div class="co-body"><p>Use &lt;plain&gt; text.</p></div></div>', html)
 
     def test_render_bundle_uses_generated_image_for_diagram_when_available(self) -> None:
         model = {
@@ -121,7 +170,7 @@ class RendererBundleTest(unittest.TestCase):
             html = index_path.read_text(encoding="utf-8")
             manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
 
-            self.assertIn('<figure class="block-content generated-image">', html)
+            self.assertIn('<figure class="figure generated-image">', html)
             self.assertIn('src="assets/images/generated-diagram.png"', html)
             self.assertNotIn("diagram-preview", html)
             self.assertEqual(manifest["outputs"]["diagrams"], ["assets/diagrams/system-flow.mmd"])

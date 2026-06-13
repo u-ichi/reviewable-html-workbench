@@ -129,7 +129,7 @@ class ModelBuilderTest(unittest.TestCase):
             render_bundle(result.model_path, bundle_dir)
 
             html = (bundle_dir / "index.html").read_text(encoding="utf-8")
-            self.assertIn('<figure class="block-content generated-image">', html)
+            self.assertIn('<figure class="figure generated-image">', html)
             self.assertIn("<img", html)
             self.assertTrue((bundle_dir / result.source_path).is_file())
 
@@ -153,7 +153,7 @@ class ModelBuilderTest(unittest.TestCase):
 
             html = (bundle_dir / "index.html").read_text(encoding="utf-8")
             manifest = json.loads((bundle_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
-            self.assertIn('<figure class="block-content generated-image">', html)
+            self.assertIn('<figure class="figure generated-image">', html)
             self.assertIn("<img", html)
             self.assertNotIn("diagram-preview", html)
             self.assertTrue((bundle_dir / result.source_path).is_file())

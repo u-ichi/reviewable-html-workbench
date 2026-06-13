@@ -3,6 +3,7 @@
 
   const COMMENTS_URL = "annotations/comments.json";
   const STORAGE_PREFIX = "reviewable-html-comments:";
+  const THEME_STORAGE_KEY = "reviewable-theme";
   const COMMENT_STATUS = Object.freeze({
     needsAgentReview: "needs_agent_review",
     needsUserReply: "needs_user_reply",
@@ -13,6 +14,11 @@
     COMMENT_STATUS.needsUserReply,
     COMMENT_STATUS.resolved,
   ];
+  const CARD_STATE_LABELS = Object.freeze({
+    open: "未対応",
+    reply: "返信あり",
+    resolved: "解決済み",
+  });
 
   const documentId = document.querySelector("[data-document-id]")?.dataset.documentId || "document";
   const storageKey = STORAGE_PREFIX + documentId;
@@ -22,11 +28,18 @@
     selectionRect: null,
     serverWritable: false,
     ignoreSelectionChange: false,
-    threadPinned: false,
+    activeCommentId: null,
+    filter: "all",
+    positionFrame: 0,
   };
 
   const ui = createUi();
   document.body.appendChild(ui.root);
+
+  initThemeToggle();
+  initFilter();
+  initFocusToggle();
+  initTocScrollSpy();
 
   document.addEventListener("selectionchange", scheduleSelectionCapture);
   document.addEventListener("keyup", scheduleSelectionCapture);
@@ -34,6 +47,9 @@
   document.addEventListener("pointerup", scheduleSelectionCapture);
   document.addEventListener("scroll", hideFloatingUi, true);
   document.addEventListener("click", handleDocumentClick);
+  window.addEventListener("resize", schedulePositionCards);
+  window.addEventListener("load", schedulePositionCards);
+  document.fonts?.ready?.then(schedulePositionCards);
   ui.toolbar.addEventListener("mousedown", preserveDocumentSelection);
   ui.commentButton.addEventListener("mousedown", preserveDocumentSelection);
   ui.commentButton.addEventListener("click", openComposerForSelection);
@@ -45,11 +61,10 @@
       await addCommentFromComposer();
     }
   });
-  ui.threadClose.addEventListener("click", closeThreadPopover);
   ui.exportButton.addEventListener("click", exportComments);
   ui.importInput.addEventListener("change", importComments);
 
-  loadComments();
+  loadComments().then(schedulePositionCards);
 
   function createUi() {
     const root = document.createElement("div");
@@ -65,19 +80,13 @@
       '    <button type="button" data-save-comment>Comment</button>',
       "  </div>",
       "</section>",
-      '<section class="review-comments-thread-popover" data-thread-popover hidden>',
-      '  <div class="review-comments-thread-header">',
-      '    <span data-thread-location></span>',
-      '    <button type="button" data-thread-close aria-label="Close">x</button>',
-      "  </div>",
-      '  <div data-thread-body></div>',
-      "</section>",
       '<div class="review-comments-utility">',
       '  <span class="review-comments-status" data-comments-status>standalone</span>',
       '  <button type="button" data-export-comments>Export</button>',
       '  <label class="review-comments-import">Import<input type="file" accept="application/json" data-import-comments></label>',
       "</div>",
     ].join("");
+    const commentRail = ensureCommentRail();
     return {
       root,
       toolbar: root.querySelector("[data-comments-toolbar]"),
@@ -86,14 +95,32 @@
       commentBody: root.querySelector("[data-comment-body]"),
       cancelButton: root.querySelector("[data-cancel-comment]"),
       saveButton: root.querySelector("[data-save-comment]"),
-      threadPopover: root.querySelector("[data-thread-popover]"),
-      threadLocation: root.querySelector("[data-thread-location]"),
-      threadBody: root.querySelector("[data-thread-body]"),
-      threadClose: root.querySelector("[data-thread-close]"),
       exportButton: root.querySelector("[data-export-comments]"),
       importInput: root.querySelector("[data-import-comments]"),
       status: root.querySelector("[data-comments-status]"),
+      commentRail,
+      commentLayer: commentRail.querySelector("#cmtLayer"),
+      commentCount: commentRail.querySelector("#cmtCount"),
     };
+  }
+
+  function ensureCommentRail() {
+    const existingLayer = document.getElementById("cmtLayer");
+    if (existingLayer) {
+      return existingLayer.closest(".cmt-rail") || existingLayer.parentElement;
+    }
+    const rail = document.createElement("aside");
+    rail.className = "cmt-rail review-comments-margin-rail";
+    rail.setAttribute("aria-label", "レビューコメント");
+    rail.innerHTML = [
+      '<div class="cmt-rail-h">',
+      "  <span>レビューコメント</span>",
+      '  <span class="cmt-rail-count" id="cmtCount">0 件</span>',
+      "</div>",
+      '<div class="cmt-layer" id="cmtLayer"></div>',
+    ].join("");
+    document.body.appendChild(rail);
+    return rail;
   }
 
   async function loadComments() {
@@ -142,17 +169,17 @@
     if (!event?.target) {
       return false;
     }
-    if (ui.root.contains(event.target)) {
+    if (ui.root.contains(event.target) || ui.commentRail?.contains(event.target)) {
       return true;
     }
-    return Boolean(event.target.closest?.("mark[data-comment-highlight], [data-comment-badge]"));
+    return Boolean(event.target.closest?.(".cx[data-comment], [data-comment-badge]"));
   }
 
   function captureSelection() {
     if (state.ignoreSelectionChange) {
       return;
     }
-    if (ui.root.contains(document.activeElement)) {
+    if (ui.root.contains(document.activeElement) || ui.commentRail?.contains(document.activeElement)) {
       return;
     }
     const selection = window.getSelection();
@@ -210,7 +237,7 @@
     if (!comment || !comment.trim()) {
       return;
     }
-    state.comments.comments.push({
+    const thread = {
       id: "cmt_" + Date.now().toString(36),
       document_id: documentId,
       block_id: state.selected.blockId,
@@ -222,9 +249,11 @@
       status: COMMENT_STATUS.needsAgentReview,
       created_at: new Date().toISOString(),
       replies: [],
-    });
+    };
+    state.comments.comments.push(thread);
     await saveComments();
     renderComments();
+    activate(thread.id, true);
     closeComposer();
     window.getSelection()?.removeAllRanges();
   }
@@ -236,7 +265,7 @@
       block.classList.remove("has-review-comments");
       block.classList.remove("has-review-replies");
     }
-    for (const thread of state.comments.comments) {
+    state.comments.comments.forEach((thread, index) => {
       const block = document.querySelector(`[data-review-block="${cssEscape(thread.block_id)}"]`);
       if (block && !isResolvedThread(thread)) {
         block.classList.add("has-review-comments");
@@ -245,25 +274,29 @@
         block.classList.add("has-review-replies");
       }
       if (block) {
-        const highlighted = highlightThreadSelection(block, thread);
+        const highlighted = highlightThreadSelection(block, thread, index + 1);
         if (!highlighted) {
-          addBlockCommentBadge(block, thread);
+          addBlockCommentBadge(block, thread, index + 1);
         }
       }
-    }
+    });
+    renderCommentCards();
+    applyFilterVisibility();
     setStatus(state.serverWritable ? "comments.json" : "standalone");
+    schedulePositionCards();
   }
 
   function clearReviewHighlights() {
-    for (const mark of document.querySelectorAll("mark[data-comment-highlight]")) {
-      const parent = mark.parentNode;
+    for (const highlight of document.querySelectorAll(".cx[data-comment]:not([data-comment-badge])")) {
+      const parent = highlight.parentNode;
       if (!parent) {
         continue;
       }
-      while (mark.firstChild) {
-        parent.insertBefore(mark.firstChild, mark);
+      highlight.querySelectorAll(".cx-num").forEach((badge) => badge.remove());
+      while (highlight.firstChild) {
+        parent.insertBefore(highlight.firstChild, highlight);
       }
-      parent.removeChild(mark);
+      parent.removeChild(highlight);
       parent.normalize();
     }
   }
@@ -274,24 +307,25 @@
     }
   }
 
-  function addBlockCommentBadge(block, thread) {
+  function addBlockCommentBadge(block, thread, number) {
     const badge = document.createElement("button");
     badge.type = "button";
-    badge.className = "review-comment-badge";
-    applyThreadMarkerClasses(badge, thread);
+    badge.className = "cx review-comment-badge";
+    badge.dataset.comment = thread.id || "";
     badge.dataset.commentBadge = thread.id || "";
-    badge.textContent = "Comment";
+    badge.dataset.state = threadCardState(thread);
+    badge.textContent = `Comment ${number}`;
     badge.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openThreadPopover(thread, badge.getBoundingClientRect(), { focusReply: true });
+      activate(thread.id, true);
     });
     block.appendChild(badge);
   }
 
-  function highlightThreadSelection(block, thread) {
+  function highlightThreadSelection(block, thread, number) {
     if (thread.anchor && Number.isInteger(thread.anchor.start) && Number.isInteger(thread.anchor.end)) {
-      return highlightByOffsets(block, thread, thread.anchor.start, thread.anchor.end);
+      return highlightByOffsets(block, thread, thread.anchor.start, thread.anchor.end, number);
     }
     const selectedText = typeof thread.selected_text === "string" ? thread.selected_text.trim() : "";
     if (!selectedText) {
@@ -305,7 +339,7 @@
         if (isSvgTextNode(node)) {
           return NodeFilter.FILTER_REJECT;
         }
-        if (node.parentElement?.closest("mark[data-comment-highlight]")) {
+        if (node.parentElement?.closest(".cx[data-comment]")) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -319,13 +353,13 @@
     const range = document.createRange();
     range.setStart(node, start);
     range.setEnd(node, start + selectedText.length);
-
-    const mark = createHighlightMark(thread);
-    range.surroundContents(mark);
+    const highlight = createHighlightElement(thread);
+    range.surroundContents(highlight);
+    appendHighlightNumber(highlight, number);
     return true;
   }
 
-  function highlightByOffsets(block, thread, start, end) {
+  function highlightByOffsets(block, thread, start, end, number) {
     if (end <= start) {
       return false;
     }
@@ -345,183 +379,478 @@
       if (isSvgTextNode(node)) {
         continue;
       }
-      highlighted = wrapTextNodeSlice(node, overlapStart - nodeStart, overlapEnd - nodeStart, thread) || highlighted;
+      const includeNumber = !highlighted;
+      highlighted = wrapTextNodeSlice(node, overlapStart - nodeStart, overlapEnd - nodeStart, thread, includeNumber ? number : null) || highlighted;
     }
     return highlighted;
   }
 
-  function wrapTextNodeSlice(node, start, end, thread) {
+  function wrapTextNodeSlice(node, start, end, thread, number) {
     if (start < 0 || end > node.nodeValue.length || start >= end) {
       return false;
     }
     const range = document.createRange();
     range.setStart(node, start);
     range.setEnd(node, end);
-    const mark = createHighlightMark(thread);
-    range.surroundContents(mark);
+    const highlight = createHighlightElement(thread);
+    range.surroundContents(highlight);
+    if (number) {
+      appendHighlightNumber(highlight, number);
+    }
     return true;
   }
 
-  function createHighlightMark(thread) {
-    const mark = document.createElement("mark");
-    mark.className = "review-comment-highlight";
-    applyThreadMarkerClasses(mark, thread);
-    mark.dataset.commentHighlight = thread.id || "";
-    mark.setAttribute("aria-label", thread.comment || "Review comment");
-    mark.tabIndex = 0;
-    mark.addEventListener("click", (event) => {
+  function createHighlightElement(thread) {
+    const highlight = document.createElement("span");
+    highlight.className = "cx";
+    highlight.dataset.comment = thread.id || "";
+    highlight.dataset.state = threadCardState(thread);
+    highlight.setAttribute("aria-label", thread.comment || "Review comment");
+    highlight.tabIndex = 0;
+    highlight.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openThreadPopover(thread, mark.getBoundingClientRect(), { focusReply: true });
+      activate(thread.id, true);
     });
-    mark.addEventListener("mouseenter", () => {
-      if (!state.threadPinned) {
-        openThreadPopover(thread, mark.getBoundingClientRect());
-      }
-    });
-    mark.addEventListener("focus", () => {
-      if (!state.threadPinned) {
-        openThreadPopover(thread, mark.getBoundingClientRect());
-      }
-    });
-    return mark;
+    highlight.addEventListener("focus", () => activate(thread.id, false));
+    return highlight;
   }
 
-  function applyThreadMarkerClasses(element, thread) {
-    element.classList.toggle("has-review-replies", isNeedsUserReply(thread));
-    element.classList.toggle("is-review-resolved", isResolvedThread(thread));
+  function appendHighlightNumber(highlight, number) {
+    const badge = document.createElement("span");
+    badge.className = "cx-num";
+    badge.textContent = String(number);
+    highlight.appendChild(badge);
   }
 
-  function renderStatus(thread) {
-    const options = STATUS_VALUES.map((status) => {
-      const selected = status === thread.status ? " selected" : "";
-      return `<option value="${status}"${selected}>${status}</option>`;
-    }).join("");
-    return `<select aria-label="Comment status">${options}</select>`;
+  function renderCommentCards() {
+    if (!ui.commentLayer) {
+      return;
+    }
+    ui.commentLayer.innerHTML = "";
+    state.comments.comments.forEach((thread, index) => {
+      const card = document.createElement("aside");
+      const cardState = threadCardState(thread);
+      card.className = "cmt";
+      card.dataset.cstate = cardState;
+      card.dataset.for = thread.id || "";
+      card.id = cardId(thread.id);
+      card.tabIndex = 0;
+      card.innerHTML = cardInner(thread, index + 1);
+      bindCommentCard(card, thread);
+      ui.commentLayer.appendChild(card);
+    });
+    updateCommentCount();
+    if (state.activeCommentId) {
+      setActiveClasses(state.activeCommentId);
+    }
+  }
+
+  function cardInner(thread, number) {
+    const cardState = threadCardState(thread);
+    const replies = renderReplies(thread);
+    const resolvedBanner = cardState === "resolved"
+      ? '<div class="cmt-resolved-by">解決済みにしました</div>'
+      : "";
+    const replyInput = cardState === "resolved"
+      ? ""
+      : [
+          '<div class="cmt-foot">',
+          '  <textarea class="cmt-input" data-thread-reply rows="2" placeholder="返信を入力…" aria-label="返信"></textarea>',
+          '  <button type="button" class="btn primary" data-thread-reply-submit>送信</button>',
+          "</div>",
+        ].join("");
+    const statusAction = cardState === "resolved"
+      ? '<button type="button" class="btn reopen" data-thread-reopen>再オープン</button>'
+      : '<button type="button" class="btn resolve" data-thread-resolve>解決</button>';
+    return [
+      '<div class="cmt-head">',
+      '  <div class="cmt-author"><span class="av">You</span> <span>Reviewer</span></div>',
+      `  <span class="cmt-state">${escapeHtml(CARD_STATE_LABELS[cardState])}</span>`,
+      "</div>",
+      `<blockquote class="cmt-quote">${escapeHtml(thread.selected_text || thread.block_id || `Comment ${number}`)}</blockquote>`,
+      `<div class="cmt-body review-comment-main-body" data-thread-comment-display tabindex="0">${escapeHtml(thread.comment || "")}</div>`,
+      `<textarea data-thread-comment-editor rows="3" hidden>${escapeHtml(thread.comment || "")}</textarea>`,
+      replies,
+      resolvedBanner,
+      replyInput,
+      '<div class="cmt-foot">',
+      `  ${statusAction}`,
+      '  <button type="button" class="btn ghost" data-thread-delete>削除</button>',
+      "</div>",
+    ].join("");
+  }
+
+  function bindCommentCard(card, thread) {
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button, textarea, select")) {
+        return;
+      }
+      activate(thread.id, false);
+    });
+    card.addEventListener("focus", () => activate(thread.id, false));
+    card.querySelector("[data-thread-comment-display]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const display = event.currentTarget;
+      const editor = card.querySelector("[data-thread-comment-editor]");
+      enterCommentEditMode(display, editor);
+    });
+    const commentEditor = card.querySelector("[data-thread-comment-editor]");
+    commentEditor?.addEventListener("keydown", async (event) => {
+      if (isSubmitShortcut(event)) {
+        event.preventDefault();
+        await saveEditedComment(thread, commentEditor);
+      }
+    });
+    commentEditor?.addEventListener("blur", async () => {
+      await saveEditedComment(thread, commentEditor);
+    });
+    card.querySelector("[data-thread-reply-submit]")?.addEventListener("click", async () => {
+      const replyEditor = card.querySelector("[data-thread-reply]");
+      await addReplyFromEditor(thread, replyEditor);
+    });
+    card.querySelector("[data-thread-reply]")?.addEventListener("keydown", async (event) => {
+      if (isReplySubmitShortcut(event)) {
+        event.preventDefault();
+        await addReplyFromEditor(thread, event.target);
+      }
+    });
+    card.querySelector("[data-thread-resolve]")?.addEventListener("click", async () => {
+      thread.status = COMMENT_STATUS.resolved;
+      await saveComments();
+      renderComments();
+      activate(thread.id, false);
+    });
+    card.querySelector("[data-thread-reopen]")?.addEventListener("click", async () => {
+      thread.status = COMMENT_STATUS.needsAgentReview;
+      await saveComments();
+      renderComments();
+      activate(thread.id, false);
+    });
+    card.querySelector("[data-thread-delete]")?.addEventListener("click", async () => {
+      state.comments.comments = state.comments.comments.filter((item) => item.id !== thread.id);
+      if (state.activeCommentId === thread.id) {
+        state.activeCommentId = null;
+      }
+      await saveComments();
+      renderComments();
+    });
   }
 
   function renderReplies(thread) {
     if (!Array.isArray(thread.replies) || thread.replies.length === 0) {
-      return "";
+      return '<div class="cmt-thread"></div>';
     }
     const replies = thread.replies.map((reply) => {
+      const agentClass = reply.role === "agent" ? " from-agent" : "";
       return [
-        '<li class="review-comment-reply">',
-        `  <div class="review-comment-author">${escapeHtml(replyAuthor(reply))}</div>`,
-        `  <div class="review-comment-body">${escapeHtml(reply.body)}</div>`,
-        "</li>",
+        `<div class="reply${agentClass}">`,
+        `  <div class="av">${escapeHtml(replyInitials(reply))}</div>`,
+        "  <div>",
+        `    <div class="reply-name">${escapeHtml(replyAuthor(reply))}<span class="reply-time">${escapeHtml(formatDateTime(reply.created_at))}</span></div>`,
+        `    <div class="reply-body">${escapeHtml(reply.body)}</div>`,
+        "  </div>",
+        "</div>",
       ].join("");
     }).join("");
-    return `<ul class="review-comment-replies">${replies}</ul>`;
-  }
-
-  function openThreadPopover(thread, rect, options = {}) {
-    const focusReply = Boolean(options.focusReply);
-    state.selected = null;
-    state.selectionRect = null;
-    state.threadPinned = focusReply || state.threadPinned;
-    clearDocumentSelectionWithoutClosingPopover();
-    ui.threadLocation.textContent = thread.block_id;
-    ui.threadBody.innerHTML = [
-      `<blockquote>${escapeHtml(thread.selected_text)}</blockquote>`,
-      '<div class="review-comment-author">You</div>',
-      `<div class="review-comment-body review-comment-main-body" data-thread-comment-display tabindex="0">${escapeHtml(thread.comment)}</div>`,
-      `<textarea data-thread-comment-editor rows="3" hidden>${escapeHtml(thread.comment)}</textarea>`,
-      `<div class="review-comment-status-row">${renderStatus(thread)}</div>`,
-      renderReplies(thread),
-      '<textarea data-thread-reply rows="1" placeholder="Reply..."></textarea>',
-      '<div class="review-comments-thread-actions">',
-      '  <button type="button" data-thread-delete>Delete</button>',
-      "</div>",
-    ].join("");
-    ui.threadBody.querySelector("select")?.addEventListener("change", async (event) => {
-      thread.status = event.target.value;
-      await saveComments();
-      renderComments();
-      openThreadPopover(thread, rect);
-    });
-    const commentDisplay = ui.threadBody.querySelector("[data-thread-comment-display]");
-    const commentEditor = ui.threadBody.querySelector("[data-thread-comment-editor]");
-    commentDisplay?.addEventListener("click", () => {
-      enterCommentEditMode(commentDisplay, commentEditor);
-    });
-    commentEditor?.addEventListener("keydown", async (event) => {
-      if (isSubmitShortcut(event)) {
-        event.preventDefault();
-        await saveEditedComment(thread, rect, commentEditor);
-      }
-    });
-    commentEditor?.addEventListener("blur", async () => {
-      await saveEditedComment(thread, rect, commentEditor);
-    });
-    ui.threadBody.querySelector("[data-thread-delete]")?.addEventListener("click", async () => {
-      state.comments.comments = state.comments.comments.filter((item) => item.id !== thread.id);
-      await saveComments();
-      renderComments();
-      closeThreadPopover();
-    });
-    ui.threadBody.querySelector("[data-thread-reply]")?.addEventListener("keydown", async (event) => {
-      if (isReplySubmitShortcut(event)) {
-        event.preventDefault();
-        await addReplyFromEditor(thread, rect, event.target);
-      }
-    });
-    positionPopover(ui.threadPopover, rect, "below");
-    ui.threadPopover.hidden = false;
-    ui.composer.hidden = true;
-    ui.toolbar.hidden = true;
-    if (focusReply) {
-      window.setTimeout(() => {
-        const replyEditor = ui.threadBody.querySelector("[data-thread-reply]");
-        if (replyEditor instanceof HTMLTextAreaElement) {
-          replyEditor.focus();
-        }
-      }, 0);
-    }
+    return `<div class="cmt-thread">${replies}</div>`;
   }
 
   function enterCommentEditMode(display, editor) {
+    if (!(editor instanceof HTMLTextAreaElement)) {
+      return;
+    }
     display.hidden = true;
     editor.hidden = false;
     editor.focus();
     editor.setSelectionRange(editor.value.length, editor.value.length);
   }
 
-  async function saveEditedComment(thread, rect, editor) {
-    const body = editor.value.trim();
-    if (!body || body === thread.comment) {
-      openThreadPopover(thread, rect);
+  async function saveEditedComment(thread, editor) {
+    if (!(editor instanceof HTMLTextAreaElement) || editor.hidden) {
       return;
     }
-    thread.comment = body;
-    await saveComments();
-    renderComments();
-    openThreadPopover(thread, rect);
-  }
-
-  async function addReplyFromEditor(thread, rect, editor) {
     const body = editor.value.trim();
     if (!body) {
+      renderComments();
+      activate(thread.id, false);
+      return;
+    }
+    if (body !== thread.comment) {
+      thread.comment = body;
+      await saveComments();
+    }
+    renderComments();
+    activate(thread.id, false);
+  }
+
+  async function addReplyFromEditor(thread, editor) {
+    if (!(editor instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    const body = editor.value.trim();
+    if (!body) {
+      editor.focus();
       return;
     }
     thread.replies = Array.isArray(thread.replies) ? thread.replies : [];
-    const reply = {
+    thread.replies.push({
       id: "reply_" + Date.now().toString(36),
       author: "user",
       role: "user",
       kind: "note",
       body,
       created_at: new Date().toISOString(),
-    };
-    thread.replies.push(reply);
+    });
     thread.status = COMMENT_STATUS.needsAgentReview;
     await saveComments();
     renderComments();
-    openThreadPopover(thread, rect);
-    const replyEditor = ui.threadBody.querySelector("[data-thread-reply]");
-    if (replyEditor instanceof HTMLTextAreaElement) {
-      replyEditor.focus();
+    activate(thread.id, false);
+    window.setTimeout(() => {
+      const nextEditor = document.querySelector(`#${cardId(thread.id)} [data-thread-reply]`);
+      if (nextEditor instanceof HTMLTextAreaElement) {
+        nextEditor.focus();
+      }
+    }, 0);
+  }
+
+  function positionCards() {
+    const layer = document.getElementById("cmtLayer");
+    if (!layer) {
+      return;
     }
+    const cards = Array.from(layer.querySelectorAll(".cmt"));
+    if (!isDesktopRail()) {
+      for (const card of cards) {
+        card.style.position = "";
+        card.style.top = "";
+      }
+      return;
+    }
+    const layerRect = layer.getBoundingClientRect();
+    cards.sort((a, b) => {
+      const aAnchor = document.querySelector(commentSelector(a.dataset.for));
+      const bAnchor = document.querySelector(commentSelector(b.dataset.for));
+      const aTop = aAnchor ? aAnchor.getBoundingClientRect().top : 0;
+      const bTop = bAnchor ? bAnchor.getBoundingClientRect().top : 0;
+      return aTop - bTop;
+    });
+    let cursor = 0;
+    for (const card of cards) {
+      if (card.hidden || card.style.display === "none") {
+        continue;
+      }
+      const anchor = document.querySelector(commentSelector(card.dataset.for));
+      const ideal = anchor ? anchor.getBoundingClientRect().top - layerRect.top + layer.scrollTop : cursor;
+      const top = Math.max(ideal, cursor);
+      card.style.position = "absolute";
+      card.style.top = `${top}px`;
+      cursor = top + card.offsetHeight + 14;
+    }
+  }
+
+  function schedulePositionCards() {
+    if (state.positionFrame) {
+      return;
+    }
+    state.positionFrame = window.requestAnimationFrame(() => {
+      state.positionFrame = 0;
+      positionCards();
+    });
+  }
+
+  function isDesktopRail() {
+    const viewDoc = document.getElementById("viewDoc");
+    return window.matchMedia("(min-width: 901px)").matches && (!viewDoc || viewDoc.classList.contains("active"));
+  }
+
+  function activate(commentId, scrollCard = true) {
+    if (!commentId) {
+      return;
+    }
+    state.activeCommentId = commentId;
+    setActiveClasses(commentId);
+    schedulePositionCards();
+    const card = document.getElementById(cardId(commentId));
+    if (card && scrollCard) {
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
+  function setActiveClasses(commentId) {
+    document.querySelectorAll(".cx.is-active, .cmt.is-active").forEach((element) => {
+      element.classList.remove("is-active");
+    });
+    document.querySelectorAll(commentSelector(commentId)).forEach((highlight) => {
+      highlight.classList.add("is-active");
+    });
+    const card = document.getElementById(cardId(commentId));
+    card?.classList.add("is-active");
+  }
+
+  function updateCommentCount() {
+    if (!ui.commentCount) {
+      return;
+    }
+    const total = state.comments.comments.length;
+    const unresolved = state.comments.comments.filter((thread) => !isResolvedThread(thread)).length;
+    ui.commentCount.textContent = `${unresolved} 件未解決 / ${total} 件`;
+  }
+
+  function applyFilterVisibility() {
+    const canvas = document.getElementById("canvas") || document.body;
+    canvas.classList.toggle("hide-resolved", state.filter === "hide-resolved");
+    canvas.classList.toggle("only-open", state.filter === "only-open");
+    state.comments.comments.forEach((thread) => {
+      const visible = shouldShowThreadByFilter(thread);
+      document.querySelectorAll(commentSelector(thread.id)).forEach((highlight) => {
+        highlight.hidden = !visible;
+      });
+      const card = document.getElementById(cardId(thread.id));
+      if (card) {
+        card.hidden = !visible;
+      }
+    });
+    schedulePositionCards();
+  }
+
+  function shouldShowThreadByFilter(thread) {
+    const cardState = threadCardState(thread);
+    if (state.filter === "hide-resolved") {
+      return cardState !== "resolved";
+    }
+    if (state.filter === "only-open") {
+      return cardState === "open";
+    }
+    return true;
+  }
+
+  function initThemeToggle() {
+    const button = document.getElementById("themeToggle");
+    const saved = safeLocalStorageGet(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") {
+      document.documentElement.dataset.theme = saved;
+    } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.dataset.theme = "dark";
+    }
+    if (!button) {
+      return;
+    }
+    const label = button.querySelector(".tt-label");
+    if (label) {
+      const current = document.documentElement.dataset.theme || "light";
+      label.textContent = current === "dark" ? "Light" : "Dark";
+    }
+    button.addEventListener("click", () => {
+      const current = document.documentElement.dataset.theme;
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      safeLocalStorageSet(THEME_STORAGE_KEY, next);
+      if (label) {
+        label.textContent = next === "dark" ? "Light" : "Dark";
+      }
+      schedulePositionCards();
+    });
+  }
+
+  function initFilter() {
+    const select = document.getElementById("filterSelect");
+    if (!select) {
+      return;
+    }
+    state.filter = select.value || "all";
+    select.addEventListener("change", () => {
+      state.filter = select.value || "all";
+      applyFilterVisibility();
+    });
+  }
+
+  function initFocusToggle() {
+    const button = document.getElementById("focusToggle");
+    const canvas = document.getElementById("canvas");
+    if (!button || !canvas) {
+      return;
+    }
+    button.addEventListener("click", () => {
+      const isFocus = canvas.classList.toggle("is-focus");
+      button.setAttribute("aria-pressed", isFocus ? "true" : "false");
+      const label = button.querySelector(".ft-label");
+      if (label) {
+        label.textContent = isFocus ? "標準表示" : "最大化";
+      } else {
+        button.textContent = isFocus ? "標準表示" : "最大化";
+      }
+      schedulePositionCards();
+    });
+  }
+
+  function initTocScrollSpy() {
+    const toc = document.querySelector(".toc");
+    if (!toc) {
+      return;
+    }
+    const links = Array.from(toc.querySelectorAll("a[href^='#']"));
+    const headings = Array.from(document.querySelectorAll(".prose h2[id], [data-review-block] h2[id], h2[id]"));
+    const canvas = document.getElementById("canvas");
+    links.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const id = link.getAttribute("href")?.slice(1);
+        const target = id ? document.getElementById(id) : null;
+        if (!target) {
+          return;
+        }
+        const targetRect = target.getBoundingClientRect();
+        if (canvas) {
+          const canvasRect = canvas.getBoundingClientRect();
+          canvas.scrollBy({ top: targetRect.top - canvasRect.top - 90, behavior: "smooth" });
+        } else {
+          window.scrollBy({ top: targetRect.top - 90, behavior: "smooth" });
+        }
+      });
+    });
+    const onScroll = rafThrottle(() => updateCurrentSection(links, headings));
+    (canvas || document).addEventListener("scroll", onScroll);
+    updateCurrentSection(links, headings);
+  }
+
+  function updateCurrentSection(links, headings) {
+    let current = null;
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top <= 100) {
+        current = heading;
+      }
+    }
+    links.forEach((link) => link.classList.remove("current"));
+    if (!current) {
+      return;
+    }
+    const link = links.find((item) => item.getAttribute("href") === `#${current.id}`);
+    link?.classList.add("current");
+  }
+
+  function rafThrottle(callback) {
+    let ticking = false;
+    return () => {
+      if (ticking) {
+        return;
+      }
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        ticking = false;
+        callback();
+      });
+    };
+  }
+
+  function threadCardState(thread) {
+    if (isResolvedThread(thread) || thread.status === "addressed") {
+      return "resolved";
+    }
+    if (isNeedsUserReply(thread) || thread.status === "reply") {
+      return "reply";
+    }
+    return "open";
   }
 
   function isSubmitShortcut(event) {
@@ -545,6 +874,16 @@
     return "You";
   }
 
+  function replyInitials(reply) {
+    if (reply.role === "agent") {
+      return "AI";
+    }
+    if (reply.role === "system") {
+      return "SYS";
+    }
+    return "You";
+  }
+
   function isNeedsUserReply(thread) {
     return thread.status === COMMENT_STATUS.needsUserReply;
   }
@@ -554,17 +893,16 @@
   }
 
   function handleDocumentClick(event) {
-    if (ui.root.contains(event.target)) {
+    if (ui.root.contains(event.target) || ui.commentRail?.contains(event.target)) {
       return;
     }
-    if (event.target.closest?.("mark[data-comment-highlight]")) {
+    if (event.target.closest?.(".cx[data-comment]")) {
       return;
     }
     if (captureImageBlockClick(event)) {
       return;
     }
     closeComposer();
-    closeThreadPopover();
   }
 
   function captureImageBlockClick(event) {
@@ -603,15 +941,6 @@
     ui.commentBody.value = "";
   }
 
-  function closeThreadPopover() {
-    ui.threadPopover.hidden = true;
-    state.threadPinned = false;
-  }
-
-  function clearDocumentSelectionWithoutClosingPopover() {
-    clearDocumentSelectionForNonTextTarget();
-  }
-
   function clearDocumentSelectionForNonTextTarget() {
     state.ignoreSelectionChange = true;
     window.getSelection()?.removeAllRanges();
@@ -623,7 +952,7 @@
   function hideFloatingUi() {
     ui.toolbar.hidden = true;
     closeComposer();
-    closeThreadPopover();
+    schedulePositionCards();
   }
 
   function exportComments() {
@@ -651,7 +980,7 @@
   }
 
   function readLocalComments() {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = safeLocalStorageGet(storageKey);
     if (!raw) {
       return { schema_version: "1.0", document_id: documentId, comments: [] };
     }
@@ -663,7 +992,7 @@
   }
 
   function writeLocalComments() {
-    window.localStorage.setItem(storageKey, JSON.stringify(state.comments));
+    safeLocalStorageSet(storageKey, JSON.stringify(state.comments));
   }
 
   function normalizeComments(payload) {
@@ -690,7 +1019,6 @@
     state.selected = selection;
     state.selectionRect = rect;
     closeComposer();
-    closeThreadPopover();
     if (!selection || !rect) {
       ui.toolbar.hidden = true;
       return;
@@ -728,7 +1056,7 @@
 
   function closestCommentHighlight(node) {
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    return element?.closest("mark[data-comment-highlight]");
+    return element?.closest(".cx[data-comment]");
   }
 
   function getRangeRect(range) {
@@ -764,7 +1092,7 @@
         if (!node.nodeValue) {
           return NodeFilter.FILTER_REJECT;
         }
-        if (node.parentElement?.closest("mark[data-comment-highlight]")) {
+        if (node.parentElement?.closest(".cx[data-comment], .cx-num")) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -808,11 +1136,23 @@
     element.style.visibility = "";
   }
 
+  function cardId(commentId) {
+    return `card-${cssIdentifier(commentId)}`;
+  }
+
+  function commentSelector(commentId) {
+    return `.cx[data-comment="${cssEscape(commentId || "")}"]`;
+  }
+
+  function cssIdentifier(value) {
+    return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
   function cssEscape(value) {
     if (window.CSS && typeof window.CSS.escape === "function") {
       return window.CSS.escape(value);
     }
-    return String(value).replace(/"/g, '\\"');
+    return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   function escapeHtml(value) {
@@ -821,5 +1161,32 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function formatDateTime(value) {
+    if (!value) {
+      return "";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleString();
+  }
+
+  function safeLocalStorageGet(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function safeLocalStorageSet(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (_error) {
+      // localStorage can be disabled in strict browser modes; comments still render.
+    }
   }
 })();

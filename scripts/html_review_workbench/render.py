@@ -42,14 +42,21 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
             "review_required": False,
         },
     )
+    metadata = model.get("metadata") if isinstance(model.get("metadata"), dict) else {}
     html = _render_template(
         {
             "title": escape(model["title"]),
             "document_id": escape(model["document_id"]),
+            "eyebrow": escape(str(metadata.get("eyebrow", "Reviewable HTML Workbench"))),
+            "doc_status": _render_doc_status(metadata),
+            "deck": _render_deck(metadata),
+            "byline": _render_byline(metadata),
+            "meta_grid": _render_meta_grid(metadata, model["generated_at"]),
             "summary": _render_optional_summary(model.get("summary")),
             "generated_at": escape(model["generated_at"]),
             "asset_version": escape(rendered_at, quote=True),
             "body": body_html,
+            "toc": _render_toc(model["blocks"]),
         }
     )
 
@@ -96,7 +103,104 @@ def _render_template(values: dict[str, str]) -> str:
 def _render_optional_summary(summary: object) -> str:
     if not isinstance(summary, str) or not summary:
         return ""
-    return f'<p class="document-summary">{escape(summary)}</p>'
+    return (
+        '<section class="summary">'
+        '<div class="summary-h">'
+        '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">'
+        '<path d="M3 4h10M3 8h10M3 12h6"/></svg>'
+        '要約 (TL;DR)'
+        '</div>'
+        f'<p>{escape(summary)}</p>'
+        '</section>'
+    )
+
+
+def _render_doc_status(metadata: dict[str, Any]) -> str:
+    status = metadata.get("status")
+    label = metadata.get("status_label")
+    if not status or not label:
+        return ""
+    css_class = escape(str(status), quote=True)
+    return (
+        f'<span class="doc-status {css_class}">'
+        f'<span class="dot"></span>{escape(str(label))}'
+        '</span>'
+    )
+
+
+def _render_deck(metadata: dict[str, Any]) -> str:
+    deck = metadata.get("deck")
+    if not isinstance(deck, str) or not deck:
+        return ""
+    return f'<p class="doc-deck">{escape(deck)}</p>'
+
+
+def _render_byline(metadata: dict[str, Any]) -> str:
+    byline = metadata.get("byline")
+    if not isinstance(byline, dict):
+        return ""
+    parts: list[str] = []
+    agent = byline.get("agent")
+    if agent:
+        parts.append(
+            '<span class="agent-badge">'
+            '<span class="agent-avatar">AI</span>'
+            f'{escape(str(agent))}'
+            '</span>'
+        )
+    reviewers = byline.get("reviewers")
+    if reviewers:
+        parts.append(f'<span class="muted">人手レビュー: {escape(str(reviewers))}</span>')
+    if not parts:
+        return ""
+    return f'<div class="byline">{"".join(parts)}</div>'
+
+
+def _render_meta_grid(metadata: dict[str, Any], generated_at: str) -> str:
+    cells = metadata.get("meta_grid")
+    if not isinstance(cells, list) or not cells:
+        return f'<p class="doc-meta document-meta">Source generated at <time>{escape(generated_at)}</time></p>'
+    parts: list[str] = []
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        key = escape(str(cell.get("key", "")))
+        value = str(cell.get("value", ""))
+        mono = bool(cell.get("mono", False))
+        confidence = cell.get("confidence")
+        val_html = ""
+        if isinstance(confidence, int):
+            bars = []
+            for i in range(5):
+                fill = " fill" if i < confidence else ""
+                bars.append(f'<span class="bar{fill}"></span>')
+            val_html = f'<span class="confidence">{"".join(bars)}</span> {escape(value)}'
+        elif mono:
+            val_html = f'<span class="mono">{escape(value)}</span>'
+        else:
+            val_html = escape(value)
+        parts.append(
+            f'<div class="meta-cell">'
+            f'<div class="meta-key">{key}</div>'
+            f'<div class="meta-val">{val_html}</div>'
+            f'</div>'
+        )
+    if not parts:
+        return f'<p class="doc-meta document-meta">Source generated at <time>{escape(generated_at)}</time></p>'
+    return f'<div class="meta-grid" aria-label="生成メタデータ">{"".join(parts)}</div>'
+
+
+def _render_toc(blocks: list[dict[str, Any]]) -> str:
+    items: list[str] = []
+    for block in blocks:
+        title = block.get("title")
+        if not isinstance(title, str) or not title:
+            continue
+        block_id = escape(block["id"], quote=True)
+        items.append(f'<li><a href="#{block_id}">{escape(title)}</a></li>')
+    if not items:
+        return ""
+    return "<ol>\n" + "\n".join(items) + "\n</ol>"
 
 
 def _render_blocks(
@@ -106,11 +210,17 @@ def _render_blocks(
 ) -> tuple[str, list[dict[str, Any]]]:
     html_parts: list[str] = []
     review_blocks: list[dict[str, Any]] = []
+    section_counter = 0
     for block in blocks:
         block_id = block["id"]
         block_type = block["type"]
         review_required = bool(block.get("review_required", False))
-        html_parts.append(_render_block(block, review_required, diagrams.get(block_id), image_outputs.get(block_id)))
+        title = block.get("title")
+        sec_num = None
+        if isinstance(title, str) and title:
+            section_counter += 1
+            sec_num = section_counter
+        html_parts.append(_render_block(block, review_required, diagrams.get(block_id), image_outputs.get(block_id), sec_num))
         review_blocks.append(
             {
                 "id": block_id,
@@ -127,14 +237,15 @@ def _render_block(
     review_required: bool,
     diagram: PlannedDiagram | None,
     image_src: str | None,
+    section_number: int | None = None,
 ) -> str:
     block_id = escape(block["id"], quote=True)
     block_type = escape(block["type"], quote=True)
     review_attr = "true" if review_required else "false"
-    title_html = _render_block_title(block.get("title"))
+    title_html = _render_block_title(block.get("title"), block_id, section_number)
     content_html = _render_block_content(block, diagram, image_src)
     return (
-        f'<section class="review-block review-block-{block_type}" '
+        '<section class="review-block" '
         f'id="{block_id}" data-review-block="{block_id}" '
         f'data-block-type="{block_type}" data-review-required="{review_attr}">\n'
         f"{title_html}\n"
@@ -143,10 +254,13 @@ def _render_block(
     )
 
 
-def _render_block_title(title: object) -> str:
+def _render_block_title(title: object, block_id: str = "", section_number: int | None = None) -> str:
     if not isinstance(title, str) or not title:
         return ""
-    return f"<h2>{escape(title)}</h2>"
+    sec_span = ""
+    if section_number is not None:
+        sec_span = f'<span class="sec-no">{section_number:02d}</span>'
+    return f"<h2>{sec_span}{escape(title)}</h2>"
 
 
 def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None, image_src: str | None) -> str:
@@ -157,7 +271,22 @@ def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None,
     if block_type == "html":
         return f'<div class="block-content">{content}</div>'
     if block_type == "callout":
-        return f'<div class="block-content callout">{escape(content)}</div>'
+        level = block.get("level", "info")
+        icon = {"warn": "!", "success": "✓"}.get(level, "i")
+        title_html = ""
+        callout_title = block.get("callout_title", "")
+        if callout_title:
+            title_html = f'<div class="co-title">{escape(callout_title)}</div>'
+        return (
+            f'<div class="callout {escape(level, quote=True)}">'
+            f'<div class="co-ico">{icon}</div>'
+            f'<div>{title_html}<div class="co-body"><p>{escape(content)}</p></div></div>'
+            '</div>'
+        )
+    if block_type == "code":
+        return _render_code_block(block)
+    if block_type == "log":
+        return _render_log_block(block)
     if block_type == "image":
         return _render_image(block, image_src)
     if diagram is not None:
@@ -165,19 +294,117 @@ def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None,
     return f'<p class="block-content">{escape(content)}</p>'
 
 
+def _render_code_block(block: dict[str, Any]) -> str:
+    content = block.get("content", "")
+    filename = block.get("filename", "")
+    language = block.get("language", "")
+    lines = content.splitlines()
+    line_spans = []
+    highlight_lines = set(block.get("highlight_lines", []))
+    for i, line in enumerate(lines, 1):
+        hl_class = " hl" if i in highlight_lines else ""
+        line_spans.append(f'<span class="ln{hl_class}" data-n="{i}">{escape(line)}</span>')
+    fname_html = f'<span class="fname">{escape(filename)}</span>' if filename else ""
+    lang_html = f'<span class="lang">{escape(language)}</span>' if language else ""
+    return (
+        '<div class="code">'
+        f'<div class="code-bar"><span class="dots"><i></i><i></i><i></i></span>{fname_html}{lang_html}</div>'
+        f'<pre class="code-body">{"".join(line_spans)}</pre>'
+        '</div>'
+    )
+
+
+def _render_log_block(block: dict[str, Any]) -> str:
+    content = block.get("content", "")
+    filename = block.get("filename", "")
+    language = block.get("language", "LOG")
+    lines = content.splitlines()
+    log_spans = []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        level_class, line_class = _detect_log_level(line)
+        log_spans.append(f'<span class="log-line{line_class}">{_format_log_line(line, level_class)}</span>')
+    fname_html = f'<span class="fname">{escape(filename)}</span>' if filename else ""
+    lang_html = f'<span class="lang">{escape(language)}</span>'
+    return (
+        '<div class="code log">'
+        f'<div class="code-bar"><span class="dots"><i></i><i></i><i></i></span>{fname_html}{lang_html}</div>'
+        f'<div class="code-body">{"".join(log_spans)}</div>'
+        '</div>'
+    )
+
+
+_LOG_LEVEL_PATTERN = re.compile(
+    r"(?P<ts>\d{2}:\d{2}:\d{2}[.\d]*)\s+(?P<lvl>INFO|OK|WARN|ERROR|DEBUG)\s+(?P<msg>.*)",
+)
+
+
+def _detect_log_level(line: str) -> tuple[str, str]:
+    match = _LOG_LEVEL_PATTERN.search(line)
+    if not match:
+        return "", ""
+    lvl = match.group("lvl").lower()
+    line_class = ""
+    if lvl == "warn":
+        line_class = " is-warn"
+    elif lvl in ("error", "err"):
+        line_class = " is-err"
+    return lvl, line_class
+
+
+def _format_log_line(line: str, level_class: str) -> str:
+    match = _LOG_LEVEL_PATTERN.search(line)
+    if not match:
+        return escape(line)
+    ts = escape(match.group("ts"))
+    lvl = escape(match.group("lvl"))
+    msg = escape(match.group("msg"))
+    lvl_css = level_class if level_class else ""
+    if level_class == "error":
+        lvl_css = "err"
+    return f'<span class="ts">{ts}</span> <span class="lvl {lvl_css}">{lvl:<5s}</span> {msg}'
+
+
 def _render_diagram(diagram: PlannedDiagram) -> str:
     source_path = escape(diagram.relative_path, quote=True)
     kind = escape(diagram.kind, quote=True)
     source = escape(diagram.source)
-    preview = _render_diagram_preview(diagram)
+    flow_html = _render_diagram_flow(diagram)
     return (
-        '<figure class="block-content diagram-fallback mermaid-diagram" '
+        '<div class="diagram-fallback" '
         f'data-diagram-kind="{kind}" data-diagram-source="{source_path}">\n'
-        f"{preview}\n"
-        f'  <figcaption>Diagram source: <code>{source_path}</code></figcaption>\n'
+        '  <div class="df-head">'
+        '<span class="df-badge">DIAGRAM FALLBACK</span>'
+        f' <span>{escape(diagram.kind)} diagram</span>'
+        '</div>\n'
+        f"{flow_html}\n"
+        f'  <div class="df-raw">source: {source_path}</div>\n'
         f'  <pre class="diagram-source"><code>{source}</code></pre>\n'
-        "</figure>"
+        "</div>"
     )
+
+
+def _render_diagram_flow(diagram: PlannedDiagram) -> str:
+    nodes, edges = _diagram_preview_graph(diagram.source)
+    if not nodes:
+        return '<div class="flow"><div class="node"><div class="n-t">Preview unavailable</div></div></div>'
+    seen: set[str] = set()
+    parts: list[str] = []
+    for source_node, target_node in edges:
+        if source_node not in seen:
+            parts.append(f'<div class="node"><div class="n-t">{escape(source_node)}</div></div>')
+            seen.add(source_node)
+        parts.append('<div class="arrow">→</div>')
+        if target_node not in seen:
+            parts.append(f'<div class="node"><div class="n-t">{escape(target_node)}</div></div>')
+            seen.add(target_node)
+    for node in nodes:
+        if node not in seen:
+            parts.append(f'<div class="node"><div class="n-t">{escape(node)}</div></div>')
+            seen.add(node)
+    return f'  <div class="flow">{"".join(parts)}</div>'
 
 
 def _prepare_image_assets(blocks: list[dict[str, Any]], model_dir: Path, output_dir: Path) -> dict[str, str]:
@@ -214,11 +441,18 @@ def _render_image(block: dict[str, Any], image_src: str | None) -> str:
     image = block.get("image") if isinstance(block.get("image"), dict) else {}
     alt = escape(str(image.get("alt") or block.get("title") or block["id"]), quote=True)
     caption = image.get("caption") or block.get("content")
-    caption_html = f"  <figcaption>{escape(str(caption))}</figcaption>\n" if caption else ""
+    src_escaped = escape(image_src, quote=True)
+    tag_label = escape(Path(image_src).name)
+    caption_parts = []
+    if caption:
+        caption_parts.append(f"  <figcaption><span class=\"fc-no\">図</span>{escape(str(caption))}</figcaption>\n")
     return (
-        '<figure class="block-content generated-image">\n'
-        f'  <img src="{escape(image_src, quote=True)}" alt="{alt}" loading="lazy">\n'
-        f"{caption_html}"
+        '<figure class="figure generated-image">\n'
+        f'  <div class="gen-image">'
+        f'<span class="gi-tag">generated-image · {tag_label}</span>'
+        f'<img src="{src_escaped}" alt="{alt}" loading="lazy" style="width:100%;height:100%;object-fit:contain;position:absolute;inset:0;">'
+        f'</div>\n'
+        f"{''.join(caption_parts)}"
         "</figure>"
     )
 
@@ -231,37 +465,6 @@ def _unique_output_asset(path: Path) -> Path:
         if not candidate.exists():
             return candidate
     raise ValueError(f"could not choose unique output image path for: {path}")
-
-
-def _render_diagram_preview(diagram: PlannedDiagram) -> str:
-    nodes, edges = _diagram_preview_graph(diagram.source)
-    if not nodes:
-        return '<div class="diagram-preview-empty">Diagram preview unavailable.</div>'
-    width = 220 * max(1, len(nodes))
-    height = 170
-    positions = {
-        node: (80 + index * 200, 80)
-        for index, node in enumerate(nodes)
-    }
-    svg_parts = [
-        f'<svg class="diagram-preview" role="img" aria-label="{escape(diagram.kind, quote=True)} diagram" '
-        f'viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">',
-        '<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z"/></marker></defs>',
-    ]
-    for source, target in edges:
-        if source not in positions or target not in positions:
-            continue
-        x1, y1 = positions[source]
-        x2, y2 = positions[target]
-        svg_parts.append(
-            f'<line class="diagram-edge" x1="{x1 + 54}" y1="{y1}" x2="{x2 - 54}" y2="{y2}" marker-end="url(#arrow)"/>'
-        )
-    for node, (x, y) in positions.items():
-        label = escape(node)
-        svg_parts.append(f'<rect class="diagram-node" x="{x - 56}" y="{y - 28}" width="112" height="56" rx="8"/>')
-        svg_parts.append(f'<text class="diagram-label" x="{x}" y="{y + 5}" text-anchor="middle">{label}</text>')
-    svg_parts.append("</svg>")
-    return "\n".join(svg_parts)
 
 
 def _diagram_preview_graph(source: str) -> tuple[list[str], list[tuple[str, str]]]:

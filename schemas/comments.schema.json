@@ -54,22 +54,27 @@
             "type": "string"
           },
           "anchor": {
-            "type": "object",
-            "required": [
-              "start",
-              "end"
-            ],
-            "properties": {
-              "start": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "end": {
-                "type": "integer",
-                "minimum": 0
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
               }
-            },
-            "additionalProperties": false
+            ]
           },
           "comment": {
             "type": "string",
@@ -120,6 +125,7 @@
                   "type": "string",
                   "enum": [
                     "note",
+                    "answer",
                     "clarification_request",
                     "implementation_note",
                     "status_change"

@@ -77,7 +77,9 @@
               "table",
               "diagram",
               "image",
-              "html"
+              "html",
+              "code",
+              "log"
             ]
           },
           "title": {
@@ -88,6 +90,23 @@
           },
           "review_required": {
             "type": "boolean"
+          },
+          "callout_title": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["info", "warn", "success"]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "highlight_lines": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 }
           },
           "diagram": {
             "type": "object",

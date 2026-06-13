@@ -1,0 +1,21 @@
+{
+  "name": "reviewable-html-workbench-local",
+  "owner": {
+    "name": "u1"
+  },
+  "metadata": {
+    "description": "Reviewable HTML Workbench — generate reviewable HTML documents with preview and review comment support.",
+    "version": "0.1.1"
+  },
+  "plugins": [
+    {
+      "name": "reviewable-html-workbench",
+      "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
+      "version": "0.1.1",
+      "author": {
+        "name": "u1"
+      },
+      "source": "./plugins/reviewable-html-workbench"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="light" data-density="compact">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,15 +7,67 @@
   <link rel="stylesheet" href="assets/style.css?v={{ asset_version }}">
 </head>
 <body>
-  <header class="document-header" data-document-id="{{ document_id }}" id="document-header" data-review-block="document-header" data-block-type="header" data-review-required="false">
-    <p class="eyebrow">Reviewable HTML Workbench</p>
-    <h1>{{ title }}</h1>
-    {{ summary }}
-    <p class="document-meta">Source generated at <time>{{ generated_at }}</time></p>
-  </header>
-  <main id="content" class="document-content">
+  <div class="app" data-document-id="{{ document_id }}">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="brand-mark">
+          <span class="brand-glyph">RW</span>
+          <span class="brand-name">Reviewable HTML Workbench</span>
+        </span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="toolset">
+        <select class="chip-select" id="filterSelect" aria-label="レビューフィルタ">
+          <option value="all">すべて</option>
+          <option value="hide-resolved">未解決のみ</option>
+          <option value="only-open">未対応のみ</option>
+        </select>
+        <button class="btn ghost" id="focusToggle" type="button" title="最大化モード" aria-pressed="false">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
+          <span class="ft-label">最大化</span>
+        </button>
+        <button class="btn ghost" id="themeToggle" type="button" title="テーマ切替">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></svg>
+          <span class="tt-label">Dark</span>
+        </button>
+      </div>
+    </header>
+    <main class="canvas" id="canvas">
+      <div class="doc-shell">
+        <div class="doc-grid">
+          <aside class="toc" aria-label="目次">
+            <p class="toc-h">目次</p>
+{{ toc }}
+          </aside>
+          <article class="doc-main">
+            <div class="paper">
+              <header class="doc-headrow document-header" id="document-header" data-review-block="document-header" data-block-type="header" data-review-required="false">
+                <div class="doc-head-main">
+                  <p class="eyebrow">{{ eyebrow }}</p>
+                  <h1 class="doc-title">{{ title }}</h1>
+                  {{ doc_status }}
+                </div>
+              </header>
+              {{ deck }}
+              {{ byline }}
+              {{ meta_grid }}
+              {{ summary }}
+              <div class="prose document-content" id="content">
 {{ body }}
-  </main>
+              </div>
+            </div>
+          </article>
+          <aside class="cmt-rail" aria-label="レビューコメント">
+            <div class="cmt-rail-h">
+              <span>レビュー</span>
+              <span class="cmt-rail-count" id="cmtCount">—</span>
+            </div>
+            <div class="cmt-layer" id="cmtLayer"></div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
   <script src="assets/review-comments.js?v={{ asset_version }}"></script>
 </body>
 </html>
