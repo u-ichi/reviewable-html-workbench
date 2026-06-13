@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja" data-theme="light" data-density="compact">
+<html lang="{{ lang }}" data-theme="light" data-density="compact">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,16 +17,16 @@
       </div>
       <div class="topbar-spacer"></div>
       <div class="toolset">
-        <select class="chip-select" id="filterSelect" aria-label="レビューフィルタ">
-          <option value="all">すべて</option>
-          <option value="hide-resolved">未解決のみ</option>
-          <option value="only-open">未対応のみ</option>
+        <select class="chip-select" id="filterSelect" data-i18n="filterLabel">
+          <option value="all" data-i18n="filterAll"></option>
+          <option value="hide-resolved" data-i18n="filterHideResolved"></option>
+          <option value="only-open" data-i18n="filterOnlyOpen"></option>
         </select>
-        <button class="btn ghost" id="focusToggle" type="button" title="最大化モード" aria-pressed="false">
+        <button class="btn ghost" id="focusToggle" type="button" data-i18n-title="focusTitle" aria-pressed="false">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
-          <span class="ft-label">最大化</span>
+          <span class="ft-label" data-i18n="focusLabel"></span>
         </button>
-        <button class="btn ghost" id="themeToggle" type="button" title="テーマ切替">
+        <button class="btn ghost" id="themeToggle" type="button" data-i18n-title="themeTitle">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></svg>
           <span class="tt-label">Dark</span>
         </button>
@@ -35,8 +35,8 @@
     <main class="canvas" id="canvas">
       <div class="doc-shell">
         <div class="doc-grid">
-          <aside class="toc" aria-label="目次">
-            <p class="toc-h">目次</p>
+          <aside class="toc" data-i18n="tocLabel">
+            <p class="toc-h" data-i18n="tocHeader"></p>
 {{ toc }}
           </aside>
           <article class="doc-main">
@@ -57,9 +57,9 @@
               </div>
             </div>
           </article>
-          <aside class="cmt-rail" aria-label="レビューコメント">
+          <aside class="cmt-rail" data-i18n="railLabel">
             <div class="cmt-rail-h">
-              <span>レビュー</span>
+              <span data-i18n="railHeader"></span>
               <span class="cmt-rail-count" id="cmtCount">—</span>
             </div>
             <div class="cmt-layer" id="cmtLayer"></div>

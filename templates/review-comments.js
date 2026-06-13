@@ -1,6 +1,58 @@
 (function () {
   "use strict";
 
+  const I18N = Object.freeze({
+    ja: {
+      cardState: { open: "未対応", reply: "返信あり", resolved: "解決済み" },
+      railLabel: "レビューコメント",
+      railHeader: "レビュー",
+      resolvedBanner: "解決済みにしました",
+      replyPlaceholder: "返信を入力…",
+      replyLabel: "返信",
+      submitBtn: "送信",
+      resolveBtn: "解決",
+      reopenBtn: "再オープン",
+      deleteBtn: "削除",
+      commentCount: function (u, t) { return u + " 件未解決 / " + t + " 件"; },
+      focusLabel: "最大化",
+      normalLabel: "標準表示",
+      filterAll: "すべて",
+      filterHideResolved: "未解決のみ",
+      filterOnlyOpen: "未対応のみ",
+      filterLabel: "レビューフィルタ",
+      focusTitle: "最大化モード",
+      themeTitle: "テーマ切替",
+      tocLabel: "目次",
+      tocHeader: "目次",
+    },
+    en: {
+      cardState: { open: "Open", reply: "Has reply", resolved: "Resolved" },
+      railLabel: "Review comments",
+      railHeader: "Review",
+      resolvedBanner: "Marked as resolved",
+      replyPlaceholder: "Write a reply…",
+      replyLabel: "Reply",
+      submitBtn: "Send",
+      resolveBtn: "Resolve",
+      reopenBtn: "Reopen",
+      deleteBtn: "Delete",
+      commentCount: function (u, t) { return u + " unresolved / " + t + " total"; },
+      focusLabel: "Maximize",
+      normalLabel: "Normal",
+      filterAll: "All",
+      filterHideResolved: "Unresolved only",
+      filterOnlyOpen: "Open only",
+      filterLabel: "Review filter",
+      focusTitle: "Maximize mode",
+      themeTitle: "Toggle theme",
+      tocLabel: "Table of contents",
+      tocHeader: "Contents",
+    },
+  });
+
+  const lang = document.documentElement.lang === "ja" ? "ja" : "en";
+  const t = I18N[lang];
+
   const COMMENTS_URL = "annotations/comments.json";
   const STORAGE_PREFIX = "reviewable-html-comments:";
   const THEME_STORAGE_KEY = "reviewable-theme";
@@ -14,11 +66,6 @@
     COMMENT_STATUS.needsUserReply,
     COMMENT_STATUS.resolved,
   ];
-  const CARD_STATE_LABELS = Object.freeze({
-    open: "未対応",
-    reply: "返信あり",
-    resolved: "解決済み",
-  });
 
   const documentId = document.querySelector("[data-document-id]")?.dataset.documentId || "document";
   const storageKey = STORAGE_PREFIX + documentId;
@@ -32,6 +79,8 @@
     filter: "all",
     positionFrame: 0,
   };
+
+  initI18nLabels();
 
   const ui = createUi();
   document.body.appendChild(ui.root);
@@ -111,11 +160,11 @@
     }
     const rail = document.createElement("aside");
     rail.className = "cmt-rail review-comments-margin-rail";
-    rail.setAttribute("aria-label", "レビューコメント");
+    rail.setAttribute("aria-label", t.railLabel);
     rail.innerHTML = [
       '<div class="cmt-rail-h">',
-      "  <span>レビューコメント</span>",
-      '  <span class="cmt-rail-count" id="cmtCount">0 件</span>',
+      "  <span>" + t.railHeader + "</span>",
+      '  <span class="cmt-rail-count" id="cmtCount">—</span>',
       "</div>",
       '<div class="cmt-layer" id="cmtLayer"></div>',
     ].join("");
@@ -450,23 +499,23 @@
     const cardState = threadCardState(thread);
     const replies = renderReplies(thread);
     const resolvedBanner = cardState === "resolved"
-      ? '<div class="cmt-resolved-by">解決済みにしました</div>'
+      ? '<div class="cmt-resolved-by">' + t.resolvedBanner + '</div>'
       : "";
     const replyInput = cardState === "resolved"
       ? ""
       : [
           '<div class="cmt-foot">',
-          '  <textarea class="cmt-input" data-thread-reply rows="2" placeholder="返信を入力…" aria-label="返信"></textarea>',
-          '  <button type="button" class="btn primary" data-thread-reply-submit>送信</button>',
+          '  <textarea class="cmt-input" data-thread-reply rows="2" placeholder="' + t.replyPlaceholder + '" aria-label="' + t.replyLabel + '"></textarea>',
+          '  <button type="button" class="btn primary" data-thread-reply-submit>' + t.submitBtn + '</button>',
           "</div>",
         ].join("");
     const statusAction = cardState === "resolved"
-      ? '<button type="button" class="btn reopen" data-thread-reopen>再オープン</button>'
-      : '<button type="button" class="btn resolve" data-thread-resolve>解決</button>';
+      ? '<button type="button" class="btn reopen" data-thread-reopen>' + t.reopenBtn + '</button>'
+      : '<button type="button" class="btn resolve" data-thread-resolve>' + t.resolveBtn + '</button>';
     return [
       '<div class="cmt-head">',
       '  <div class="cmt-author"><span class="av">You</span> <span>Reviewer</span></div>',
-      `  <span class="cmt-state">${escapeHtml(CARD_STATE_LABELS[cardState])}</span>`,
+      `  <span class="cmt-state">${escapeHtml(t.cardState[cardState])}</span>`,
       "</div>",
       `<blockquote class="cmt-quote">${escapeHtml(thread.selected_text || thread.block_id || `Comment ${number}`)}</blockquote>`,
       `<div class="cmt-body review-comment-main-body" data-thread-comment-display tabindex="0">${escapeHtml(thread.comment || "")}</div>`,
@@ -476,7 +525,7 @@
       replyInput,
       '<div class="cmt-foot">',
       `  ${statusAction}`,
-      '  <button type="button" class="btn ghost" data-thread-delete>削除</button>',
+      '  <button type="button" class="btn ghost" data-thread-delete>' + t.deleteBtn + '</button>',
       "</div>",
     ].join("");
   }
@@ -694,7 +743,7 @@
     }
     const total = state.comments.comments.length;
     const unresolved = state.comments.comments.filter((thread) => !isResolvedThread(thread)).length;
-    ui.commentCount.textContent = `${unresolved} 件未解決 / ${total} 件`;
+    ui.commentCount.textContent = t.commentCount(unresolved, total);
   }
 
   function applyFilterVisibility() {
@@ -723,6 +772,28 @@
       return cardState === "open";
     }
     return true;
+  }
+
+  function initI18nLabels() {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      var key = el.dataset.i18n;
+      if (t[key] === undefined) { return; }
+      if (el.tagName === "SELECT") {
+        el.setAttribute("aria-label", t[key]);
+      } else if (el.tagName === "ASIDE") {
+        el.setAttribute("aria-label", t[key]);
+      } else {
+        el.textContent = t[key];
+      }
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+      var key = el.dataset.i18nTitle;
+      if (t[key] !== undefined) { el.title = t[key]; }
+    });
+    document.querySelectorAll("[data-i18n] option[data-i18n]").forEach(function (opt) {
+      var key = opt.dataset.i18n;
+      if (t[key] !== undefined) { opt.textContent = t[key]; }
+    });
   }
 
   function initThemeToggle() {
@@ -776,9 +847,9 @@
       button.setAttribute("aria-pressed", isFocus ? "true" : "false");
       const label = button.querySelector(".ft-label");
       if (label) {
-        label.textContent = isFocus ? "標準表示" : "最大化";
+        label.textContent = isFocus ? t.normalLabel : t.focusLabel;
       } else {
-        button.textContent = isFocus ? "標準表示" : "最大化";
+        button.textContent = isFocus ? t.normalLabel : t.focusLabel;
       }
       schedulePositionCards();
     });

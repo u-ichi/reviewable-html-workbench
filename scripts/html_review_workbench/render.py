@@ -43,8 +43,10 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
         },
     )
     metadata = model.get("metadata") if isinstance(model.get("metadata"), dict) else {}
+    doc_lang = str(metadata.get("lang", "ja"))
     html = _render_template(
         {
+            "lang": escape(doc_lang),
             "title": escape(model["title"]),
             "document_id": escape(model["document_id"]),
             "eyebrow": escape(str(metadata.get("eyebrow", "Reviewable HTML Workbench"))),
@@ -52,7 +54,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
             "deck": _render_deck(metadata),
             "byline": _render_byline(metadata),
             "meta_grid": _render_meta_grid(metadata, model["generated_at"]),
-            "summary": _render_optional_summary(model.get("summary")),
+            "summary": _render_optional_summary(model.get("summary"), doc_lang),
             "generated_at": escape(model["generated_at"]),
             "asset_version": escape(rendered_at, quote=True),
             "body": body_html,
@@ -100,15 +102,16 @@ def _render_template(values: dict[str, str]) -> str:
     return template
 
 
-def _render_optional_summary(summary: object) -> str:
+def _render_optional_summary(summary: object, lang: str = "ja") -> str:
     if not isinstance(summary, str) or not summary:
         return ""
+    heading = "Summary (TL;DR)" if lang != "ja" else "要約 (TL;DR)"
     return (
         '<section class="summary">'
         '<div class="summary-h">'
         '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">'
         '<path d="M3 4h10M3 8h10M3 12h6"/></svg>'
-        '要約 (TL;DR)'
+        f'{heading}'
         '</div>'
         f'<p>{escape(summary)}</p>'
         '</section>'
