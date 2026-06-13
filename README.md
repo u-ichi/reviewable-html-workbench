@@ -53,10 +53,11 @@ claude --plugin-dir /path/to/reviewable-html-workbench
 
 ### Codex CLI
 
-Add the GitHub repository as a plugin marketplace:
+Add the GitHub repository as a plugin marketplace and install:
 
 ```bash
 codex plugin marketplace add u-ichi/reviewable-html-workbench
+codex plugin install reviewable-html-workbench
 ```
 
 Or clone and register locally:
