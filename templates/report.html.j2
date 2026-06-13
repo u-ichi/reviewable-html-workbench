@@ -26,6 +26,10 @@
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
           <span class="ft-label" data-i18n="focusLabel"></span>
         </button>
+        <button class="btn ghost" id="publishToggle" type="button" data-i18n-title="publishTitle" aria-pressed="false">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3C4.5 3 2 8 2 8s2.5 5 6 5 6-5 6-5-2.5-5-6-5Z"/><circle cx="8" cy="8" r="2"/></svg>
+          <span class="pt-label" data-i18n="publishLabel"></span>
+        </button>
         <button class="btn ghost" id="themeToggle" type="button" data-i18n-title="themeTitle">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></svg>
           <span class="tt-label">Dark</span>
@@ -67,6 +71,21 @@
         </div>
       </div>
     </main>
+    <div class="pub-exit" id="pubExit" role="status">
+      <span class="pe-label"><b data-i18n="publishExitLabel"></b></span>
+      <div class="pe-seg" role="group">
+        <button class="pe-w on" data-pw="standard" data-i18n="publishStandard"></button>
+        <button class="pe-w" data-pw="max" data-i18n="publishMax"></button>
+      </div>
+      <button class="pe-btn primary" id="pubDownloadBtn">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3M8 10 5 7M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>
+        <span data-i18n="publishDownload"></span>
+      </button>
+      <button class="pe-btn" id="pubExitBtn">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        <span data-i18n="publishExit"></span>
+      </button>
+    </div>
   </div>
   <script src="assets/review-comments.js?v={{ asset_version }}"></script>
 </body>

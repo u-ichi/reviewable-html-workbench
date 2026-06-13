@@ -46,6 +46,25 @@ class RendererBundleTest(unittest.TestCase):
             self.assertEqual(manifest["review_blocks"][1]["id"], "overview")
             self.assertRegex(manifest["input"]["sha256"], r"^[0-9a-f]{64}$")
 
+    def test_render_bundle_includes_publish_elements(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            index_path = render_bundle(ROOT / "tests/fixtures/minimal_document_model.json", output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            css = (output_dir / "assets/style.css").read_text(encoding="utf-8")
+
+            for marker in [
+                'id="publishToggle"',
+                'id="pubDownloadBtn"',
+                'id="pubExitBtn"',
+            ]:
+                self.assertIn(marker, html)
+            self.assertTrue('id="pubExit"' in html or 'class="pub-exit"' in html)
+
+            for marker in [".is-published", ".pub-exit", ".pub-toast"]:
+                self.assertIn(marker, css)
+
     def test_render_toc_uses_block_titles(self) -> None:
         toc = _render_toc(
             [

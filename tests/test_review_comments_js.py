@@ -23,6 +23,10 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "renderCommentCards",
             "positionCards",
             "activate",
+            "initPublishToggle",
+            "setPublished",
+            "buildPublishedDoc",
+            "downloadPublishedDoc",
             "threadCardState",
             "normalizeThreadStatus",
         ]:
@@ -65,6 +69,47 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
 
         for classification in ["actionable", "needs_clarification", "blocked", "already_addressed"]:
             self.assertNotIn(classification, status_block)
+
+    def test_publish_preview_exports_clean_html_without_review_runtime(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+
+        self.assertIn("initPublishToggle();", script)
+        self.assertIn('document.body.classList.contains("is-published")', script)
+        self.assertIn('document.querySelector("#canvas .doc-shell")', script)
+        self.assertIn('clone.querySelectorAll(".toc, .cmt-rail, .doc-status, .byline, .cx-num")', script)
+        self.assertIn('clone.querySelectorAll(".cx")', script)
+        self.assertIn('clone.querySelectorAll(".review-comment-highlight")', script)
+        self.assertIn('clone.querySelectorAll(".review-comment-badge")', script)
+        self.assertIn('"<body class=\\"is-published\\">\\n"', script)
+        self.assertIn("const css = await collectCSS();", script)
+        self.assertIn("toast(t.publishToast);", script)
+
+    def test_published_i18n_keys_exist(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        ja_block = script[script.index("ja: {") : script.index("},\n    en: {")]
+        en_block = script[script.index("en: {") : script.index("},\n  });")]
+
+        for key in [
+            "publishLabel",
+            "publishActive",
+            "publishTitle",
+            "publishStandard",
+            "publishMax",
+            "publishDownload",
+            "publishExit",
+            "publishExitLabel",
+            "publishToast",
+        ]:
+            self.assertIn(f"{key}:", ja_block)
+            self.assertIn(f"{key}:", en_block)
+
+    def test_published_escape_handler(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        start = script.index("function initPublishToggle()")
+        publish_block = script[start : script.index("function setPublished", start)]
+
+        self.assertIn('event.key === "Escape"', publish_block)
+        self.assertIn("is-published", publish_block)
 
 
 if __name__ == "__main__":

@@ -647,6 +647,81 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .is-focus .cx .cx-num { display: none; }
 #focusToggle[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); }
 
+/* ---------- 14c. PUBLISHED / PUBLIC MODE ----------------- */
+
+/* 公開プレビューモード: トップバー・目次・コメントレール非表示、1カラム化 */
+.is-published .topbar { display: none; }
+.is-published .doc-grid { grid-template-columns: minmax(0, 1fr); }
+.is-published .toc, .is-published .cmt-rail { display: none; }
+.is-published .doc-shell { max-width: 1180px; padding-top: var(--sp-7); }
+.is-published .paper { padding: var(--sp-7) clamp(28px, 5vw, 64px) var(--sp-8); }
+.is-published .prose p, .is-published .prose ul, .is-published .prose ol,
+.is-published .doc-deck { max-width: none; }
+
+/* 公開内最大化 */
+.is-published .canvas.is-focus .doc-shell { max-width: 1480px; }
+.is-published .canvas.is-focus .prose p,
+.is-published .canvas.is-focus .prose ul,
+.is-published .canvas.is-focus .prose ol,
+.is-published .canvas.is-focus .doc-deck { max-width: none; }
+
+/* 大きなブロックも幅制限解除 */
+.is-published .table-wrap, .is-published .code, .is-published .figure,
+.is-published .diagram-fallback, .is-published .summary,
+.is-published .meta-grid { max-width: none; }
+
+/* レビュー要素の非表示 */
+.is-published .cx { background: transparent; border-bottom: 0; cursor: default; color: inherit; }
+.is-published .cx .cx-num { display: none; }
+.is-published .doc-status,
+.is-published .byline,
+.is-published .toc-flag { display: none; }
+.is-published .review-comments-root { display: none; }
+.is-published .review-comments-utility { display: none; }
+
+/* フローティングバー */
+.pub-exit {
+  display: none; position: fixed; bottom: var(--sp-5); left: 50%;
+  transform: translateX(-50%); z-index: 80;
+  background: #1c1f24; color: #e7e3da;
+  border-radius: var(--r-pill); padding: 6px 6px 6px 18px;
+  gap: 8px; align-items: center;
+  font-size: var(--fs-small); box-shadow: var(--sh-3);
+}
+.is-published .pub-exit { display: flex; }
+.pub-exit > * { flex: none; }
+.pub-exit .pe-label { font-weight: 550; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+@media (max-width: 760px) { .pub-exit .pe-label { display: none; } }
+.pub-exit .pe-w, .pub-exit .pe-btn { white-space: nowrap; }
+.pub-exit .pe-label b { font-weight: 700; }
+.pub-exit .pe-seg { display: inline-flex; background: rgba(255,255,255,.14); border-radius: var(--r-pill); padding: 2px; }
+.pub-exit .pe-seg .pe-w {
+  padding: 4px 12px; border-radius: var(--r-pill); border: none;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.pub-exit .pe-seg .pe-w.on { background: var(--paper); color: var(--ink); }
+.pub-exit .pe-btn {
+  padding: 6px 14px; border-radius: var(--r-pill); border: none;
+  background: rgba(255,255,255,.14); color: inherit; font: inherit;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+}
+.pub-exit .pe-btn.primary { background: var(--brand); color: #fff; }
+.pub-exit .pe-btn:hover { filter: brightness(.94); }
+.pub-exit .pe-btn .icon { width: 14px; height: 14px; }
+
+/* トースト */
+.pub-toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: #1c1f24; color: #e7e3da;
+  padding: 10px 18px; border-radius: var(--r-pill);
+  font: var(--fs-small)/1.4 var(--font-sans);
+  box-shadow: var(--sh-3); z-index: 90;
+  opacity: 0; transition: opacity .24s, transform .24s;
+  display: flex; align-items: center; gap: 8px;
+}
+.pub-toast .icon { width: 14px; height: 14px; }
+.pub-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* ---------- 15. COMMENT CARDS ----------------------------- */
 .cmt {
   background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--r-md);

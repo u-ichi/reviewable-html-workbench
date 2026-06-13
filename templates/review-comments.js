@@ -24,6 +24,15 @@
       themeTitle: "テーマ切替",
       tocLabel: "目次",
       tocHeader: "目次",
+      publishLabel: "公開プレビュー",
+      publishActive: "プレビュー中",
+      publishTitle: "公開プレビュー",
+      publishStandard: "標準",
+      publishMax: "最大化",
+      publishDownload: "公開用HTMLを書き出し",
+      publishExit: "編集に戻る",
+      publishExitLabel: "公開プレビュー",
+      publishToast: "公開用HTMLを書き出しました",
     },
     en: {
       cardState: { open: "Open", reply: "Has reply", resolved: "Resolved" },
@@ -47,6 +56,15 @@
       themeTitle: "Toggle theme",
       tocLabel: "Table of contents",
       tocHeader: "Contents",
+      publishLabel: "Publish preview",
+      publishActive: "Previewing",
+      publishTitle: "Publish preview",
+      publishStandard: "Standard",
+      publishMax: "Maximize",
+      publishDownload: "Export published HTML",
+      publishExit: "Back to edit",
+      publishExitLabel: "Published preview",
+      publishToast: "Published HTML exported",
     },
   });
 
@@ -88,6 +106,7 @@
   initThemeToggle();
   initFilter();
   initFocusToggle();
+  initPublishToggle();
   initTocScrollSpy();
 
   document.addEventListener("selectionchange", scheduleSelectionCapture);
@@ -225,6 +244,9 @@
   }
 
   function captureSelection() {
+    if (document.body.classList.contains("is-published")) {
+      return;
+    }
     if (state.ignoreSelectionChange) {
       return;
     }
@@ -853,6 +875,258 @@
       }
       schedulePositionCards();
     });
+  }
+
+  function initPublishToggle() {
+    const button = document.getElementById("publishToggle");
+    if (!button) {
+      return;
+    }
+
+    button.addEventListener("click", () => {
+      setPublished(!document.body.classList.contains("is-published"));
+    });
+
+    const exitButton = document.getElementById("pubExitBtn");
+    if (exitButton) {
+      exitButton.addEventListener("click", () => setPublished(false));
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && document.body.classList.contains("is-published")) {
+        setPublished(false);
+      }
+    });
+
+    document.querySelectorAll(".pe-w").forEach((widthButton) => {
+      widthButton.addEventListener("click", () => {
+        const canvas = document.getElementById("canvas");
+        if (!canvas) {
+          return;
+        }
+        const isMax = widthButton.getAttribute("data-pw") === "max";
+        canvas.classList.toggle("is-focus", isMax);
+        const focusButton = document.getElementById("focusToggle");
+        if (focusButton) {
+          focusButton.setAttribute("aria-pressed", isMax ? "true" : "false");
+          const label = focusButton.querySelector(".ft-label");
+          if (label) {
+            label.textContent = isMax ? t.normalLabel : t.focusLabel;
+          }
+        }
+        document.querySelectorAll(".pe-w").forEach((buttonItem) => {
+          buttonItem.classList.toggle("on", buttonItem === widthButton);
+        });
+        schedulePositionCards();
+      });
+    });
+
+    const downloadButton = document.getElementById("pubDownloadBtn");
+    if (downloadButton) {
+      downloadButton.addEventListener("click", downloadPublishedDoc);
+    }
+  }
+
+  function setPublished(on) {
+    document.body.classList.toggle("is-published", on);
+    const button = document.getElementById("publishToggle");
+    if (button) {
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+      const label = button.querySelector(".pt-label");
+      if (label) {
+        label.textContent = on ? t.publishActive : t.publishLabel;
+      }
+    }
+    if (on) {
+      const canvas = document.getElementById("canvas");
+      const isFocus = canvas && canvas.classList.contains("is-focus");
+      document.querySelectorAll(".pe-w").forEach((widthButton) => {
+        const isMax = widthButton.getAttribute("data-pw") === "max";
+        widthButton.classList.toggle("on", isMax === Boolean(isFocus));
+      });
+    }
+    schedulePositionCards();
+  }
+
+  async function buildPublishedDoc() {
+    const shell = document.querySelector("#canvas .doc-shell");
+    if (!shell) {
+      return null;
+    }
+    const clone = shell.cloneNode(true);
+
+    clone.querySelectorAll(".toc, .cmt-rail, .doc-status, .byline, .cx-num").forEach((node) => node.remove());
+
+    clone.querySelectorAll(".cx").forEach((element) => {
+      const parent = element.parentNode;
+      if (!parent) {
+        return;
+      }
+      while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+      }
+      parent.removeChild(element);
+    });
+
+    clone.querySelectorAll("[data-comment]").forEach((node) => {
+      node.removeAttribute("data-comment");
+    });
+    clone.querySelectorAll("[data-cstate-host]").forEach((node) => {
+      node.removeAttribute("data-cstate-host");
+    });
+
+    clone.querySelectorAll(".review-comment-highlight").forEach((element) => {
+      const parent = element.parentNode;
+      if (!parent) {
+        return;
+      }
+      while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+      }
+      parent.removeChild(element);
+    });
+    clone.querySelectorAll(".review-comment-badge").forEach((node) => node.remove());
+
+    await embedImages(clone);
+
+    const root = document.documentElement;
+    const density = root.getAttribute("data-density") || "compact";
+    const docLang = root.lang || "ja";
+    const canvas = document.getElementById("canvas");
+    const isFocus = canvas && canvas.classList.contains("is-focus");
+    const titleElement = clone.querySelector(".doc-title");
+    const title = titleElement ? titleElement.textContent.trim() : "document";
+
+    const css = await collectCSS();
+    var darkOverrides =
+      "@media(prefers-color-scheme:dark){:root{" +
+      "--bg-app:#131519;--bg-rail:#171a1f;--paper:#1c1f24;--paper-2:#20242a;" +
+      "--ink:#e7e3da;--ink-2:#a6a299;--ink-3:#7d7a72;--ink-faint:#5b5851;" +
+      "--line-1:#2c2f35;--line-2:#393d44;--line-3:#4a4e56;" +
+      "--brand:#6ea4dc;--brand-soft:#1f2d3c;" +
+      "--open:#6ea4dc;--open-bg:#1c2c3b;--open-line:#355472;" +
+      "--reply:#d6a85a;--reply-bg:#352c18;--reply-line:#604c25;" +
+      "--resolved:#6dba88;--resolved-bg:#1c2e23;--resolved-line:#345240;" +
+      "--code-bg:#15181d;--code-bg-2:#1b1f25;--code-line:#262b32;" +
+      "--sh-1:0 1px 2px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.04);" +
+      "--sh-2:0 2px 8px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.05);" +
+      "--sh-3:0 10px 30px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);" +
+      "--focus-ring:0 0 0 3px color-mix(in srgb,var(--brand) 40%,transparent);" +
+      "}}";
+    const html =
+      "<!DOCTYPE html>\n<html lang=\"" + docLang + "\" data-density=\"" + density + "\">\n" +
+      "<head>\n<meta charset=\"utf-8\">\n" +
+      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
+      "<title>" + escapeHtml(title) + "</title>\n" +
+      "<style>\n" + css +
+      "\n/* published export overrides */\n" +
+      "html,body{background:var(--bg-app);}\n" +
+      ".canvas{overflow:visible;height:auto;min-height:100vh;}\n" +
+      darkOverrides + "\n" +
+      "</style>\n</head>\n" +
+      "<body class=\"is-published\">\n" +
+      "<main class=\"canvas" + (isFocus ? " is-focus" : "") + "\">\n" +
+      clone.outerHTML + "\n</main>\n</body>\n</html>\n";
+    return { html, title };
+  }
+
+  async function collectCSS() {
+    let css = "";
+    for (let index = 0; index < document.styleSheets.length; index += 1) {
+      try {
+        const rules = document.styleSheets[index].cssRules;
+        for (let ruleIndex = 0; ruleIndex < rules.length; ruleIndex += 1) {
+          css += rules[ruleIndex].cssText + "\n";
+        }
+      } catch (_error) {
+        var href = document.styleSheets[index].href;
+        if (href) {
+          try {
+            var resp = await fetch(href);
+            if (resp.ok) {
+              css += (await resp.text()) + "\n";
+            }
+          } catch (_fetchError) { /* skip */ }
+        }
+      }
+    }
+    return css;
+  }
+
+  async function embedImages(container) {
+    var imgs = container.querySelectorAll("img[src]");
+    var promises = Array.prototype.map.call(imgs, function(img) {
+      var src = img.getAttribute("src");
+      if (!src || src.startsWith("data:")) {
+        return Promise.resolve();
+      }
+      var origImg = document.querySelector('img[src="' + CSS.escape(src) + '"]') ||
+                    document.querySelector('img[src="' + src + '"]');
+      if (origImg && origImg.naturalWidth > 0 && origImg.complete) {
+        try {
+          var cvs = document.createElement("canvas");
+          cvs.width = origImg.naturalWidth;
+          cvs.height = origImg.naturalHeight;
+          cvs.getContext("2d").drawImage(origImg, 0, 0);
+          img.setAttribute("src", cvs.toDataURL("image/png"));
+          return Promise.resolve();
+        } catch (_canvasError) { /* fall through to fetch */ }
+      }
+      return fetch(src).then(function(r) { return r.blob(); }).then(function(blob) {
+        return new Promise(function(resolve) {
+          var reader = new FileReader();
+          reader.onloadend = function() {
+            img.setAttribute("src", reader.result);
+            resolve();
+          };
+          reader.onerror = function() { resolve(); };
+          reader.readAsDataURL(blob);
+        });
+      }).catch(function() { /* keep original src */ });
+    });
+    await Promise.all(promises);
+  }
+
+  function slugify(value) {
+    return (value || "document").replace(/[\\/:*?"<>|\s]+/g, "_").replace(/_+/g, "_").slice(0, 48) || "document";
+  }
+
+  function toast(message) {
+    const element = document.createElement("div");
+    element.className = "pub-toast";
+    element.innerHTML = [
+      '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>',
+      escapeHtml(message),
+    ].join("");
+    document.body.appendChild(element);
+    window.requestAnimationFrame(() => {
+      element.classList.add("show");
+    });
+    window.setTimeout(() => {
+      element.classList.remove("show");
+      window.setTimeout(() => {
+        element.remove();
+      }, 240);
+    }, 2600);
+  }
+
+  async function downloadPublishedDoc() {
+    const doc = await buildPublishedDoc();
+    if (!doc) {
+      return;
+    }
+    const blob = new Blob([doc.html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = slugify(doc.title) + ".html";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1500);
+    toast(t.publishToast);
   }
 
   function initTocScrollSpy() {
