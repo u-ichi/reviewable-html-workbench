@@ -4,25 +4,34 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-A Claude Code / Codex CLI plugin for generating reviewable HTML documents with preview server, inline review comments, and agent feedback ingestion.
+A Claude Code / Codex CLI plugin that lets you review agent-generated HTML documents with inline comments — and have the agent read those comments, reply, and improve the document in the next iteration.
 
 ![Overview](docs/images/overview.png)
 
 ## Overview
 
-Agent workflows often produce long reports, design documents, research notes, and comparison tables that need human review before they become useful. Plain text and chat messages make that review hard: comments lose their location, generated diagrams are difficult to inspect, and follow-up changes are easy to miss.
+Agent workflows produce reports, design documents, and comparison tables — but turning those outputs into something you actually trust requires back-and-forth review. Chat-based feedback loses context: "fix the table in section 3" works once, but doesn't scale when you have dozens of comments across a long document.
 
-Reviewable HTML Workbench turns those outputs into self-contained HTML bundles with structured document blocks, generated assets, a local preview runtime, and review comments attached to exact document ranges. It is built for Claude Code and Codex CLI plugin workflows, while keeping the runtime small: Python 3.11+, standard library only, HTML, CSS, and vanilla JavaScript.
+Reviewable HTML Workbench solves this by putting the review conversation **inside the document itself**:
 
-The plugin includes two skills. `visual-html-renderer` creates, validates, renders, and previews visual HTML documents. `reviewable-design-doc` builds review-ready design documents and can ingest HTML comments back into the agent workflow, including agent replies and review-cycle state.
+1. **Generate** — The agent produces an HTML bundle with structured sections, diagrams, and images.
+2. **Review** — You open the preview, select any text or image, and leave a comment right where the issue is.
+3. **Ingest** — The agent reads your comments, classifies each one, and writes replies explaining what it will change.
+4. **Improve** — The agent updates the document, re-renders, and you see the changes in context.
+5. **Repeat** — Keep commenting and refining until the document is ready.
+
+Comments are attached to exact document ranges and persisted as structured JSON, so nothing is lost between iterations. When you're satisfied, export the final document as a single self-contained HTML file.
+
+The plugin includes two skills. `visual-html-renderer` creates, validates, renders, and previews visual HTML documents. `reviewable-design-doc` builds review-ready design documents and ingests review comments back into the agent workflow — including agent replies, comment classification, and review-cycle state tracking.
 
 ## Features
 
+- **Inline Review Comments**: select any text or image in the preview to leave a comment. Comments are highlighted in the document with margin cards showing status, replies, and threading.
+- **Review Ingestion**: the agent reads `annotations/comments.json`, classifies each comment (actionable, clarification, already addressed, etc.), writes agent replies, and tracks review-cycle state — so the review conversation stays structured across iterations.
+- **Publish & Download**: switch to a clean reading view with no review UI, then download a single self-contained HTML file with all CSS and images embedded. The exported file auto-detects OS light/dark theme.
 - **Document Model**: schema-driven document input for predictable HTML generation.
 - **HTML Rendering**: produces `index.html`, copied assets, and `renderer-manifest.json`.
 - **Preview Server with Tailscale**: starts a session-scoped preview server, preferring Tailscale IPv4 and falling back to `127.0.0.1`; `0.0.0.0` bind is rejected.
-- **Inline Review Comments**: comment highlights, margin cards, replies, status changes, import, and export.
-- **Review Ingestion**: reads `annotations/comments.json`, classifies comments, writes agent replies, and saves review-cycle state.
 - **Dark/Light Theme**: UI support for theme switching in rendered review documents.
 - **Diagram + Image Support**: stores Mermaid sources, renders fallback diagrams, and attaches generated image assets to document model blocks.
 
@@ -183,9 +192,9 @@ MIT
 <details>
 <summary>日本語</summary>
 
-Reviewable HTML Workbench は、Claude Code / Codex CLI 向けの HTML レビュー用プラグインです。設計資料、調査レポート、比較表、図示つきドキュメントをレビュー可能な HTML bundle として生成し、ローカルまたは Tailscale 経由の preview server で確認できます。
+Reviewable HTML Workbench は、Claude Code / Codex CLI 向けの HTML レビュー用プラグインです。agent が生成した設計資料・調査レポート・比較表を HTML で出力し、本文の任意の箇所にレビューコメントを書き込めます。agent はそのコメントを読み取り、返信し、内容を改善して再出力します。コメントと改善を繰り返して、ドキュメントを一緒に磨き上げるワークフローを実現します。
 
-主な機能は、schema 駆動の document model、HTML レンダリング、Preview Runtime、本文に紐づくレビューコメント、コメント取り込み、agent reply 書き戻し、図・生成画像サポートです。
+完成したら、レビュー要素を除いた読者向けの HTML を 1 ファイルでダウンロードできます（CSS・画像埋め込み済み、OS テーマ自動検知対応）。
 
 2つの skill を含みます。
 
