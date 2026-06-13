@@ -265,6 +265,8 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
 .prose h2 .sec-no { font-family: var(--font-mono); font-size: 14px; color: var(--ink-faint); font-weight: 500; margin-right: 10px; }
 .prose h3 { font-size: var(--fs-h3); font-weight: 650; margin: var(--sp-5) 0 0; letter-spacing: .01em; }
 .prose p { margin: 0; max-width: 72ch; text-wrap: pretty; }
+.prose a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.prose a:hover { color: var(--brand); text-decoration-thickness: 2px; }
 .prose a.ref { color: var(--brand); text-decoration: none; font-weight: 550; }
 .prose a.ref:hover { text-decoration: underline; }
 .prose sup.cite { font-size: 10px; color: var(--brand); font-weight: 700; font-family: var(--font-mono); vertical-align: super; margin-left: 1px; }
