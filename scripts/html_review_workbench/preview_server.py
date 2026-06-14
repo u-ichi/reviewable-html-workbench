@@ -116,6 +116,11 @@ def start_preview(
     session_id = uuid.uuid4().hex
     owner_session = owner_session or current_owner_session() or "unknown"
     owner_pid = owner_pid or current_agent_pid()
+    if not owner_pid:
+        raise PreviewConfigurationError(
+            "--owner-pid is required; pass the caller's PID (e.g. --owner-pid $$) "
+            "so the server shuts down when the owning process exits"
+        )
     created_at = datetime.now(timezone.utc).isoformat()
 
     process = subprocess.Popen(

@@ -165,7 +165,7 @@ HTML_REVIEW_WORKBENCH_TAILSCALE_IP=<tailscale-ip> \
 
 - `preview` が `status: running` を返した場合、最終応答に `url` を必ず含める。ファイルパスだけで完了しない。
 - `preview` が `status: off` または `status: failed` の場合、URLが無い理由を明示し、可能なら `--mode auto` で再実行してURL提示まで進める。
-- `--owner-pid` で指定したプロセスを監視し、そのプロセスが終了するとサーバーも自動終了する。`--owner-pid` を省略するとサーバーは `stop_command` で明示停止するまで生存する。
+- `--owner-pid` で指定したプロセスを監視し、そのプロセスが終了するとサーバーも自動終了する。`--owner-pid` は必須であり、省略するとエラーになる。
 - 手動停止が必要な時だけ、返却JSONの `stop_command` を使う。PIDなしで全previewを停止しない。
 
 ## 完了時の確認

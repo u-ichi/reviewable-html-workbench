@@ -102,12 +102,12 @@ class PreviewServerTest(unittest.TestCase):
             root = Path(tmp)
             (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
 
-            session = start_preview(root, "local")
+            session = start_preview(root, "local", owner_pid=os.getpid())
             try:
                 self.assertEqual(session.bind, "127.0.0.1")
                 self.assertEqual(session.mode, "local")
                 self.assertGreater(session.pid, 0)
-                self.assertIsNone(session.owner_pid)
+                self.assertEqual(session.owner_pid, os.getpid())
                 self.assertTrue(session.url.startswith("http://127.0.0.1:"))
                 self.assertEqual(session.stop_command, f"bin/kill-review-preview.sh {session.pid}")
                 self.assertEqual(Path(session.manifest).parent, (root / "annotations").resolve())
@@ -120,7 +120,7 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertEqual(manifest["port"], session.port)
                 self.assertEqual(manifest["url"], session.url)
                 self.assertEqual(manifest["pid"], session.pid)
-                self.assertIsNone(manifest["owner_pid"])
+                self.assertEqual(manifest["owner_pid"], os.getpid())
                 self.assertEqual(manifest["owner_session"], session.owner_session)
                 self.assertEqual(manifest["status"], "running")
             finally:
@@ -156,7 +156,7 @@ class PreviewServerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            session = start_preview(root, "local")
+            session = start_preview(root, "local", owner_pid=os.getpid())
             try:
                 comments_url = session.url.replace("/index.html", "/annotations/comments.json")
                 initial = _read_json_url(comments_url)
