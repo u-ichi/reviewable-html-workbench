@@ -83,7 +83,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("attach-image", visual)
         self.assertIn("render` → `validate` → `preview", visual)
         self.assertIn("返却JSONの `url`", visual)
-        self.assertIn("親PIDを監視", visual)
+        self.assertIn("--owner-pid", visual)
 
     def test_reviewable_design_doc_builds_model_and_reports_preview_url(self) -> None:
         reviewable = (ROOT / "skills/reviewable-design-doc/SKILL.md").read_text(encoding="utf-8")
@@ -94,7 +94,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("現行rendererに専用描画がない", reviewable)
         self.assertIn("source-capture draft", reviewable)
         self.assertIn("返却JSONの `url`", reviewable)
-        self.assertIn("親PIDを監視", reviewable)
+        self.assertIn("--owner-pid", reviewable)
 
     def test_same_fixture_keeps_artifact_structure_across_skill_workflows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

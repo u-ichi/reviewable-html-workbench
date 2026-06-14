@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import argparse
 import os
+import selectors
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -76,6 +77,31 @@ class PreviewSession:
         return payload
 
 
+def _wait_for_ready_signal(
+    process: subprocess.Popen[bytes], timeout: float = 5.0
+) -> int:
+    """サーバーの ready シグナルを読み、実ポートを返す。"""
+    sel = selectors.DefaultSelector()
+    try:
+        sel.register(process.stdout, selectors.EVENT_READ)
+        events = sel.select(timeout=timeout)
+        if not events:
+            raise PreviewConfigurationError(
+                "preview server did not become ready within timeout"
+            )
+        line = process.stdout.readline()
+        if not line:
+            raise PreviewConfigurationError(
+                "preview server exited before becoming ready"
+            )
+        signal = json.loads(line)
+        return int(signal["port"])
+    finally:
+        sel.close()
+        if process.stdout:
+            process.stdout.close()
+
+
 def start_preview(
     root: Path,
     mode: PreviewMode = "auto",
@@ -87,7 +113,6 @@ def start_preview(
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
 
     bind, resolved_mode = resolve_bind(mode)
-    port = pick_free_port(bind)
     session_id = uuid.uuid4().hex
     owner_session = owner_session or current_owner_session() or "unknown"
     owner_pid = owner_pid or current_agent_pid()
@@ -99,7 +124,7 @@ def start_preview(
             "-m",
             "scripts.html_review_workbench.preview_server",
             "--serve",
-            str(port),
+            "0",
             "--bind",
             bind,
             "--owner-session",
@@ -109,10 +134,11 @@ def start_preview(
             str(root),
         ],
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
+    port = _wait_for_ready_signal(process)
     url = f"http://{bind}:{port}/index.html"
     manifest_path = root / "annotations" / f"preview-session-{session_id}.json"
     session = PreviewSession(
@@ -147,10 +173,7 @@ def current_owner_session(environ: dict[str, str] | None = None) -> str | None:
 
 
 def current_agent_pid() -> int | None:
-    parent_pid = os.getppid()
-    if parent_pid <= 1:
-        return None
-    return parent_pid
+    return None
 
 
 def resolve_bind(
@@ -255,6 +278,11 @@ def serve(root: Path, bind: str, port: int, owner_pid: int | None = None) -> Non
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
     handler = partial(ReviewPreviewHandler, root=root)
     with ThreadingHTTPServer((bind, port), handler) as server:
+        actual_port = server.server_address[1]
+        sys.stdout.buffer.write(
+            json.dumps({"ready": True, "port": actual_port}).encode() + b"\n"
+        )
+        sys.stdout.buffer.flush()
         if owner_pid and owner_pid > 1:
             _start_owner_watchdog(server, owner_pid)
         server.serve_forever()
