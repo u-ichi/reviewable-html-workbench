@@ -194,16 +194,42 @@ def _render_meta_grid(metadata: dict[str, Any], generated_at: str) -> str:
 
 
 def _render_toc(blocks: list[dict[str, Any]]) -> str:
-    items: list[str] = []
+    if not any(block.get("heading_level") == 2 for block in blocks):
+        items: list[str] = []
+        for block in blocks:
+            title = block.get("title")
+            if not isinstance(title, str) or not title:
+                continue
+            block_id = escape(block["id"], quote=True)
+            items.append(f'<li><a href="#{block_id}">{escape(title)}</a></li>')
+        if not items:
+            return ""
+        return "<ol>\n" + "\n".join(items) + "\n</ol>"
+
+    html = '<ol class="toc-list">\n'
+    in_nested = False
     for block in blocks:
         title = block.get("title")
         if not isinstance(title, str) or not title:
             continue
         block_id = escape(block["id"], quote=True)
-        items.append(f'<li><a href="#{block_id}">{escape(title)}</a></li>')
-    if not items:
-        return ""
-    return "<ol>\n" + "\n".join(items) + "\n</ol>"
+        heading_level = block.get("heading_level", 3)
+        if heading_level == 2:
+            if in_nested:
+                html += "</ol>\n</li>\n"
+                in_nested = False
+            html += f'<li class="toc-h2"><a href="#{block_id}">{escape(title)}</a>\n'
+            html += "<ol>\n"
+            in_nested = True
+        else:
+            if not in_nested:
+                html += '<li class="toc-h2"><span></span>\n<ol>\n'
+                in_nested = True
+            html += f'<li><a href="#{block_id}">{escape(title)}</a></li>\n'
+    if in_nested:
+        html += "</ol>\n</li>\n"
+    html += "</ol>"
+    return html
 
 
 def _render_blocks(
@@ -213,17 +239,37 @@ def _render_blocks(
 ) -> tuple[str, list[dict[str, Any]]]:
     html_parts: list[str] = []
     review_blocks: list[dict[str, Any]] = []
-    section_counter = 0
+    h2_counter = 0
+    h3_counter = 0
     for block in blocks:
         block_id = block["id"]
         block_type = block["type"]
         review_required = bool(block.get("review_required", False))
         title = block.get("title")
+        heading_level = int(block.get("heading_level", 3))
         sec_num = None
         if isinstance(title, str) and title:
-            section_counter += 1
-            sec_num = section_counter
-        html_parts.append(_render_block(block, review_required, diagrams.get(block_id), image_outputs.get(block_id), sec_num))
+            if heading_level == 2:
+                if block_id in ("layer1-header", "layer2-header", "layer3-header"):
+                    h2_counter += 1
+                    sec_num = str(h2_counter)
+                h3_counter = 0
+            else:
+                h3_counter += 1
+                if h2_counter > 0:
+                    sec_num = f"{h2_counter}.{h3_counter}"
+                else:
+                    sec_num = str(h3_counter)
+        html_parts.append(
+            _render_block(
+                block,
+                review_required,
+                diagrams.get(block_id),
+                image_outputs.get(block_id),
+                sec_num,
+                heading_level,
+            )
+        )
         review_blocks.append(
             {
                 "id": block_id,
@@ -240,13 +286,14 @@ def _render_block(
     review_required: bool,
     diagram: PlannedDiagram | None,
     image_src: str | None,
-    section_number: int | None = None,
+    section_number: str | None = None,
+    heading_level: int = 3,
 ) -> str:
     block_id = escape(block["id"], quote=True)
     block_type = escape(block["type"], quote=True)
     review_attr = "true" if review_required else "false"
-    title_html = _render_block_title(block.get("title"), block_id, section_number)
-    content_html = _render_block_content(block, diagram, image_src)
+    title_html = _render_block_title(block.get("title"), block_id, section_number, heading_level)
+    content_html = _render_block_content(block, diagram, image_src, section_number, heading_level)
     return (
         '<section class="review-block" '
         f'id="{block_id}" data-review-block="{block_id}" '
@@ -257,21 +304,35 @@ def _render_block(
     )
 
 
-def _render_block_title(title: object, block_id: str = "", section_number: int | None = None) -> str:
+def _render_block_title(
+    title: object,
+    block_id: str = "",
+    section_number: str | None = None,
+    heading_level: int = 3,
+) -> str:
     if not isinstance(title, str) or not title:
         return ""
     sec_span = ""
     if section_number is not None:
-        sec_span = f'<span class="sec-no">{section_number:02d}</span>'
-    return f"<h2>{sec_span}{escape(title)}</h2>"
+        sec_span = f'<span class="sec-no">{section_number}</span>'
+    tag = f"h{heading_level}"
+    return f"<{tag}>{sec_span}{escape(title)}</{tag}>"
 
 
-def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None, image_src: str | None) -> str:
+def _render_block_content(
+    block: dict[str, Any],
+    diagram: PlannedDiagram | None,
+    image_src: str | None,
+    section_number: str | None = None,
+    heading_level: int = 3,
+) -> str:
     content = block.get("content", "")
     block_type = block["type"]
     if image_src is not None:
         return _render_image(block, image_src)
     if block_type == "html":
+        if section_number is not None:
+            content = _shift_content_headings(str(content), section_number, heading_level)
         return f'<div class="block-content">{content}</div>'
     if block_type == "callout":
         level = block.get("level", "info")
@@ -295,6 +356,22 @@ def _render_block_content(block: dict[str, Any], diagram: PlannedDiagram | None,
     if diagram is not None:
         return _render_diagram(diagram)
     return f'<p class="block-content">{escape(content)}</p>'
+
+
+def _shift_content_headings(content: str, section_number: str, heading_level: int) -> str:
+    sub_counter = 0
+
+    def repl(match: re.Match[str]) -> str:
+        nonlocal sub_counter
+        sub_counter += 1
+        sub_no = f'{section_number}.{sub_counter}'
+        tag = "h4" if heading_level == 3 else "h3"
+        return f'<{tag}><span class="sub-sec-no">{sub_no}</span>'
+
+    content = re.sub(r"<h3>", repl, content)
+    if heading_level == 3:
+        content = content.replace("</h3>", "</h4>")
+    return content
 
 
 def _render_code_block(block: dict[str, Any]) -> str:

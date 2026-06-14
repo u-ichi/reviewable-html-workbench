@@ -742,9 +742,13 @@
     state.activeCommentId = commentId;
     setActiveClasses(commentId);
     schedulePositionCards();
-    const card = document.getElementById(cardId(commentId));
-    if (card && scrollCard) {
-      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (scrollCard) {
+      window.requestAnimationFrame(() => {
+        const card = document.getElementById(cardId(commentId));
+        if (card) {
+          card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      });
     }
   }
 
@@ -1294,7 +1298,10 @@
     }, 0);
   }
 
-  function hideFloatingUi() {
+  function hideFloatingUi(event) {
+    if (event?.target && (ui.root.contains(event.target) || ui.commentRail?.contains(event.target))) {
+      return;
+    }
     ui.toolbar.hidden = true;
     closeComposer();
     schedulePositionCards();

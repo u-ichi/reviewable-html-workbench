@@ -91,6 +91,10 @@
           "review_required": {
             "type": "boolean"
           },
+          "heading_level": {
+            "type": "integer",
+            "enum": [2, 3]
+          },
           "callout_title": {
             "type": "string"
           },

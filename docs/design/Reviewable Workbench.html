@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light" data-density="compact">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviewable HTML Workbench — 設計案</title>
+<link rel="stylesheet" href="workbench.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="brand-mark">
+      <div class="brand-glyph">RW</div>
+      <div>
+        <div class="brand-name">Reviewable Workbench</div>
+      </div>
+    </div>
+
+    <nav class="topbar-tabs" role="tablist" aria-label="ビュー切替">
+      <button class="tab" role="tab" data-view="viewDoc" aria-selected="true">ドキュメント</button>
+      <button class="tab" role="tab" data-view="viewMobile" aria-selected="false">モバイル</button>
+      <button class="tab" role="tab" data-view="viewSpec" aria-selected="false">デザイン仕様</button>
+    </nav>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="toolset">
+      <span class="tool-label">表示</span>
+      <div class="seg" id="viewportSeg" role="group" aria-label="ビューポート">
+        <button class="on" data-vp="desktop">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M5.5 14h5M8 11.5V14"/></svg>Desktop</button>
+        <button data-vp="mobile">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>
+      </div>
+
+      <button class="btn ghost" id="focusToggle" title="最大化モード（目次・コメントを隠して横幅最大）" aria-pressed="false">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
+        <span class="ft-label">最大化</span>
+      </button>
+
+      <button class="btn ghost" id="publishToggle" title="一般公開プレビュー（レビューUI・ツールバーを排した配布文書の見え方）" aria-pressed="false">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3C4.5 3 2 8 2 8s2.5 5 6 5 6-5 6-5-2.5-5-6-5Z"/><circle cx="8" cy="8" r="2"/></svg>
+        <span class="pt-label">公開プレビュー</span>
+      </button>
+
+      <select class="chip-select" id="filterSelect" aria-label="レビュー表示フィルタ">
+        <option value="all">すべてのコメント</option>
+        <option value="hide-resolved">解決済みを隠す</option>
+        <option value="only-open">未対応のみ</option>
+      </select>
+
+      <button class="btn ghost" id="themeToggle" title="テーマ切替">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></svg>
+        <span class="tt-label">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ CANVAS ============ -->
+  <main class="canvas" id="canvas">
+
+    <!-- ============================================================
+         VIEW 1 · DESKTOP DOCUMENT
+         ============================================================ -->
+    <section class="view active" id="viewDoc" data-screen-label="Desktop document">
+      <div class="doc-shell">
+        <div class="doc-grid">
+
+          <!-- TOC RAIL -->
+          <aside class="toc" aria-label="目次">
+            <p class="toc-h">目次</p>
+            <ol>
+              <li>
+                <a href="#s1" class="current">1. 背景と課題<span class="toc-flag">●1</span></a>
+                <ol class="toc-sub">
+                  <li><a href="#s1">1.1 現行基盤の状況</a></li>
+                  <li><a href="#s1">1.2 調査の前提と制約</a></li>
+                </ol>
+              </li>
+              <li>
+                <a href="#s2">2. 評価方法と軸</a>
+                <ol class="toc-sub">
+                  <li><a href="#s2">2.1 テストデータセット</a></li>
+                  <li><a href="#s2">2.2 評価軸の重み</a></li>
+                </ol>
+              </li>
+              <li><a href="#s3">3. 候補の比較<span class="toc-flag">●1</span></a></li>
+              <li>
+                <a href="#s4">4. コスト試算の前提</a>
+                <ol class="toc-sub">
+                  <li><a href="#s4">4.1 ワークロード想定</a></li>
+                </ol>
+              </li>
+              <li>
+                <a href="#s5">5. 検証ログ</a>
+                <ol class="toc-sub">
+                  <li><a href="#s5">5.1 クエリベンチマーク</a></li>
+                </ol>
+              </li>
+              <li>
+                <a href="#s6">6. アーキテクチャ案<span class="toc-flag">●1</span></a>
+                <ol class="toc-sub">
+                  <li><a href="#s6">6.1 併用構成の概要</a></li>
+                </ol>
+              </li>
+              <li><a href="#s7">7. 推奨と結論<span class="toc-flag">✓1</span></a></li>
+            </ol>
+            <div class="toc-meta">
+              <strong>レビュー状況</strong><br>
+              未対応 2 · 返信あり 1 · 解決済み 1<br>
+              担当: 佐藤 / 田中 / 高橋 / 鈴木
+            </div>
+          </aside>
+
+          <!-- MAIN PAPER -->
+          <article class="doc-main">
+            <div class="paper">
+
+              <!-- DOCUMENT HEADER -->
+              <div class="doc-breadcrumb">
+                <a href="#">調査タスク</a><span class="sep">/</span>
+                <a href="#">データ基盤</a><span class="sep">/</span>
+                <span>選定調査 #248</span>
+              </div>
+              <div class="doc-headrow">
+                <div style="flex:1; min-width:260px;">
+                  <p class="eyebrow">技術選定レポート</p>
+                  <h1 class="doc-title">次期データ基盤 — ストレージ / クエリエンジン選定調査</h1>
+                </div>
+                <span class="doc-status in-review"><span class="dot"></span>レビュー中</span>
+              </div>
+              <p class="doc-deck">オンプレ Postgres の分析ワークロード逼迫を受け、列指向 OLAP エンジンへの移行候補を 4 製品で比較。コスト・性能・運用負荷・ロックインの観点から推奨案を提示する。</p>
+              <div class="byline">
+                <span class="agent-badge"><span class="agent-avatar">AI</span>Workbench Agent が生成</span>
+                <span class="muted">人手レビュー: 佐藤・田中・高橋・鈴木</span>
+              </div>
+
+              <!-- GENERATED METADATA -->
+              <div class="meta-grid" aria-label="生成メタデータ">
+                <div class="meta-cell"><div class="meta-key">生成日時</div><div class="meta-val mono">2026-06-11 13:58 JST</div></div>
+                <div class="meta-cell"><div class="meta-key">モデル</div><div class="meta-val mono">research-agent v4.2</div></div>
+                <div class="meta-cell"><div class="meta-key">調査ソース</div><div class="meta-val">38 件 <span class="mono">(一次 12)</span></div></div>
+                <div class="meta-cell"><div class="meta-key">所要時間</div><div class="meta-val mono">6m 41s</div></div>
+                <div class="meta-cell"><div class="meta-key">信頼度</div><div class="meta-val"><span class="confidence"><span class="bar fill"></span><span class="bar fill"></span><span class="bar fill"></span><span class="bar fill"></span><span class="bar"></span></span> 中〜高</div></div>
+                <div class="meta-cell"><div class="meta-key">版</div><div class="meta-val mono">rev.3 / 確定前</div></div>
+              </div>
+
+              <!-- SUMMARY / TL;DR -->
+              <section class="summary">
+                <div class="summary-h">
+                  <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"/></svg>
+                  要約 (TL;DR)
+                </div>
+                <p>4 候補（ClickHouse / BigQuery / Snowflake / DuckDB）のうち、<strong>当社のクエリ支配的なワークロードと月額予算（〜¥45万）では ClickHouse を推奨</strong>。既存 Postgres を OLTP として残し、CDC で ClickHouse に取り込む併用構成とする。</p>
+                <ul>
+                  <li>集計クエリの P95 は現行比 <strong>11〜18 倍</strong> 改善（§5 検証ログ）。</li>
+                  <li>月額試算は最安だが、運用負荷とマネージド度は中程度（要 SRE 体制）。</li>
+                  <li>フルマネージドを最優先する場合は BigQuery が次点。</li>
+                </ul>
+              </section>
+
+              <div class="prose autonum" id="prose" data-screen-label="Document body">
+                <h2 id="s1">背景と課題</h2>
+                <h3>現行基盤の状況</h3>
+                <p>現行の分析基盤は OLTP 用の Postgres を相乗りで利用しており、データ量の増加に伴い分析クエリと業務トランザクションが競合している。特に <span class="cx" data-comment="c1" data-state="open">オンプレ Postgres では月次バッチが SLA を逸脱し始めている<span class="cx-num">1</span></span>状況で、四半期の経営レポート生成が平均 42 分かかっている<sup class="cite">[3]</sup>。</p>
+                <h3>調査の前提と制約</h3>
+                <p>本調査では、列指向の分析特化エンジンへ分析ワークロードを切り出すことを前提に、<strong>初期コスト・運用負荷・既存資産との接続性</strong>を主要な制約として候補を評価する。</p>
+                <h4>対象データとワークロード</h4>
+                <ul>
+                  <li>対象データ量: 常時 <code>~4 TB</code>、月間スキャン <code>~12 TB</code>。</li>
+                  <li>主要ワークロード: ダッシュボード集計（高頻度・低レイテンシ要求）。</li>
+                </ul>
+                <h4>既存環境の制約</h4>
+                <ul>
+                  <li>制約: 既存 BI ツール（Metabase / Looker）との互換、SQL 資産の流用。</li>
+                </ul>
+
+                <!-- §2 -->
+                <h2 id="s2">評価方法と軸</h2>
+                <h3>テストデータセット</h3>
+                <p>各候補に対し、代表的な集計クエリ 14 本・取込ジョブ 3 本を同一データセット（TPC-DS 100GB 相当 + 自社サンプル）で実行し、レイテンシ・スループット・月額コストを実測した。定性軸は 5 段階で評価している。</p>
+                <h3>評価軸の重み</h3>
+                <p>意思決定では <strong>クエリ性能（集計）と月額コストを最重視</strong>し、運用負荷を次点に置いた。マネージド度は「SRE が 1 名で運用可能か」を基準に判定している。</p>
+                <h4>定量指標の算出方法</h4>
+                <p>レイテンシは P95、スループットは 60 秒間の完了クエリ数で測定し、各 5 回試行の中央値を採用した。月額コストは後述（§4）の前提に基づく税抜試算。</p>
+                <h4>定性指標の評点基準</h4>
+                <p>運用負荷・ロックイン・学習コストは、社内の運用実績とドキュメント整備度をもとに 5 段階で相対評価している。</p>
+
+                <!-- §3 COMPARISON TABLE -->
+                <h2 id="s3">候補の比較</h2>
+                <p>横スクロールで全候補を比較できる。緑の列が推奨候補。評価は ●＝高 で 5 段階。</p>
+
+                <div class="table-wrap">
+                  <div class="table-cap">
+                    <span><span class="t-no">表 1</span> &nbsp; <span class="t-title">OLAP エンジン 4 製品 比較マトリクス</span></span>
+                    <span>実測 14 クエリ平均 · 2026-06 時点</span>
+                  </div>
+                  <div class="table-scroll">
+                    <table class="cmp">
+                      <colgroup><col><col class="pick"><col><col><col></colgroup>
+                      <thead>
+                        <tr>
+                          <th class="axis">評価軸</th>
+                          <th class="pick">ClickHouse <span class="axis-sub" style="color:inherit">推奨</span></th>
+                          <th>BigQuery</th>
+                          <th>Snowflake</th>
+                          <th>DuckDB</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="axis">集計クエリ性能<span class="axis-sub">P95 latency</span></td>
+                          <td class="pick"><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note num">0.9s</span></td>
+                          <td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note num">1.6s</span></td>
+                          <td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note num">1.9s</span></td>
+                          <td><span class="rate mid r3"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note num">単一ノード</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">大規模スキャン<span class="axis-sub">12TB/月</span></td>
+                          <td class="pick"><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate low r2"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis"><span class="cx" data-comment="c2" data-state="reply">月額試算（コスト）<span class="cx-num">2</span></span><span class="axis-sub">当社想定負荷</span></td>
+                          <td class="pick"><strong class="num">¥285k</strong><span class="tag-cell-note">自前運用 / IaaS</span></td>
+                          <td><strong class="num">¥410k</strong><span class="tag-cell-note">従量・スキャン課金</span></td>
+                          <td><strong class="num">¥520k</strong><span class="tag-cell-note">クレジット定額</span></td>
+                          <td><strong class="num">¥40k</strong><span class="tag-cell-note">単一インスタンス</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">運用負荷<span class="axis-sub">SRE 工数</span></td>
+                          <td class="pick"><span class="rate mid r3"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">クラスタ自前</span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">フルマネージド</span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">フルマネージド</span></td>
+                          <td><span class="rate mid r3"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">組込・小規模</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">スケーラビリティ</td>
+                          <td class="pick"><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">水平・手動</span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">自動</span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">自動</span></td>
+                          <td><span class="rate low r1"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">単一ノード</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">BI 連携<span class="axis-sub">Metabase/Looker</span></td>
+                          <td class="pick"><span class="tag-yes">対応</span></td>
+                          <td><span class="tag-yes">対応</span></td>
+                          <td><span class="tag-yes">対応</span></td>
+                          <td><span class="tag-no">限定的</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">ベンダーロックイン</td>
+                          <td class="pick"><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">OSS / 低</span></td>
+                          <td><span class="rate low r2"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">GCP 依存</span></td>
+                          <td><span class="rate low r2"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">高</span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span><span class="tag-cell-note">OSS / 低</span></td>
+                        </tr>
+                        <tr>
+                          <td class="axis">学習コスト</td>
+                          <td class="pick"><span class="rate mid r3"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                          <td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- §4 COST + CALLOUT -->
+                <h2 id="s4">コスト試算の前提</h2>
+                <h3>ワークロード想定</h3>
+                <p>月額はいずれも <strong>スキャン 12 TB/月・ストレージ 4 TB 常時・同時実行 8</strong> を前提に試算した。クエリ量が支配的なワークロードのため、スキャン従量・クレジット定額型は相対的に割高になる。</p>
+
+                <div class="callout warn">
+                  <div class="co-ico">!</div>
+                  <div>
+                    <div class="co-title">注意 — 自前運用の隠れコスト</div>
+                    <div class="co-body"><p>ClickHouse の月額には SRE 工数（試算 0.3 人月）を含めていない。マネージド ClickHouse Cloud を選ぶ場合、月額は約 <strong>¥420k</strong> に上昇し BigQuery と拮抗する。</p></div>
+                  </div>
+                </div>
+
+                <div class="callout info">
+                  <div class="co-ico">i</div>
+                  <div>
+                    <div class="co-title">補足 — 為替前提</div>
+                    <div class="co-body"><p>USD 建て課金は <code>¥158/USD</code> で換算。為替変動 ±10% で BigQuery / Snowflake の順位は変わらない。</p></div>
+                  </div>
+                </div>
+
+                <!-- §5 CODE / LOG -->
+                <h2 id="s5">検証ログ</h2>
+                <h3>クエリベンチマーク</h3>
+                <p>代表クエリ（日次 GMV 集計）の実行計画を示す。</p>
+
+                <div class="code">
+                  <div class="code-bar"><span class="dots"><i></i><i></i><i></i></span><span class="fname">benchmark_q07.sql</span><span class="lang">SQL</span></div>
+                  <pre class="code-body"><span class="ln" data-n="1"><span class="tok-c">-- 日次 GMV 集計 (直近 90 日, 1.2B rows)</span></span><span class="ln hl" data-n="2"><span class="tok-k">SELECT</span> toDate(ordered_at) <span class="tok-k">AS</span> d,</span><span class="ln" data-n="3">       <span class="tok-f">sum</span>(amount) <span class="tok-k">AS</span> gmv,</span><span class="ln" data-n="4">       <span class="tok-f">uniqExact</span>(user_id) <span class="tok-k">AS</span> buyers</span><span class="ln" data-n="5"><span class="tok-k">FROM</span> orders</span><span class="ln" data-n="6"><span class="tok-k">WHERE</span> ordered_at &gt;= now() - <span class="tok-n">90</span></span><span class="ln" data-n="7"><span class="tok-k">GROUP BY</span> d <span class="tok-k">ORDER BY</span> d;</span><span class="ln" data-n="8"><span class="tok-c">-- ClickHouse: 0.91s · Postgres(現行): 16.4s</span></span></pre>
+                </div>
+
+                <div class="code log" style="margin-top:14px;">
+                  <div class="code-bar"><span class="dots"><i></i><i></i><i></i></span><span class="fname">cdc_sync.log</span><span class="lang">LOG · tail</span></div>
+                  <div class="code-body">
+                    <span class="log-line"><span class="ts">12:01:03.221</span> <span class="lvl info">INFO </span> debezium: snapshot complete, switching to streaming</span>
+                    <span class="log-line"><span class="ts">12:01:04.880</span> <span class="lvl ok">OK   </span> sink=clickhouse batch=2048 rows flushed in 142ms</span>
+                    <span class="log-line"><span class="ts">12:01:07.512</span> <span class="lvl info">INFO </span> lag.p50=3.1s lag.p95=8.0s lag.max=11.4s</span>
+                    <span class="log-line is-warn"><span class="ts">12:01:09.004</span> <span class="lvl warn">WARN </span> backpressure: consumer slower than producer (queue=1.8k)</span>
+                    <span class="log-line"><span class="ts">12:01:12.770</span> <span class="lvl ok">OK   </span> queue drained, lag.p95=8.0s within SLA(&lt;15s)</span>
+                    <span class="log-line is-err"><span class="ts">12:03:41.119</span> <span class="lvl err">ERROR</span> retryable: schema drift on `orders.coupon_code` (null→str) — auto-cast applied</span>
+                  </div>
+                </div>
+
+                <!-- §6 DIAGRAM + IMAGE -->
+                <h2 id="s6">アーキテクチャ案</h2>
+                <h3>併用構成の概要</h3>
+                <p>OLTP（Postgres）を残し、CDC で ClickHouse に取り込む併用構成。BI は ClickHouse を参照する。</p>
+
+                <!-- DIAGRAM FALLBACK -->
+                <div class="diagram-fallback" data-comment="c4" id="c4" data-cstate-host>
+                  <div class="df-head">
+                    <span class="df-badge">DIAGRAM FALLBACK</span>
+                    <span class="cx" data-comment="c4" data-state="open" style="font-family:var(--font-mono)">アーキテクチャ概念図<span class="cx-num">4</span></span>
+                    <span>· mermaid のレンダリングに失敗したため簡易表示</span>
+                  </div>
+                  <div class="flow">
+                    <div class="node"><div class="n-t">App</div><div class="n-s">OLTP write</div></div>
+                    <div class="arrow">→</div>
+                    <div class="node"><div class="n-t">Postgres</div><div class="n-s">source of truth</div></div>
+                    <div class="arrow">→</div>
+                    <div class="node"><div class="n-t">Debezium</div><div class="n-s">CDC</div></div>
+                    <div class="arrow">→</div>
+                    <div class="node accent"><div class="n-t">ClickHouse</div><div class="n-s">OLAP</div></div>
+                    <div class="arrow">→</div>
+                    <div class="node"><div class="n-t">Metabase</div><div class="n-s">BI</div></div>
+                  </div>
+                  <div class="df-raw">原本: graph LR; App--&gt;Postgres--&gt;Debezium--&gt;ClickHouse--&gt;Metabase</div>
+                </div>
+
+                <!-- GENERATED IMAGE -->
+                <figure class="figure">
+                  <div class="gen-image">
+                    <span class="gi-tag">generated-image · arch_overview.png</span>
+                    <div class="gi-center">アーキテクチャ概念図（生成画像）<span class="gi-dim">1600 × 850 · 画像をここに配置</span></div>
+                  </div>
+                  <figcaption><span class="fc-no">図 2</span>エージェント生成のアーキテクチャ概念図。実装時は確定版に差し替える。</figcaption>
+                </figure>
+
+                <!-- §7 CONCLUSION -->
+                <h2 id="s7">推奨と結論</h2>
+                <p>当社のクエリ支配的ワークロードと予算制約のもとでは、<span class="cx" data-comment="c3" data-state="resolved">推奨は ClickHouse + 既存 Postgres の併用<span class="cx-num">3</span></span>とする。CDC 同期遅延は P95 8 秒で SLA 内に収まることを確認済み（§5）。</p>
+                <div class="reco">
+                  <div class="reco-tag">✓ 推奨</div>
+                  <p><strong>ClickHouse（自前運用）+ Postgres CDC 併用。</strong>初期は IaaS 上の 3 ノード構成で開始し、SRE 体制が整い次第マネージドへの移行を再評価する。フルマネージド最優先なら BigQuery を次点とする。</p>
+                </div>
+                <p style="color:var(--ink-3); font-size:var(--fs-small); margin-top:var(--sp-5);">出典: [3] 社内 SLA ダッシュボード 2026Q1 / ベンチマークは付録 A 参照。</p>
+              </div>
+            </div>
+          </article>
+
+          <!-- COMMENT RAIL -->
+          <aside class="cmt-rail" aria-label="レビューコメント">
+            <div class="cmt-rail-h">
+              <span>レビュー</span>
+              <span class="cmt-rail-count" id="cmtCount">—</span>
+            </div>
+            <div class="cmt-layer" id="cmtLayer"></div>
+          </aside>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         VIEW 2 · MOBILE
+         ============================================================ -->
+    <section class="view" id="viewMobile" data-screen-label="Mobile document">
+      <div class="mobile-stage">
+        <p class="mobile-note">モバイルでは右マージンを廃し、コメントは該当ブロックの直下にインライン展開する折りたたみスレッドに切り替わる。表は横スクロール、比較軸（先頭列）は固定。</p>
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="m-statusbar"><span>9:41</span><span class="m-icons">●●● ▮▮▮ ▮</span></div>
+            <div class="m-topbar">
+              <span class="m-back">‹</span>
+              <span class="m-title">次期データ基盤 選定調査</span>
+              <span class="m-rev">レビュー 4</span>
+            </div>
+            <div class="m-scroll">
+              <p class="eyebrow">技術選定レポート</p>
+              <h1 class="doc-title">次期データ基盤 — ストレージ / クエリエンジン選定調査</h1>
+              <p class="doc-deck">Postgres の分析逼迫を受け、OLAP 移行候補 4 製品を比較し推奨案を提示する。</p>
+
+              <div class="byline" style="margin:14px 0;"><span class="agent-badge"><span class="agent-avatar">AI</span>Agent 生成</span></div>
+
+              <div class="meta-grid">
+                <div class="meta-cell"><div class="meta-key">生成</div><div class="meta-val mono">06-11 13:58</div></div>
+                <div class="meta-cell"><div class="meta-key">モデル</div><div class="meta-val mono">v4.2</div></div>
+                <div class="meta-cell"><div class="meta-key">信頼度</div><div class="meta-val">中〜高</div></div>
+                <div class="meta-cell"><div class="meta-key">版</div><div class="meta-val mono">rev.3</div></div>
+              </div>
+
+              <section class="summary" style="margin:16px 0;">
+                <div class="summary-h">要約</div>
+                <p>クエリ支配的な負荷と予算では <strong>ClickHouse を推奨</strong>。Postgres を残し CDC 併用。</p>
+              </section>
+
+              <div class="prose">
+                <h2 style="margin-top:24px;">背景</h2>
+                <p>分析クエリと業務トランザクションが競合し、<span class="cx" data-state="open">月次バッチが SLA を逸脱<span class="cx-num">1</span></span>している。</p>
+
+                <!-- inline thread: OPEN -->
+                <div class="m-thread" data-cstate="open" data-cstate-host>
+                  <div class="m-thread-head">
+                    <div class="av u1">ST</div>
+                    <div><div class="cmt-name" style="font-size:12px;">佐藤 (PM)</div><div class="cmt-time">2日前</div></div>
+                    <span class="cmt-state"><span class="sdot"></span>未対応</span>
+                    <span class="m-chev">›</span>
+                  </div>
+                  <div class="m-thread-body">
+                    <p class="cmt-quote">“月次バッチが SLA を逸脱”</p>
+                    <div class="cmt-body"><p>逸脱の頻度と影響範囲の根拠を1つ足してほしいです。</p></div>
+                    <div class="cmt-foot"><input class="cmt-input" placeholder="返信を入力…"><button class="btn primary">送信</button></div>
+                  </div>
+                </div>
+
+                <h2 style="margin-top:24px;">候補の比較</h2>
+                <p>横スクロールで全候補を比較。先頭列（比較軸）は固定。</p>
+                <div class="table-wrap">
+                  <div class="table-cap"><span><span class="t-no">表1</span> 比較マトリクス</span></div>
+                  <div class="table-scroll">
+                    <table class="cmp">
+                      <thead><tr><th class="axis">軸</th><th class="pick">ClickHouse</th><th>BigQuery</th><th>Snowflake</th></tr></thead>
+                      <tbody>
+                        <tr><td class="axis">性能</td><td class="pick"><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td><td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td><td><span class="rate good r4"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td></tr>
+                        <tr><td class="axis"><span class="cx" data-state="reply">月額<span class="cx-num">2</span></span></td><td class="pick num"><strong>¥285k</strong></td><td class="num">¥410k</td><td class="num">¥520k</td></tr>
+                        <tr><td class="axis">運用</td><td class="pick"><span class="rate mid r3"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td><td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td><td><span class="rate good r5"><span class="pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></span></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- inline thread: REPLY -->
+                <div class="m-thread" data-cstate="reply" data-cstate-host>
+                  <div class="m-thread-head">
+                    <div class="av u2">TN</div>
+                    <div><div class="cmt-name" style="font-size:12px;">田中 (Data Eng)</div><div class="cmt-time">1日前</div></div>
+                    <span class="cmt-state"><span class="sdot"></span>返信あり</span>
+                    <span class="m-count">2</span>
+                    <span class="m-chev">›</span>
+                  </div>
+                  <div class="m-thread-body">
+                    <p class="cmt-quote">“月額試算（コスト）”</p>
+                    <div class="cmt-body"><p>どのワークロード前提ですか？</p></div>
+                    <div class="cmt-thread">
+                      <div class="reply from-agent"><div class="av">AI</div><div><div class="reply-name">Workbench Agent<span class="role">回答</span></div><div class="reply-body">スキャン 12TB/月・ストレージ 4TB で試算。表下に注記を追加しました。</div></div></div>
+                    </div>
+                    <div class="cmt-foot"><input class="cmt-input" placeholder="返信を入力…"><button class="btn primary">送信</button></div>
+                  </div>
+                </div>
+
+                <h2 style="margin-top:24px;">推奨</h2>
+                <p><span class="cx" data-state="resolved">ClickHouse + Postgres 併用<span class="cx-num">3</span></span>を推奨する。</p>
+
+                <!-- inline thread: RESOLVED -->
+                <div class="m-thread" data-cstate="resolved" data-cstate-host>
+                  <div class="m-thread-head">
+                    <div class="av u4">TK</div>
+                    <div><div class="cmt-name" style="font-size:12px;">高橋 (Reviewer)</div><div class="cmt-time">1日前</div></div>
+                    <span class="cmt-state"><span class="sdot"></span>解決済み</span>
+                    <span class="m-count">2</span>
+                    <span class="m-chev">›</span>
+                  </div>
+                  <div class="m-thread-body">
+                    <p class="cmt-quote">“ClickHouse + Postgres 併用”</p>
+                    <div class="cmt-body"><p>同期遅延が許容できるか数値根拠を求めます。</p></div>
+                    <div class="cmt-thread">
+                      <div class="reply from-agent"><div class="av">AI</div><div><div class="reply-name">Workbench Agent<span class="role">回答</span></div><div class="reply-body">P95 同期遅延 8 秒の検証ログを §5 に追加。</div></div></div>
+                      <div class="reply"><div class="av u4">TK</div><div><div class="reply-name">高橋<span class="role">確認</span></div><div class="reply-body">許容範囲です。クローズします。</div></div></div>
+                    </div>
+                    <div class="cmt-resolved-by"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>高橋 さんが解決済みに · 23時間前</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="m-fab" id="mFab">
+              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12v8H6l-3 2.5v-2.5H2z"/></svg>
+              レビュー <span class="badge-n">4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         VIEW 3 · DESIGN SPEC
+         ============================================================ -->
+    <section class="view" id="viewSpec" data-screen-label="Design spec">
+      <div class="spec-shell">
+        <p class="eyebrow">実装者向け</p>
+        <h1 class="doc-title" style="margin-bottom:12px;">デザイン仕様 — Reviewable Workbench</h1>
+        <p class="spec-lede">静的 HTML / CSS / 少量 JS で実装できる前提のトークンとパターン集。外部 CDN・Web フォント・画像ホスティングに依存しない。全トークンは <code class="mono">:root</code> の CSS 変数で定義し、<code class="mono">[data-theme]</code> と <code class="mono">[data-density]</code> で上書きする。</p>
+
+        <h2>カラートークン</h2>
+        <h3 style="font-size:14px;color:var(--ink-3);margin:8px 0;">サーフェス / インク（warm neutral）</h3>
+        <div class="spec-grid">
+          <div class="spec-card"><div class="swatch" style="background:var(--bg-app)"></div><span class="s-name">背景</span><span class="s-hex">#efece5</span><br><span class="s-var">--bg-app</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--paper)"></div><span class="s-name">用紙面</span><span class="s-hex">#fdfcf9</span><br><span class="s-var">--paper</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--ink)"></div><span class="s-name">主テキスト</span><span class="s-hex">#232019</span><br><span class="s-var">--ink</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--ink-2)"></div><span class="s-name">副テキスト</span><span class="s-hex">#5f5b51</span><br><span class="s-var">--ink-2</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--line-2)"></div><span class="s-name">罫線</span><span class="s-hex">#d6d1c5</span><br><span class="s-var">--line-2</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--brand)"></div><span class="s-name">構造アクセント</span><span class="s-hex">#2f6093</span><br><span class="s-var">--brand</span></div>
+        </div>
+        <h3 style="font-size:14px;color:var(--ink-3);margin:18px 0 8px;">レビュー状態 — 3 つの色相で識別</h3>
+        <div class="spec-grid">
+          <div class="spec-card"><div class="swatch" style="background:var(--open)"></div><span class="s-name">未対応 / open</span><br><span class="s-var">--open · bg #e9f1f9</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--reply)"></div><span class="s-name">返信あり / reply</span><br><span class="s-var">--reply · bg #f7efdc</span></div>
+          <div class="spec-card"><div class="swatch" style="background:var(--resolved)"></div><span class="s-name">解決済み / resolved</span><br><span class="s-var">--resolved · bg #e9f1ea</span></div>
+        </div>
+
+        <h2>タイポグラフィ・スケール</h2>
+        <p class="s-var" style="margin:0 0 6px;">UI / 見出し = システム sans（ゴシック） / コード = システム mono。明朝体・Web フォントは使用しない。見出しは太さと字間で階層を作る。</p>
+        <div>
+          <div class="type-row"><span class="t-spec">H1 / 30px sans 700</span><span style="font-family:var(--font-serif);font-size:30px;font-weight:700;letter-spacing:-.02em;">文書タイトル Title</span></div>
+          <div class="type-row"><span class="t-spec">H2 / 21px sans 700</span><span style="font-family:var(--font-serif);font-size:21px;font-weight:700;letter-spacing:-.015em;">セクション見出し</span></div>
+          <div class="type-row"><span class="t-spec">H3 / 16px sans 650</span><span style="font-size:16px;font-weight:650;">サブ見出し</span></div>
+          <div class="type-row"><span class="t-spec">Body / 15px · 1.72</span><span style="font-size:15px;">本文テキスト 123 ABC あいう。読みやすさ優先で行間広め。</span></div>
+          <div class="type-row"><span class="t-spec">Small / 13px</span><span style="font-size:13px;color:var(--ink-2)">補助テキスト・コメント本文</span></div>
+          <div class="type-row"><span class="t-spec">Mono / 12-13px</span><span style="font-family:var(--font-mono);font-size:13px;">code · 2026-06-11 · ¥285k</span></div>
+        </div>
+
+        <h2>スペーシング・スケール</h2>
+        <p class="s-var" style="margin:0 0 12px;">4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px。高密度モードでブロック間隔と行間が縮む。</p>
+        <div class="space-scale">
+          <div class="s-item"><div class="s-box" style="width:4px;height:4px"></div>4</div>
+          <div class="s-item"><div class="s-box" style="width:8px;height:8px"></div>8</div>
+          <div class="s-item"><div class="s-box" style="width:12px;height:12px"></div>12</div>
+          <div class="s-item"><div class="s-box" style="width:16px;height:16px"></div>16</div>
+          <div class="s-item"><div class="s-box" style="width:24px;height:24px"></div>24</div>
+          <div class="s-item"><div class="s-box" style="width:32px;height:32px"></div>32</div>
+          <div class="s-item"><div class="s-box" style="width:48px;height:48px"></div>48</div>
+          <div class="s-item"><div class="s-box" style="width:64px;height:64px"></div>64</div>
+        </div>
+
+        <h2>ボーダー / シャドウ方針</h2>
+        <table class="spec-table">
+          <thead><tr><th>用途</th><th>角丸</th><th>境界の作り方</th></tr></thead>
+          <tbody>
+            <tr><td>インラインタグ / pip</td><td class="mono">2px</td><td>塗り or 1px 罫線のみ。影なし</td></tr>
+            <tr><td>ボタン / 入力 / セル</td><td class="mono">4px</td><td>1px 罫線。hover で罫線を 1 段濃く</td></tr>
+            <tr><td>カード / コメント / 表</td><td class="mono">6px</td><td>1px 罫線 + <code class="mono">--sh-1</code>（極薄）</td></tr>
+            <tr><td>用紙面 / コンテナ</td><td class="mono">8px</td><td>罫線主体。影は最小限</td></tr>
+            <tr><td>ポップオーバー / 選択中</td><td class="mono">6px</td><td><code class="mono">--sh-3</code> で浮かせる（唯一の強い影）</td></tr>
+          </tbody>
+        </table>
+        <p class="s-var" style="margin-top:10px;">原則: <strong>境界は罫線、奥行きは控えめな影</strong>。派手なグラデーション・大きな角丸・ドロップシャドウの多用は避ける。影は階層を示す時だけ。</p>
+
+        <h2>レビューブロックの状態別デザイン</h2>
+        <div class="spec-state-row">
+          <div class="spec-card" style="border-left:3px solid var(--open)">
+            <div class="cmt-state" style="color:var(--open);background:var(--open-bg);display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;"><span class="sdot" style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>未対応 open</div>
+            <p style="font-size:13px;color:var(--ink-2);margin:10px 0 0;">本文ハイライト=<strong>塗り + 2px 下線（青）</strong>。カードは左 3px 青、不透明度 100%。返信入力＋解決ボタンを表示。</p>
+          </div>
+          <div class="spec-card" style="border-left:3px solid var(--reply)">
+            <div class="cmt-state" style="color:var(--reply);background:var(--reply-bg);display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;"><span class="sdot" style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>返信あり reply</div>
+            <p style="font-size:13px;color:var(--ink-2);margin:10px 0 0;">ハイライト=<strong>塗り + 2px 下線（琥珀）</strong>。カードに返信スレッド表示（agent 返信はグラデ avatar）。未解決として残る。</p>
+          </div>
+          <div class="spec-card" style="border-left:3px solid var(--resolved)">
+            <div class="cmt-state" style="color:var(--resolved);background:var(--resolved-bg);display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;"><span class="sdot" style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>解決済み resolved</div>
+            <p style="font-size:13px;color:var(--ink-2);margin:10px 0 0;">ハイライトは<strong>後退（破線下線のみ・塗りなし）</strong>。カードは不透明度 78% に落とし、解決者バナー表示。フィルタで非表示可能。</p>
+          </div>
+        </div>
+        <p class="s-var" style="margin-top:12px;">状態差は <strong>色相 + 塗りの有無 + 不透明度</strong>で表現し、文言の追加に頼らない。未対応＝主張、返信あり＝進行中、解決済み＝後退、という視覚的ヒエラルキー。</p>
+
+        <h2>ブロック別の見せ方</h2>
+        <table class="spec-table">
+          <thead><tr><th>ブロック</th><th>方針</th></tr></thead>
+          <tbody>
+            <tr><td><strong>大きな比較表</strong></td><td>先頭列（比較軸）と見出し行を <code class="mono">position:sticky</code> で固定し横スクロール。推奨列は緑の淡い塗りで縦に追える。評価は 5 段階の pip、コストは tabular-nums の等幅数字で桁を揃える。</td></tr>
+            <tr><td><strong>callout</strong></td><td>26px アイコン枠 + 本文の 2 カラム grid。info=青 / warn=琥珀 / success=緑、左 3px ボーダー + 淡い地。角丸 6px。</td></tr>
+            <tr><td><strong>code / log</strong></td><td>ライトでも濃紺サーフェス（コード規約）。行番号・最小限のシンタックス色。log は INFO/OK/WARN/ERROR を色分けし、WARN/ERROR 行に地色。</td></tr>
+            <tr><td><strong>diagram fallback</strong></td><td>破線枠 +「DIAGRAM FALLBACK」バッジで失敗を明示し、box/arrow の簡易フロー＋原本定義を併記。SVG を描き起こさない。</td></tr>
+            <tr><td><strong>generated image</strong></td><td>斜めストライプのプレースホルダ + 寸法表記。差し替え前提を mono ラベルで明示。外部ホスティング不使用。</td></tr>
+          </tbody>
+        </table>
+
+        <h2>レイアウト / レスポンシブ</h2>
+        <table class="spec-table">
+          <thead><tr><th>幅</th><th>レイアウト</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">≥1180px</td><td>3 カラム grid: <code class="mono">232px / 1fr / 332px</code>（目次・用紙・コメント）。本文の可読幅は 72ch、表は用紙幅いっぱいに breakout。</td></tr>
+            <tr><td class="mono">901–1180px</td><td>目次を隠し 2 カラム（用紙 + コメント）。</td></tr>
+            <tr><td class="mono">≤900px</td><td>1 カラム。マージンコメント廃止 → 該当ブロック直下のインライン折りたたみスレッドへ。表は横スクロール継続。</td></tr>
+          </tbody>
+        </table>
+
+        <h2>実装メモ（CSS）</h2>
+        <div class="spec-note">
+<span class="c">/* テーマ・密度はルート属性で切替。トークンのみ差し替える */</span><br>
+&lt;html <span class="p">data-theme</span>=<span class="v">"light|dark"</span> <span class="p">data-density</span>=<span class="v">"comfortable|compact"</span>&gt;<br><br>
+<span class="c">/* 比較表: 軸列と見出し行を固定 */</span><br>
+table.cmp th.axis, td.axis { <span class="p">position</span>: <span class="v">sticky</span>; <span class="p">left</span>: <span class="v">0</span>; }<br>
+table.cmp thead th { <span class="p">position</span>: <span class="v">sticky</span>; <span class="p">top</span>: <span class="v">0</span>; }<br><br>
+<span class="c">/* マージンコメントは JS で anchor の offsetTop に整列、</span><br>
+<span class="c">   衝突時は下方向にスタック（Docs 方式）。レール幅 332px。 */</span><br>
+<span class="c">/* レビュー状態は data 属性で表現 */</span><br>
+.cx[<span class="p">data-state</span>=<span class="v">"open|reply|resolved"</span>]<br>
+.cmt[<span class="p">data-cstate</span>=<span class="v">"open|reply|resolved"</span>]<br><br>
+<span class="c">/* 状態の視覚ルール */</span><br>
+open&nbsp;&nbsp;&nbsp;&nbsp;→ 塗り + 2px 下線、card opacity 1.0<br>
+reply&nbsp;&nbsp;&nbsp;→ 塗り + 2px 下線（別色相）、スレッド表示<br>
+resolved → 破線下線のみ、card opacity .78、フィルタ対象
+        </div>
+        <p class="s-var" style="margin-top:14px;">キーボード: 目次リンクと <span class="kbd">Tab</span> 移動で各ブロックへ。コメントカード・ハイライトは相互に <code class="mono">.is-active</code> でリンクし、クリックで対象へスクロールする。</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- floating exit bar for published preview -->
+  <div class="pub-exit" id="pubExit" role="status">
+    <span class="pe-label"><b>一般公開プレビュー</b> ・ そのままホストできる文書を書き出せます</span>
+    <div class="pe-seg" role="group" aria-label="幅">
+      <button class="pe-w on" data-pw="standard">標準</button>
+      <button class="pe-w" data-pw="max">最大化</button>
+    </div>
+    <button class="pe-btn primary" id="pubDownloadBtn">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3M8 10 5 7M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>
+      公開用HTMLを書き出し
+    </button>
+    <button class="pe-btn" id="pubExitBtn">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      編集に戻る
+    </button>
+  </div>
+</div>
+
+<script src="workbench.js"></script>
+
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100" height="100" fill="#2f6093"/>
+  <rect x="30" y="26" width="34" height="48" rx="2" fill="#fdfcf9"/>
+  <rect x="35" y="33" width="24" height="3" rx="1.5" fill="#232019"/>
+  <rect x="35" y="40" width="20" height="2" rx="1" fill="#8d887d"/>
+  <rect x="35" y="45" width="22" height="2" rx="1" fill="#8d887d"/>
+  <rect x="35" y="52" width="14" height="2" rx="1" fill="#8d887d"/>
+  <rect x="56" y="48" width="18" height="22" rx="2" fill="#e9f1f9" stroke="#2f6fb0" stroke-width="1.5"/>
+  <circle cx="62" cy="55" r="2.5" fill="#2f6fb0"/>
+</svg>
+</template>
+</body>
+</html>
