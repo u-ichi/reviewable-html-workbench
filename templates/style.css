@@ -233,6 +233,8 @@ body {
 .doc-status.in-review .dot { background: var(--open); }
 
 .eyebrow { font-size: var(--fs-caption); font-weight: 650; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); margin-bottom: 10px; }
+.eyebrow a { color: inherit; text-decoration: none; }
+.eyebrow a:hover { text-decoration: underline; }
 h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(--fs-h1); line-height: 1.18; letter-spacing: -.02em; margin: 0 0 var(--sp-3); color: var(--ink); text-wrap: balance; }
 .doc-deck { font-size: var(--fs-lead); line-height: 1.55; color: var(--ink-2); margin: 0; max-width: 60ch; text-wrap: pretty; }
 
@@ -361,6 +363,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   margin: 0 0 var(--block-gap);
   padding: var(--pad-card) 0 0;
   border-top: 1px solid var(--line-1);
+  scroll-margin-top: 24px;
 }
 .review-block:first-child {
   padding-top: 0;

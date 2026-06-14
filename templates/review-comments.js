@@ -989,6 +989,11 @@
     clone.querySelectorAll("[data-cstate-host]").forEach((node) => {
       node.removeAttribute("data-cstate-host");
     });
+    clone.querySelectorAll("[data-review-block]").forEach((node) => {
+      node.removeAttribute("data-review-block");
+      node.removeAttribute("data-review-required");
+      node.removeAttribute("data-block-type");
+    });
 
     clone.querySelectorAll(".review-comment-highlight").forEach((element) => {
       const parent = element.parentNode;
@@ -1012,6 +1017,17 @@
     const titleElement = clone.querySelector(".doc-title");
     const title = titleElement ? titleElement.textContent.trim() : "document";
 
+    const summaryEl = clone.querySelector(".summary p");
+    const firstP = clone.querySelector(".document-content .block-content p");
+    const description = (summaryEl || firstP || { textContent: "" }).textContent.trim().slice(0, 200);
+
+    const eyebrow = clone.querySelector(".eyebrow");
+    if (eyebrow) {
+      eyebrow.innerHTML = '<a href="https://github.com/u-ichi/reviewable-html-workbench" ' +
+        'style="color:inherit;text-decoration:none;" target="_blank" rel="noopener">' +
+        escapeHtml(eyebrow.textContent.trim()) + "</a>";
+    }
+
     const css = await collectCSS();
     var darkOverrides =
       "@media(prefers-color-scheme:dark){:root{" +
@@ -1033,6 +1049,12 @@
       "<head>\n<meta charset=\"utf-8\">\n" +
       "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
       "<title>" + escapeHtml(title) + "</title>\n" +
+      '<meta property="og:title" content="' + escapeHtml(title) + '">\n' +
+      '<meta property="og:description" content="' + escapeHtml(description) + '">\n' +
+      '<meta property="og:type" content="article">\n' +
+      '<meta name="twitter:card" content="summary">\n' +
+      '<meta name="twitter:title" content="' + escapeHtml(title) + '">\n' +
+      '<meta name="twitter:description" content="' + escapeHtml(description) + '">\n' +
       "<style>\n" + css +
       "\n/* published export overrides */\n" +
       "html,body{background:var(--bg-app);}\n" +
