@@ -203,19 +203,5 @@ def _read_json_url(url: str) -> object:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_until_preview_ready(url: str) -> None:
-    deadline = time.monotonic() + 5
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=1) as response:
-                if response.status == 200:
-                    return
-        except urllib.error.URLError as exc:
-            last_error = exc
-        time.sleep(0.05)
-    raise AssertionError(f"preview server did not become ready: {last_error}")
-
-
 if __name__ == "__main__":
     unittest.main()

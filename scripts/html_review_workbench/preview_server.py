@@ -115,7 +115,6 @@ def start_preview(
     bind, resolved_mode = resolve_bind(mode)
     session_id = uuid.uuid4().hex
     owner_session = owner_session or current_owner_session() or "unknown"
-    owner_pid = owner_pid or current_agent_pid()
     if not owner_pid:
         raise PreviewConfigurationError(
             "--owner-pid is required; pass the caller's PID (e.g. --owner-pid $$) "
@@ -177,10 +176,6 @@ def current_owner_session(environ: dict[str, str] | None = None) -> str | None:
     return None
 
 
-def current_agent_pid() -> int | None:
-    return None
-
-
 def resolve_bind(
     mode: PreviewMode,
     tailscale_ip_getter: Callable[[], str | None] | None = None,
@@ -201,13 +196,6 @@ def resolve_bind(
             return _validate_bind(tailscale_ip), "tailscale"
         return "127.0.0.1", "local"
     raise PreviewConfigurationError(f"unsupported preview mode: {mode}")
-
-
-def pick_free_port(bind: str) -> int:
-    bind = _validate_bind(bind)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind((bind, 0))
-        return int(sock.getsockname()[1])
 
 
 def write_session_manifest(path: Path, session: PreviewSession) -> None:
