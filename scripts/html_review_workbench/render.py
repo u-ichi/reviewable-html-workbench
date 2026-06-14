@@ -312,11 +312,8 @@ def _render_block_title(
 ) -> str:
     if not isinstance(title, str) or not title:
         return ""
-    sec_span = ""
-    if section_number is not None:
-        sec_span = f'<span class="sec-no">{section_number}</span>'
     tag = f"h{heading_level}"
-    return f"<{tag}>{sec_span}{escape(title)}</{tag}>"
+    return f"<{tag}>{escape(title)}</{tag}>"
 
 
 def _render_block_content(
@@ -359,17 +356,8 @@ def _render_block_content(
 
 
 def _shift_content_headings(content: str, section_number: str, heading_level: int) -> str:
-    sub_counter = 0
-
-    def repl(match: re.Match[str]) -> str:
-        nonlocal sub_counter
-        sub_counter += 1
-        sub_no = f'{section_number}.{sub_counter}'
-        tag = "h4" if heading_level == 3 else "h3"
-        return f'<{tag}><span class="sub-sec-no">{sub_no}</span>'
-
-    content = re.sub(r"<h3>", repl, content)
     if heading_level == 3:
+        content = content.replace("<h3>", "<h4>")
         content = content.replace("</h3>", "</h4>")
     return content
 

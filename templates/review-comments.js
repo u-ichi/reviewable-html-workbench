@@ -862,21 +862,32 @@
     });
   }
 
+  function applyFocusState(canvas, button, isFocus) {
+    canvas.classList.toggle("is-focus", isFocus);
+    button.setAttribute("aria-pressed", isFocus ? "true" : "false");
+    const label = button.querySelector(".ft-label");
+    if (label) {
+      label.textContent = isFocus ? t.normalLabel : t.focusLabel;
+    } else {
+      button.textContent = isFocus ? t.normalLabel : t.focusLabel;
+    }
+  }
+
   function initFocusToggle() {
     const button = document.getElementById("focusToggle");
     const canvas = document.getElementById("canvas");
     if (!button || !canvas) {
       return;
     }
+    const stored = localStorage.getItem("rw:focus");
+    if (stored === "true") {
+      applyFocusState(canvas, button, true);
+      schedulePositionCards();
+    }
     button.addEventListener("click", () => {
-      const isFocus = canvas.classList.toggle("is-focus");
-      button.setAttribute("aria-pressed", isFocus ? "true" : "false");
-      const label = button.querySelector(".ft-label");
-      if (label) {
-        label.textContent = isFocus ? t.normalLabel : t.focusLabel;
-      } else {
-        button.textContent = isFocus ? t.normalLabel : t.focusLabel;
-      }
+      const isFocus = !canvas.classList.contains("is-focus");
+      applyFocusState(canvas, button, isFocus);
+      localStorage.setItem("rw:focus", isFocus ? "true" : "false");
       schedulePositionCards();
     });
   }

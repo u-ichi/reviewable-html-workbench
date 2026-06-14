@@ -175,7 +175,7 @@ body {
 .view.active { display: block; }
 
 /* Desktop reading layout */
-.doc-shell { max-width: 1320px; margin: 0 auto; padding: var(--sp-7) var(--sp-6) var(--sp-8); }
+.doc-shell { max-width: 1600px; margin: 0 auto; padding: var(--sp-7) var(--sp-6) var(--sp-8); }
 .doc-grid {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr) 332px;
@@ -271,32 +271,32 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
 .review-block > h4 { font-size: var(--fs-body); font-weight: 600; margin: var(--sp-4) 0 var(--sp-2); }
 .review-block > h4 .sub-sec-no, .block-content h4 .sub-sec-no { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); font-weight: 500; margin-right: 6px; }
 .prose.autonum { counter-reset: h2 h3 h4; }
-.prose.autonum h2 { counter-increment: h2; counter-reset: h3 0 h4 0; }
-.prose.autonum h3 { counter-increment: h3; counter-reset: h4 0; }
-.prose.autonum h4 { counter-increment: h4; }
-.prose.autonum h2 .sec-no { display: none; }
-.prose.autonum h2::before {
+.prose.autonum .review-block:has(> h2) { counter-increment: h2; counter-reset: h3 h4; }
+.prose.autonum .review-block:has(> h3) { counter-increment: h3; counter-reset: h4; }
+.prose.autonum .review-block > h4, .prose.autonum .block-content h4 { counter-increment: h4; }
+.prose.autonum .sec-no, .prose.autonum .sub-sec-no { display: none; }
+.prose.autonum .review-block > h2::before {
   content: counter(h2) ".";
-  font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--ink-faint);
+  font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--brand);
   margin-right: 12px; letter-spacing: 0;
 }
-.prose.autonum h3::before {
+.prose.autonum .review-block > h3::before {
   content: counter(h2) "." counter(h3);
-  font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--brand);
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--ink-2);
   margin-right: 9px; letter-spacing: 0;
 }
-.prose.autonum h4::before {
+.prose.autonum .review-block > h4::before, .prose.autonum .block-content h4::before {
   content: counter(h2) "." counter(h3) "." counter(h4);
   font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--ink-3);
   margin-right: 8px; letter-spacing: 0;
 }
-.prose p { margin: 0; max-width: 72ch; text-wrap: pretty; }
+.prose p { margin: 0; max-width: none; text-wrap: pretty; }
 .prose a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
 .prose a:hover { color: var(--brand); text-decoration-thickness: 2px; }
 .prose a.ref { color: var(--brand); text-decoration: none; font-weight: 550; }
 .prose a.ref:hover { text-decoration: underline; }
 .prose sup.cite { font-size: 10px; color: var(--brand); font-weight: 700; font-family: var(--font-mono); vertical-align: super; margin-left: 1px; }
-.prose ul, .prose ol { margin: 0; padding-left: 22px; max-width: 72ch; }
+.prose ul, .prose ol { margin: 0; padding-left: 22px; max-width: none; }
 .prose li + li { margin-top: 6px; }
 .prose strong { font-weight: 650; }
 .prose p:has(> strong:only-child) {
