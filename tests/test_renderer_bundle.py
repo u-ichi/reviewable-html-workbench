@@ -149,7 +149,7 @@ class RendererBundleTest(unittest.TestCase):
             index_path = render_bundle(model_path, output_dir)
 
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('<div class="callout info">', html)
+            self.assertIn('<div class="callout info" role="doc-note">', html)
             self.assertIn('<div class="co-ico">i</div>', html)
             self.assertIn('<div><div class="co-body"><p>Use &lt;plain&gt; text.</p></div></div>', html)
 

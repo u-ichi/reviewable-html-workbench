@@ -35,7 +35,8 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 - 新規に設計資料を作る場合、最初の保存対象は `output/tmp/<purpose>/document-model.json` または `output/<YYYY-MM-DD>_<name>/document-model.json` にする。
 - `.md` ファイルを設計本文の下書き、中間成果物、HTML化対象として作らない。
 - 一時的に自然文入力を保存する必要がある場合だけ、`source.txt`, `input.txt`, `source-content.txt` のようなプレーンテキスト名を使う。
-- 設計資料の本文は、見出し記号を含む原稿ではなく、`blocks[].title`, `blocks[].type`, `blocks[].content`, `review_required` を持つ文書モデルとして表現する。
+- 設計資料の本文は、見出し記号を含む原稿ではなく、`blocks[].title`, `blocks[].type`, `blocks[].heading_level`, `blocks[].content`, `review_required` を持つ文書モデルとして表現する。
+- 設計資料は通常4ブロック以上になるため、大区分のブロック（背景・要求、アーキテクチャ、代替案比較、意思決定、未決事項など）には `heading_level: 2` を設定し、その配下の詳細ブロックには `heading_level: 3` を使う。rendererは `<h1>` を文書タイトルに使うため、`heading_level: 2` が章見出し、`heading_level: 3` が節見出しになる。各章の冒頭にはその章で扱う内容を示す導入段落を置く。
 - 比較・代替案・評価軸は `html` block内の `<table>`、手順は `<ol>`、並列項目は `<ul>`、操作例・ログ・コマンドは `<pre><code>`、処理・依存・構成はdiagramブロック、決定・前提・注意はplain textのcallout、レビューしてほしい論点は専用のレビュー観点blockにする。
 - `section`, `text`, `table` block typeは現行rendererに専用描画がないため、最終モデルでは使わない。
 - diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。sourceに無い関係や判断を画像側で追加しない。

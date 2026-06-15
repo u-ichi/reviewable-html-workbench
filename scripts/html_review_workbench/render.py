@@ -250,9 +250,8 @@ def _render_blocks(
         sec_num = None
         if isinstance(title, str) and title:
             if heading_level == 2:
-                if block_id in ("layer1-header", "layer2-header", "layer3-header"):
-                    h2_counter += 1
-                    sec_num = str(h2_counter)
+                h2_counter += 1
+                sec_num = str(h2_counter)
                 h3_counter = 0
             else:
                 h3_counter += 1
@@ -339,7 +338,7 @@ def _render_block_content(
         if callout_title:
             title_html = f'<div class="co-title">{escape(callout_title)}</div>'
         return (
-            f'<div class="callout {escape(level, quote=True)}">'
+            f'<div class="callout {escape(level, quote=True)}" role="doc-note">'
             f'<div class="co-ico">{icon}</div>'
             f'<div>{title_html}<div class="co-body"><p>{escape(content)}</p></div></div>'
             '</div>'
