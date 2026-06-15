@@ -1,6 +1,7 @@
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/worktrees/
+.agents/rules/project-management.md
 
 # macOS
 .DS_Store
