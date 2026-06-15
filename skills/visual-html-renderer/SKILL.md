@@ -143,7 +143,7 @@ python3 -m scripts.html_review_workbench.cli validate \
 python3 -m scripts.html_review_workbench.cli preview \
   --root <output-dir> \
   --mode auto \
-  --owner-pid $$
+  --owner-pid $PPID
 ```
 
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、preview本体をsandbox内で起動したまま、IPだけを小さいresolverで先に取得して渡す。
@@ -155,7 +155,7 @@ HTML_REVIEW_WORKBENCH_TAILSCALE_IP=<tailscale-ip> \
   python3 -m scripts.html_review_workbench.cli preview \
     --root <output-dir> \
     --mode auto \
-    --owner-pid $$
+    --owner-pid $PPID
 ```
 
 ユーザーが明示的にプレビュー不要と言った場合、または自動テスト・fixture検証で副作用を抑える場合だけ `--mode off` を使う。ユーザー向け成果物では `--mode off` を既定にしない。
@@ -165,7 +165,7 @@ HTML_REVIEW_WORKBENCH_TAILSCALE_IP=<tailscale-ip> \
 
 - `preview` が `status: running` を返した場合、最終応答に `url` を必ず含める。ファイルパスだけで完了しない。
 - `preview` が `status: off` または `status: failed` の場合、URLが無い理由を明示し、可能なら `--mode auto` で再実行してURL提示まで進める。
-- `--owner-pid` で指定したプロセスを監視し、そのプロセスが終了するとサーバーも自動終了する。`--owner-pid` は必須であり、省略するとエラーになる。
+- `$PPID` で agent セッションのプロセスを監視し、セッション終了時にサーバーも自動停止する。加えて idle timeout でも孤児を防止する。
 - 手動停止が必要な時だけ、返却JSONの `stop_command` を使う。PIDなしで全previewを停止しない。
 
 ## 完了時の確認

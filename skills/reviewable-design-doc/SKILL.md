@@ -76,12 +76,12 @@ python3 -m scripts.html_review_workbench.cli validate \
 python3 -m scripts.html_review_workbench.cli preview \
   --root <output-dir> \
   --mode auto \
-  --owner-pid $$
+  --owner-pid $PPID
 ```
 
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、`visual-html-renderer` と同じく `python3 -m scripts.html_review_workbench.preview_host_resolve` で取得したIPv4を `HTML_REVIEW_WORKBENCH_TAILSCALE_IP` に渡してから `preview --mode auto` を起動する。
 
-`preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。`--owner-pid` で指定したプロセスを監視し、そのプロセスが終了するとサーバーも自動終了する。`--owner-pid` は必須であり、省略するとエラーになる。
+`preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。`$PPID` で agent セッションのプロセスを監視し、セッション終了時にサーバーも自動停止する。加えて idle timeout でも孤児を防止する。
 
 レビュー取り込み時は、最新のpreview sessionまたはユーザー指定の成果物rootから `annotations/comments.json` を読み込む。
 

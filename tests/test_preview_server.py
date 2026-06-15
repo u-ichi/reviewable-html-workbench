@@ -102,7 +102,7 @@ class PreviewServerTest(unittest.TestCase):
             root = Path(tmp)
             (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
 
-            session = start_preview(root, "local", owner_pid=os.getpid())
+            session = start_preview(root, "local", owner_pid=os.getpid(), idle_timeout=0)
             try:
                 self.assertEqual(session.bind, "127.0.0.1")
                 self.assertEqual(session.mode, "local")
@@ -133,7 +133,7 @@ class PreviewServerTest(unittest.TestCase):
             root = Path(tmp)
             (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
             owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-            session = start_preview(root, "local", owner_pid=owner.pid)
+            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=0)
             try:
                 owner.terminate()
                 owner.wait(timeout=5)
@@ -156,7 +156,7 @@ class PreviewServerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            session = start_preview(root, "local", owner_pid=os.getpid())
+            session = start_preview(root, "local", owner_pid=os.getpid(), idle_timeout=0)
             try:
                 comments_url = session.url.replace("/index.html", "/annotations/comments.json")
                 initial = _read_json_url(comments_url)
@@ -196,6 +196,38 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertIsNotNone(session.process)
                 session.process.terminate()
                 session.process.wait(timeout=5)
+
+    def test_preview_server_starts_without_owner_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+
+            session = start_preview(root, "local", idle_timeout=0)
+            try:
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+            finally:
+                self.assertIsNotNone(session.process)
+                session.process.terminate()
+                session.process.wait(timeout=5)
+
+    def test_preview_server_idle_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+
+            session = start_preview(root, "local", owner_pid=os.getpid(), idle_timeout=3)
+            try:
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                time.sleep(5)
+                self.assertIsNotNone(session.process)
+                session.process.wait(timeout=5)
+                self.assertIsNotNone(session.process.poll())
+            finally:
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
 
 
 def _read_json_url(url: str) -> object:

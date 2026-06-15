@@ -50,6 +50,7 @@ class PreviewSession:
     owner_session: str
     manifest: str
     stop_command: str
+    idle_timeout: float
     process: subprocess.Popen[bytes] | None
 
     def to_payload(self) -> dict[str, object]:
@@ -68,6 +69,7 @@ class PreviewSession:
             "owner_session": self.owner_session,
             "manifest": self.manifest,
             "stop_command": self.stop_command,
+            "idle_timeout": self.idle_timeout,
         }
 
     def manifest_payload(self) -> dict[str, object]:
@@ -107,6 +109,7 @@ def start_preview(
     mode: PreviewMode = "auto",
     owner_session: str | None = None,
     owner_pid: int | None = None,
+    idle_timeout: float = 3600.0,
 ) -> PreviewSession:
     root = root.resolve()
     if not root.is_dir():
@@ -115,28 +118,27 @@ def start_preview(
     bind, resolved_mode = resolve_bind(mode)
     session_id = uuid.uuid4().hex
     owner_session = owner_session or current_owner_session() or "unknown"
-    if not owner_pid:
-        raise PreviewConfigurationError(
-            "--owner-pid is required; pass the caller's PID (e.g. --owner-pid $$) "
-            "so the server shuts down when the owning process exits"
-        )
     created_at = datetime.now(timezone.utc).isoformat()
 
+    command = [
+        sys.executable,
+        "-m",
+        "scripts.html_review_workbench.preview_server",
+        "--serve",
+        "0",
+        "--bind",
+        bind,
+        "--owner-session",
+        owner_session,
+        "--idle-timeout",
+        str(idle_timeout),
+    ]
+    if owner_pid:
+        command.extend(["--owner-pid", str(owner_pid)])
+    command.append(str(root))
+
     process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "scripts.html_review_workbench.preview_server",
-            "--serve",
-            "0",
-            "--bind",
-            bind,
-            "--owner-session",
-            owner_session,
-            "--owner-pid",
-            str(owner_pid or 0),
-            str(root),
-        ],
+        command,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -160,6 +162,7 @@ def start_preview(
         owner_session=owner_session,
         manifest=str(manifest_path),
         stop_command=f"bin/kill-review-preview.sh {process.pid}",
+        idle_timeout=idle_timeout,
         process=process,
     )
     write_session_manifest(manifest_path, session)
@@ -215,6 +218,20 @@ def _validate_bind(bind: str) -> str:
 
 class ReviewPreviewHandler(SimpleHTTPRequestHandler):
     comments_route = "/annotations/comments.json"
+    _last_activity: float = 0.0
+    _lock = threading.Lock()
+
+    @classmethod
+    def touch_activity(cls) -> None:
+        with cls._lock:
+            cls._last_activity = time.monotonic()
+
+    @classmethod
+    def seconds_since_last_activity(cls) -> float:
+        with cls._lock:
+            if cls._last_activity == 0.0:
+                return 0.0
+            return time.monotonic() - cls._last_activity
 
     def __init__(self, *args: object, root: Path, **kwargs: object) -> None:
         self.root = root.resolve()
@@ -228,12 +245,14 @@ class ReviewPreviewHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:
+        self.touch_activity()
         if self._path() == self.comments_route:
             self._send_json(self.store.read(self._document_id()))
             return
         super().do_GET()
 
     def do_PUT(self) -> None:
+        self.touch_activity()
         if self._path() != self.comments_route:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -269,12 +288,19 @@ class ReviewPreviewHandler(SimpleHTTPRequestHandler):
         return urlparse(self.path).path
 
 
-def serve(root: Path, bind: str, port: int, owner_pid: int | None = None) -> None:
+def serve(
+    root: Path,
+    bind: str,
+    port: int,
+    owner_pid: int | None = None,
+    idle_timeout: float = 3600.0,
+) -> None:
     bind = _validate_bind(bind)
     root = root.resolve()
     if not root.is_dir():
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
-    handler = partial(ReviewPreviewHandler, root=root)
+    handler_class = ReviewPreviewHandler
+    handler = partial(handler_class, root=root)
     with ThreadingHTTPServer((bind, port), handler) as server:
         actual_port = server.server_address[1]
         sys.stdout.buffer.write(
@@ -283,6 +309,8 @@ def serve(root: Path, bind: str, port: int, owner_pid: int | None = None) -> Non
         sys.stdout.buffer.flush()
         if owner_pid and owner_pid > 1:
             _start_owner_watchdog(server, owner_pid)
+        if idle_timeout > 0:
+            _start_idle_watchdog(server, handler_class, idle_timeout)
         server.serve_forever()
 
 
@@ -309,6 +337,26 @@ def _start_owner_watchdog(server: ThreadingHTTPServer, owner_pid: int, interval_
     thread.start()
 
 
+def _start_idle_watchdog(
+    server: ThreadingHTTPServer,
+    handler_class: type[ReviewPreviewHandler],
+    timeout: float,
+    check_interval: float = 30.0,
+) -> None:
+    effective_interval = min(check_interval, max(timeout / 2, 0.1))
+
+    def watch() -> None:
+        while True:
+            time.sleep(effective_interval)
+            idle = handler_class.seconds_since_last_activity()
+            if handler_class._last_activity > 0 and idle >= timeout:
+                server.shutdown()
+                return
+
+    thread = threading.Thread(target=watch, name="preview-idle-watchdog", daemon=True)
+    thread.start()
+
+
 def _pid_is_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -325,6 +373,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--owner-session", default="unknown")
     parser.add_argument("--owner-pid", type=int)
+    parser.add_argument("--idle-timeout", type=float, default=3600.0)
     parser.add_argument("root", nargs="?")
     return parser
 
@@ -334,7 +383,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.serve is None or args.root is None:
         parser.error("--serve PORT and root are required")
-    serve(Path(args.root), args.bind, args.serve, owner_pid=args.owner_pid)
+    serve(
+        Path(args.root),
+        args.bind,
+        args.serve,
+        owner_pid=args.owner_pid,
+        idle_timeout=args.idle_timeout,
+    )
     return 0
 
 

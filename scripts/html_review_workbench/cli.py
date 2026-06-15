@@ -43,7 +43,7 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
     "preview": {
         "purpose": "Start or describe a session-scoped preview runtime.",
         "required_options": ("--root",),
-        "optional_options": ("--mode", "--owner-session", "--owner-pid"),
+        "optional_options": ("--mode", "--owner-session", "--owner-pid", "--idle-timeout"),
     },
     "ingest-review": {
         "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
@@ -125,6 +125,7 @@ def preview(args: argparse.Namespace) -> int:
             args.mode,
             owner_session=args.owner_session,
             owner_pid=args.owner_pid,
+            idle_timeout=args.idle_timeout,
         )
     except PreviewConfigurationError as exc:
         print(json.dumps({"status": "failed", "error": str(exc), "root": args.root, "mode": args.mode}, ensure_ascii=False))
@@ -208,6 +209,7 @@ def build_parser() -> argparse.ArgumentParser:
     preview_parser.add_argument("--mode", choices=["auto", "tailscale", "local", "off"], default="auto")
     preview_parser.add_argument("--owner-session")
     preview_parser.add_argument("--owner-pid", type=int)
+    preview_parser.add_argument("--idle-timeout", type=float, default=3600.0)
     preview_parser.set_defaults(func=preview)
 
     ingest_parser = subparsers.add_parser(
