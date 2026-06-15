@@ -407,11 +407,11 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
 .block-content > *:last-child { margin-bottom: 0; }
 
 .block-content table {
-  width: 100%;
-  min-width: 720px;
+  min-width: 100%;
+  width: max-content;
+  max-width: none;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
   font-size: var(--fs-small);
 }
 .block-content th,
@@ -421,6 +421,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   border-right: 1px solid var(--line-1);
   text-align: left;
   vertical-align: top;
+  max-width: 420px;
   overflow-wrap: anywhere;
   word-break: normal;
 }
