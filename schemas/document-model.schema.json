@@ -61,6 +61,7 @@
         "required": [
           "id",
           "type",
+          "heading_level",
           "content"
         ],
         "properties": {
@@ -94,8 +95,7 @@
           "heading_level": {
             "type": "integer",
             "enum": [2, 3],
-            "default": 3,
-            "description": "見出しタグのレベル。2 = 章見出し (h2)、3 = 節見出し (h3、デフォルト)。文書タイトルが h1 を使うため、本文ブロックの見出しは h2 から始まる。"
+            "description": "見出しタグのレベル。2 = 章見出し (h2)、3 = 節見出し (h3)。文書タイトルが h1 を使うため、本文ブロックの見出しは h2 から始まる。"
           },
           "callout_title": {
             "type": "string"

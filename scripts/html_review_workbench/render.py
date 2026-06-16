@@ -194,7 +194,7 @@ def _render_meta_grid(metadata: dict[str, Any], generated_at: str) -> str:
 
 
 def _render_toc(blocks: list[dict[str, Any]]) -> str:
-    if not any(block.get("heading_level") == 2 for block in blocks):
+    if not any(block["heading_level"] == 2 for block in blocks):
         items: list[str] = []
         for block in blocks:
             title = block.get("title")
@@ -213,7 +213,7 @@ def _render_toc(blocks: list[dict[str, Any]]) -> str:
         if not isinstance(title, str) or not title:
             continue
         block_id = escape(block["id"], quote=True)
-        heading_level = block.get("heading_level", 3)
+        heading_level = block["heading_level"]
         if heading_level == 2:
             if in_nested:
                 html += "</ol>\n</li>\n"
@@ -246,7 +246,7 @@ def _render_blocks(
         block_type = block["type"]
         review_required = bool(block.get("review_required", False))
         title = block.get("title")
-        heading_level = int(block.get("heading_level", 3))
+        heading_level = int(block["heading_level"])
         sec_num = None
         if isinstance(title, str) and title:
             if heading_level == 2:
@@ -265,8 +265,8 @@ def _render_blocks(
                 review_required,
                 diagrams.get(block_id),
                 image_outputs.get(block_id),
-                sec_num,
                 heading_level,
+                sec_num,
             )
         )
         review_blocks.append(
@@ -285,14 +285,14 @@ def _render_block(
     review_required: bool,
     diagram: PlannedDiagram | None,
     image_src: str | None,
+    heading_level: int,
     section_number: str | None = None,
-    heading_level: int = 3,
 ) -> str:
     block_id = escape(block["id"], quote=True)
     block_type = escape(block["type"], quote=True)
     review_attr = "true" if review_required else "false"
-    title_html = _render_block_title(block.get("title"), block_id, section_number, heading_level)
-    content_html = _render_block_content(block, diagram, image_src, section_number, heading_level)
+    title_html = _render_block_title(block.get("title"), block_id, heading_level, section_number)
+    content_html = _render_block_content(block, diagram, image_src, heading_level, section_number)
     return (
         '<section class="review-block" '
         f'id="{block_id}" data-review-block="{block_id}" '
@@ -305,9 +305,9 @@ def _render_block(
 
 def _render_block_title(
     title: object,
-    block_id: str = "",
+    block_id: str,
+    heading_level: int,
     section_number: str | None = None,
-    heading_level: int = 3,
 ) -> str:
     if not isinstance(title, str) or not title:
         return ""
@@ -319,8 +319,8 @@ def _render_block_content(
     block: dict[str, Any],
     diagram: PlannedDiagram | None,
     image_src: str | None,
+    heading_level: int,
     section_number: str | None = None,
-    heading_level: int = 3,
 ) -> str:
     content = block.get("content", "")
     block_type = block["type"]

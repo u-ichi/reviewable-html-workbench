@@ -850,7 +850,7 @@ textarea.cmt-input, input.cmt-input {
 .cmt-empty { color: var(--ink-faint); font-size: var(--fs-small); padding: var(--sp-4); border: 1px dashed var(--line-2); border-radius: var(--r-md); text-align: center; }
 
 /* ---------- 17. RESPONSIVE -------------------------------- */
-@media (max-width: 1180px) {
+@media (max-width: 1024px) {
   .doc-grid { grid-template-columns: minmax(0,1fr) 320px; }
   .toc { display: none; }
 }

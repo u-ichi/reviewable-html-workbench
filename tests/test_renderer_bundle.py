@@ -29,7 +29,7 @@ class RendererBundleTest(unittest.TestCase):
             self.assertNotIn("review-block-section", html)
             self.assertIn('<section class="summary">', html)
             self.assertIn('Smallest document model used to exercise renderer fixtures.', html)
-            self.assertIn('<li><a href="#overview">Overview</a></li>', html)
+            self.assertIn('<a href="#overview">Overview</a>', html)
             self.assertIn(".code-body", css)
             self.assertIn(".prose code:not(pre code)", css)
             self.assertIn("--code-ink:    #d7d3c8", css)
@@ -68,9 +68,9 @@ class RendererBundleTest(unittest.TestCase):
     def test_render_toc_uses_block_titles(self) -> None:
         toc = _render_toc(
             [
-                {"id": "overview", "title": "Overview"},
-                {"id": "details", "title": "Details & Risks"},
-                {"id": "untitled", "content": "No title"},
+                {"id": "overview", "title": "Overview", "heading_level": 3},
+                {"id": "details", "title": "Details & Risks", "heading_level": 3},
+                {"id": "untitled", "content": "No title", "heading_level": 3},
             ]
         )
 
@@ -99,6 +99,7 @@ class RendererBundleTest(unittest.TestCase):
                 {
                     "id": "system-flow",
                     "type": "diagram",
+                    "heading_level": 2,
                     "title": "System Flow",
                     "content": "flowchart TD\n  A[Input] --> B[Output]",
                     "review_required": True,
@@ -135,6 +136,7 @@ class RendererBundleTest(unittest.TestCase):
                 {
                     "id": "callout",
                     "type": "callout",
+                    "heading_level": 2,
                     "title": "Note",
                     "content": "Use <plain> text.",
                     "review_required": True,
@@ -163,6 +165,7 @@ class RendererBundleTest(unittest.TestCase):
                 {
                     "id": "system-flow",
                     "type": "diagram",
+                    "heading_level": 2,
                     "title": "System Flow",
                     "content": "flowchart TD\n  A[Input] --> B[Output]",
                     "diagram_source": "flowchart TD\n  A[Input] --> B[Output]",

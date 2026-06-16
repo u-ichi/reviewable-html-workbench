@@ -57,6 +57,7 @@ class SchemaValidationTest(unittest.TestCase):
         fixture["blocks"][0] = {
             "id": "system-flow",
             "type": "diagram",
+            "heading_level": 2,
             "title": "System Flow",
             "content": "flowchart TD\n  A[Input] --> B[Output]",
             "diagram_source": "flowchart TD\n  A[Input] --> B[Output]",

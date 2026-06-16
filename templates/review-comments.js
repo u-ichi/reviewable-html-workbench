@@ -804,9 +804,7 @@
     document.querySelectorAll("[data-i18n]").forEach(function (el) {
       var key = el.dataset.i18n;
       if (t[key] === undefined) { return; }
-      if (el.tagName === "SELECT") {
-        el.setAttribute("aria-label", t[key]);
-      } else if (el.tagName === "ASIDE") {
+      if (el.tagName === "SELECT" || el.tagName === "ASIDE" || el.tagName === "NAV") {
         el.setAttribute("aria-label", t[key]);
       } else {
         el.textContent = t[key];

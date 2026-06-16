@@ -114,6 +114,7 @@ def html_block(
     return {
         "id": block_id,
         "type": "html",
+        "heading_level": 2,
         "title": title,
         "content": content,
         "review_required": True,

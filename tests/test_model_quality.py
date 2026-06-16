@@ -21,19 +21,25 @@ class ModelQualityTest(unittest.TestCase):
             self.assertIn("source-capture draft is not a final HTML document model", result.errors)
 
     def test_check_model_rejects_renderer_unsupported_types(self) -> None:
-        result = check_model_quality(_write_model({"id": "table-block", "type": "table", "content": "A | B"}))
+        result = check_model_quality(
+            _write_model({"id": "table-block", "type": "table", "heading_level": 2, "content": "A | B"})
+        )
 
         self.assertFalse(result.ok)
         self.assertIn("block table-block uses renderer-unsupported type: table", result.errors)
 
     def test_check_model_rejects_callout_html_content(self) -> None:
-        result = check_model_quality(_write_model({"id": "callout", "type": "callout", "content": "<strong>重要</strong>"}))
+        result = check_model_quality(
+            _write_model({"id": "callout", "type": "callout", "heading_level": 2, "content": "<strong>重要</strong>"})
+        )
 
         self.assertFalse(result.ok)
         self.assertIn("callout block callout must use plain text content", result.errors)
 
     def test_check_model_rejects_html_without_structure(self) -> None:
-        result = check_model_quality(_write_model({"id": "plain-html", "type": "html", "content": "plain text"}))
+        result = check_model_quality(
+            _write_model({"id": "plain-html", "type": "html", "heading_level": 2, "content": "plain text"})
+        )
 
         self.assertFalse(result.ok)
         self.assertIn("html block plain-html has no HTML structure", result.errors)
@@ -44,6 +50,7 @@ class ModelQualityTest(unittest.TestCase):
                 {
                     "id": "comparison",
                     "type": "html",
+                    "heading_level": 2,
                     "content": "<table><tbody><tr><th>軸</th><td>値</td></tr></tbody></table>",
                 }
             )

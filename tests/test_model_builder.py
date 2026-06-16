@@ -208,6 +208,7 @@ def _image_model() -> dict[str, object]:
             {
                 "id": "screen-image",
                 "type": "image",
+                "heading_level": 2,
                 "title": "Screen",
                 "content": "レビューUIの画面イメージ",
                 "review_required": True,
@@ -233,6 +234,7 @@ def _diagram_model() -> dict[str, object]:
             {
                 "id": "flow-diagram",
                 "type": "diagram",
+                "heading_level": 2,
                 "title": "Flow",
                 "content": source,
                 "diagram_kind": "flow",
