@@ -15,10 +15,12 @@ Claude Code / Codex CLI の両方で使えるように、plugin manifest は age
 - Codex plugin (`.codex-plugin/plugin.json`)
 - Agent Skills (`skills/*/SKILL.md`)
 
-## 開発コマンド
+## 開発コマンド（自動テスト・構造検証）
+
+以下は自動化された構造検証であり、機能の「動作確認」ではない。
 
 ```bash
-# テスト
+# 自動テスト（コード正当性の検証）
 python3 -m unittest discover -s tests
 
 # Claude plugin manifest 検証
@@ -31,6 +33,14 @@ python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 # CLI skeleton 確認
 python3 -m scripts.html_review_workbench.cli --help
 ```
+
+## 動作確認（実シナリオ検証）
+
+このシステムの利用者は agent であり、Python CLI を直接叩く人間はいない。CLI は agent のツールである。「動作確認」とは CLI の入出力が正しい JSON を返すことではなく、agent がユーザーのワークフロー内で機能を正しく使えることを意味する。
+
+自動テスト pass は動作確認の前提条件であり、動作確認そのものではない。
+
+実シナリオ検証の手順は各 skill の SKILL.md「実シナリオ検証」セクションに記載。
 
 ## ディレクトリ構成
 

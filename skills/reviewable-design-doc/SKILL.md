@@ -11,7 +11,7 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 
 設計資料としてレビューできる構造を作り、最終HTML生成は `visual-html-renderer` に渡す。
 
-レビュー完了後は `annotations/comments.json` を読み、明確な指摘は設計へ反映し、確認が必要な指摘はHTMLの同じコメントスレッドへagent replyとして返信する。
+レビュー完了後は `annotations/comments.json` を読み、明確な指摘は設計へ反映し、確認・回答が必要な指摘は `add-reply` CLI でHTMLの同じコメントスレッドへ書き戻す（チャットへの回答ではなくHTML上の返信として）。
 
 ## 基本手順
 
@@ -25,8 +25,7 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 8. `render` CLIでHTML bundleを生成する。
 9. `validate` CLIでHTML bundleを検証する。
 10. ユーザー向け最終HTMLでは既定で `preview` CLIを `--mode auto` で起動し、返却JSONの `url` と `stop_command` を最終応答に必ず書く。
-11. レビュー完了後は `ingest-review` CLIでコメントを分類し、必要に応じて設計へ反映する。
-12. 確認が必要なコメントには、`add-reply` CLIで同じHTMLコメントスレッドへagent replyを書き戻し、チャットだけで確認質問を終えない。
+11. ユーザーがコメントを入れたら「レビューコメントへの対応」セクションに従う。
 
 ## 設計資料モデル作成の規約
 
@@ -42,6 +41,26 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 - diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。sourceに無い関係や判断を画像側で追加しない。
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
+
+## レビューコメントへの対応
+
+ユーザーが「コメント入れた」「レビューした」等でコメントの存在を知らせた時に開始する。文書作成（手順 1-10）とは独立したインタラクションであり、以下を毎回実行する。
+
+IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で HTML コメントスレッドに書き戻す。チャットだけで回答を返して終わりにしてはならない。チャットでは補足や次のアクション提案のみ行い、コメントへの実質的な回答は HTML 側に書く。
+
+### 手順
+
+1. `ingest-review` CLI でコメントを分類する。
+2. 分類結果の `needs_clarification` コメントについて、`comment` と `selected_text` を読み、設計資料の該当箇所の文脈を踏まえてコメントの意図を理解する。
+3. 各コメントに対する実質的な回答を `add-reply` CLI で HTML コメントスレッドに書き戻す。
+4. `actionable` なコメントは設計へ反映し、必要に応じて再 render する。
+5. ユーザーにブラウザでの確認を依頼する。
+
+### なぜチャット回答ではなく add-reply か
+
+- ユーザーはブラウザ上でコメントと回答をセットで読む。チャットに書いた回答は、コメントの文脈から切り離される。
+- 複数コメントがある場合、チャットでは各コメントへの回答の対応関係が崩れる。
+- HTML 上の回答はコメントスレッドに紐づいて永続化される。チャットの回答はセッション終了で消える。
 
 ## CodexでのCLI呼び出し
 
@@ -120,9 +139,23 @@ python3 -m scripts.html_review_workbench.cli ingest-review \
 - `needs_clarification` のコメントには、`add-reply` によりHTMLコメントスレッド上のagent replyが追加されている。
 - コメント反映でユーザー確認が必要な場合は、チャットだけでなくHTMLコメントへ返信済みであることを確認している。
 
+## 実シナリオ検証
+
+自動テスト pass と CLI の JSON 出力確認は、実シナリオ検証ではない。「動作確認」を求められた場合、以下のエンドツーエンドフローを実行する。
+
+### レビュー取り込み・返信の検証
+
+1. ユーザーが HTML 上にコメントを入れたことを確認する（ユーザーからの報告を待つ）。
+2. `ingest-review` で `comments.json` を取り込み、分類結果を読む。
+3. 各コメントの `comment` と `selected_text` を読み、設計資料の該当箇所の文脈を踏まえて、コメントの意図を理解する。
+4. `needs_clarification` のコメントに対して、コメント内容に対する実質的な返答を考え、`add-reply` で HTML コメントスレッドに書き戻す。
+5. ユーザーに返信した旨を伝え、ブラウザで表示と内容の両方を確認してもらう。
+
+検証の完了条件: ユーザーがブラウザ上で agent の返信を読み、内容と表示の両方が意図通りであることを確認した時点。CLI が正しい JSON を返したことではない。
+
 ## ガード
 
 - 設計として未確定の内容は確定事項と分けて書く。
 - レビューコメント機能は必須で有効化する。
-- 確認が必要な場合、チャットだけで聞き返さずHTMLコメントへ返信する。
+- IMPORTANT: レビューコメントに回答する時は `add-reply` で HTML コメントスレッドに書き戻す。チャットで回答内容を述べただけでは回答完了にならない。
 - HTML低レベル実装をこのskillに重複実装しない。

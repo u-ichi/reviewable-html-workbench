@@ -41,12 +41,13 @@
    - Claude: `claude --plugin-dir /path/to/reviewable-html-workbench`
    - Codex: `codex plugin marketplace add /path/to/reviewable-html-workbench` で repo-local marketplace を登録する。path に空白があり失敗する場合は、空白を含まない symlink 経由で登録する。
 
-7. **実出力を見て直す**
+7. **実出力を見て直す**（自動テストとは別の検証層）
+   - 手順5の自動テストはコード正当性の検証。ここでは agent が実際のユーザーワークフロー内で機能を使い、ユーザーがブラウザ上で結果を確認する。
    - `check-model` の失敗理由
    - HTML表示
    - range selection comment
    - comments.json取り込み
-   - agent reply
+   - agent reply（コメント内容を読み、設計文脈を踏まえた実質的な返信になっているか）
    - 再生成後のpreview URL
 
 ## 最初のMVP

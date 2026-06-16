@@ -205,6 +205,16 @@ HTML_REVIEW_WORKBENCH_TAILSCALE_IP=<tailscale-ip> \
 - preview 有効時は提示URL、bind先、PID、停止方法をユーザーへ伝える。
 - preview は `0.0.0.0` にbindしていない。
 
+## 実シナリオ検証
+
+自動テスト pass と CLI の JSON 出力確認は、実シナリオ検証ではない。「動作確認」を求められた場合、以下を実行する。
+
+1. 実際の内容について `document-model.json` を作り、`render` → `validate` → `preview` を実行する。
+2. preview URL をユーザーに提示し、ブラウザで表示を確認してもらう。
+3. 表示に問題がある場合は、文書モデルを修正して再 render する。
+
+検証の完了条件: ユーザーがブラウザ上で最終 HTML の表示を確認した時点。`validate` が `status: ok` を返したことではない。
+
 ## Completion receipt
 
 最終応答には次を含める。

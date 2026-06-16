@@ -853,9 +853,15 @@
     if (!select) {
       return;
     }
+    const storageKey = "reviewFilter_" + documentId;
+    const saved = localStorage.getItem(storageKey);
+    if (saved && Array.from(select.options).some((o) => o.value === saved)) {
+      select.value = saved;
+    }
     state.filter = select.value || "all";
     select.addEventListener("change", () => {
       state.filter = select.value || "all";
+      localStorage.setItem(storageKey, state.filter);
       applyFilterVisibility();
     });
   }
@@ -1180,17 +1186,15 @@
         if (!target) {
           return;
         }
-        const targetRect = target.getBoundingClientRect();
-        if (canvas) {
-          const canvasRect = canvas.getBoundingClientRect();
-          canvas.scrollBy({ top: targetRect.top - canvasRect.top - 90, behavior: "smooth" });
-        } else {
-          window.scrollBy({ top: targetRect.top - 90, behavior: "smooth" });
-        }
+        const sc = canvas || document.documentElement;
+        sc.scrollTop = target.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 72;
       });
     });
     const onScroll = rafThrottle(() => updateCurrentSection(links, headings));
-    (canvas || document).addEventListener("scroll", onScroll);
+    if (canvas) {
+      canvas.addEventListener("scroll", onScroll);
+    }
+    window.addEventListener("scroll", onScroll);
     updateCurrentSection(links, headings);
   }
 

@@ -78,7 +78,11 @@ codex plugin marketplace add ./reviewable-html-workbench
 
 ## Quick Start
 
-Create a document model from source text:
+The plugin is used by agents inside Claude Code or Codex CLI. A typical workflow:
+
+### 1. Agent generates the document
+
+The agent creates a document model, renders it to HTML, and starts a preview server:
 
 ```bash
 python3 -m scripts.html_review_workbench.cli build-model \
@@ -86,36 +90,40 @@ python3 -m scripts.html_review_workbench.cli build-model \
   --title "Example Design Note" \
   --document-id example-design-note \
   --output output/tmp/example/document-model.json
-```
-
-For final HTML output, agents should refine the document model directly before rendering. Then validate and render it:
-
-```bash
-python3 -m scripts.html_review_workbench.cli check-model \
-  --model output/tmp/example/document-model.json
 
 python3 -m scripts.html_review_workbench.cli render \
   --model output/tmp/example/document-model.json \
   --output output/tmp/example/bundle
 
-python3 -m scripts.html_review_workbench.cli validate \
-  --root output/tmp/example/bundle
-```
-
-Start a preview server:
-
-```bash
 python3 -m scripts.html_review_workbench.cli preview \
-  --root output/tmp/example/bundle \
-  --mode auto
+  --root output/tmp/example/bundle --mode auto
 ```
 
-After human review, ingest comments from the generated bundle:
+The agent shares the preview URL with you.
+
+### 2. You review in the browser
+
+Open the preview URL, select any text or image, and leave comments directly in the document. Comments are saved to `annotations/comments.json`.
+
+### 3. Agent reads and replies
+
+Tell the agent you've added comments. The agent ingests them, reads each comment in context, and writes replies back to the same comment threads:
 
 ```bash
 python3 -m scripts.html_review_workbench.cli ingest-review \
   --root output/tmp/example/bundle
+
+python3 -m scripts.html_review_workbench.cli add-reply \
+  --root output/tmp/example/bundle \
+  --thread-id <comment-id> \
+  --body "Reply text based on the comment content and document context"
 ```
+
+You see the agent's replies in the browser, in the same comment thread where you left your review.
+
+### 4. Iterate
+
+The agent updates the document based on your feedback, re-renders, and you continue reviewing until the document is ready.
 
 ## Skills
 
@@ -141,6 +149,7 @@ python3 -m scripts.html_review_workbench.cli <command>
 | `preview` | Start or describe a session-scoped preview runtime. |
 | `ingest-review` | Read review comments, classify them, write agent replies, and save review-cycle state. |
 | `validate` | Validate a generated HTML bundle. |
+| `add-reply` | Add an agent reply to a comment thread in `comments.json`. |
 
 ## Schemas
 
