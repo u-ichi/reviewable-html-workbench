@@ -184,8 +184,12 @@ body {
 }
 
 /* TOC rail */
-.toc { position: sticky; top: 76px; max-height: calc(100vh - 76px - 32px); overflow-y: auto; font-size: var(--fs-small); }
-.toc-h { font-size: var(--fs-caption); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--sp-3); font-weight: 650; }
+.toc { position: sticky; top: 76px; max-height: calc(100vh - 76px - 32px); overflow-y: hidden; display: flex; flex-direction: column; font-size: var(--fs-small); }
+.toc-h { font-size: var(--fs-caption); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--sp-3); font-weight: 650; flex-shrink: 0; }
+.toc ol.toc-list { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line-2); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.toc ol.toc-list::-webkit-scrollbar { width: 4px; }
+.toc ol.toc-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 2px; }
+.toc ol.toc-list::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 .toc ol { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line-2); }
 .toc li a {
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;

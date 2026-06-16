@@ -1196,6 +1196,20 @@
     }
     window.addEventListener("scroll", onScroll);
     updateCurrentSection(links, headings);
+
+    const tocList = toc.querySelector("ol.toc-list");
+    if (tocList) {
+      tocList.addEventListener("wheel", (e) => {
+        const maxScroll = tocList.scrollHeight - tocList.clientHeight;
+        if (maxScroll <= 0) { return; }
+        const atTop = tocList.scrollTop <= 0 && e.deltaY < 0;
+        const atBottom = tocList.scrollTop >= maxScroll && e.deltaY > 0;
+        if (!atTop && !atBottom) {
+          e.preventDefault();
+          tocList.scrollTop += e.deltaY;
+        }
+      }, { passive: false });
+    }
   }
 
   function updateCurrentSection(links, headings) {
