@@ -133,12 +133,56 @@ class PreviewServerTest(unittest.TestCase):
             root = Path(tmp)
             (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
             owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=0)
+            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=0, owner_grace=0)
             try:
                 owner.terminate()
                 owner.wait(timeout=5)
                 self.assertIsNotNone(session.process)
                 session.process.wait(timeout=7)
+            finally:
+                if owner.poll() is None:
+                    owner.terminate()
+                    owner.wait(timeout=5)
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
+
+    def test_owner_pid_death_with_grace_keeps_server_alive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=0, owner_grace=10)
+            try:
+                owner.terminate()
+                owner.wait(timeout=5)
+                time.sleep(1)
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                self.assertIsNotNone(session.process)
+                self.assertIsNone(session.process.poll())
+            finally:
+                if owner.poll() is None:
+                    owner.terminate()
+                    owner.wait(timeout=5)
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
+
+    def test_owner_pid_death_grace_expires_without_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=0, owner_grace=3)
+            try:
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                owner.terminate()
+                owner.wait(timeout=5)
+                self.assertIsNotNone(session.process)
+                session.process.wait(timeout=8)
+                self.assertIsNotNone(session.process.poll())
             finally:
                 if owner.poll() is None:
                     owner.terminate()

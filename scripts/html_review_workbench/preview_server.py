@@ -110,6 +110,7 @@ def start_preview(
     owner_session: str | None = None,
     owner_pid: int | None = None,
     idle_timeout: float = 3600.0,
+    owner_grace: float = 300.0,
 ) -> PreviewSession:
     root = root.resolve()
     if not root.is_dir():
@@ -132,6 +133,8 @@ def start_preview(
         owner_session,
         "--idle-timeout",
         str(idle_timeout),
+        "--owner-grace",
+        str(owner_grace),
     ]
     if owner_pid:
         command.extend(["--owner-pid", str(owner_pid)])
@@ -294,6 +297,7 @@ def serve(
     port: int,
     owner_pid: int | None = None,
     idle_timeout: float = 3600.0,
+    owner_grace: float = 300.0,
 ) -> None:
     bind = _validate_bind(bind)
     root = root.resolve()
@@ -308,7 +312,7 @@ def serve(
         )
         sys.stdout.buffer.flush()
         if owner_pid and owner_pid > 1:
-            _start_owner_watchdog(server, owner_pid)
+            _start_owner_watchdog(server, owner_pid, handler_class, grace_seconds=owner_grace)
         if idle_timeout > 0:
             _start_idle_watchdog(server, handler_class, idle_timeout)
         server.serve_forever()
@@ -325,16 +329,46 @@ def _content_length(handler: SimpleHTTPRequestHandler) -> int:
     return length
 
 
-def _start_owner_watchdog(server: ThreadingHTTPServer, owner_pid: int, interval_seconds: float = 2.0) -> None:
+def _start_owner_watchdog(
+    server: ThreadingHTTPServer,
+    owner_pid: int,
+    handler_class: type[ReviewPreviewHandler],
+    grace_seconds: float = 300.0,
+    interval_seconds: float = 2.0,
+) -> None:
     def watch() -> None:
         while True:
             if not _pid_is_alive(owner_pid):
-                server.shutdown()
+                _run_grace_period(server, handler_class, grace_seconds, interval_seconds)
                 return
             time.sleep(interval_seconds)
 
     thread = threading.Thread(target=watch, name="preview-owner-watchdog", daemon=True)
     thread.start()
+
+
+def _run_grace_period(
+    server: ThreadingHTTPServer,
+    handler_class: type[ReviewPreviewHandler],
+    grace_seconds: float,
+    check_interval: float,
+) -> None:
+    if grace_seconds <= 0:
+        server.shutdown()
+        return
+
+    grace_start = time.monotonic()
+    effective_interval = min(check_interval, max(grace_seconds / 2, 0.1))
+    while True:
+        time.sleep(effective_interval)
+        elapsed = time.monotonic() - grace_start
+        idle = handler_class.seconds_since_last_activity()
+        if handler_class._last_activity > 0 and idle >= grace_seconds:
+            server.shutdown()
+            return
+        if handler_class._last_activity == 0.0 and elapsed >= grace_seconds:
+            server.shutdown()
+            return
 
 
 def _start_idle_watchdog(
@@ -374,6 +408,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--owner-session", default="unknown")
     parser.add_argument("--owner-pid", type=int)
     parser.add_argument("--idle-timeout", type=float, default=3600.0)
+    parser.add_argument("--owner-grace", type=float, default=300.0)
     parser.add_argument("root", nargs="?")
     return parser
 
@@ -389,6 +424,7 @@ def main() -> int:
         args.serve,
         owner_pid=args.owner_pid,
         idle_timeout=args.idle_timeout,
+        owner_grace=args.owner_grace,
     )
     return 0
 

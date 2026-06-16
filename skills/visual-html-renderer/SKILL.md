@@ -172,6 +172,8 @@ python3 -m scripts.html_review_workbench.cli preview \
   --owner-pid $PPID
 ```
 
+注意: `$PPID` は preview コマンドを直接実行する Bash の親プロセス ID を指す。ラッパースクリプト (bash run-render.sh 等) 内で `$PPID` を使うと、一時的な Bash プロセスの親を監視してしまい、スクリプト完了後に preview server が自動停止する。preview コマンドは常に agent が直接 Bash tool call で実行し、ラッパースクリプトに含めない。
+
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、preview本体をsandbox内で起動したまま、IPだけを小さいresolverで先に取得して渡す。
 
 ```bash
@@ -183,6 +185,8 @@ HTML_REVIEW_WORKBENCH_TAILSCALE_IP=<tailscale-ip> \
     --mode auto \
     --owner-pid $PPID
 ```
+
+注意: `$PPID` は preview コマンドを直接実行する Bash の親プロセス ID を指す。ラッパースクリプト (bash run-render.sh 等) 内で `$PPID` を使うと、一時的な Bash プロセスの親を監視してしまい、スクリプト完了後に preview server が自動停止する。preview コマンドは常に agent が直接 Bash tool call で実行し、ラッパースクリプトに含めない。
 
 ユーザーが明示的にプレビュー不要と言った場合、または自動テスト・fixture検証で副作用を抑える場合だけ `--mode off` を使う。ユーザー向け成果物では `--mode off` を既定にしない。
 成果物はユーザーが直接読む最終HTMLなら `output/<YYYY-MM-DD>_<name>/`、再利用しない検証なら `output/tmp/<purpose>/` に置く。

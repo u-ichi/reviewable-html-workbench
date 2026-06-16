@@ -26,7 +26,7 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 9. `validate` CLIでHTML bundleを検証する。
 10. ユーザー向け最終HTMLでは既定で `preview` CLIを `--mode auto` で起動し、返却JSONの `url` と `stop_command` を最終応答に必ず書く。
 11. レビュー完了後は `ingest-review` CLIでコメントを分類し、必要に応じて設計へ反映する。
-12. 確認が必要なコメントには、チャットだけでなくHTMLコメントへagent replyを書き戻す。
+12. 確認が必要なコメントには、`add-reply` CLIで同じHTMLコメントスレッドへagent replyを書き戻し、チャットだけで確認質問を終えない。
 
 ## 設計資料モデル作成の規約
 
@@ -80,6 +80,8 @@ python3 -m scripts.html_review_workbench.cli preview \
   --owner-pid $PPID
 ```
 
+注意: `$PPID` は preview コマンドを直接実行する Bash の親プロセス ID を指す。ラッパースクリプト (bash run-render.sh 等) 内で `$PPID` を使うと、一時的な Bash プロセスの親を監視してしまい、スクリプト完了後に preview server が自動停止する。preview コマンドは常に agent が直接 Bash tool call で実行し、ラッパースクリプトに含めない。
+
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、`visual-html-renderer` と同じく `python3 -m scripts.html_review_workbench.preview_host_resolve` で取得したIPv4を `HTML_REVIEW_WORKBENCH_TAILSCALE_IP` に渡してから `preview --mode auto` を起動する。
 
 `preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。`$PPID` で agent セッションのプロセスを監視し、セッション終了時にサーバーも自動停止する。加えて idle timeout でも孤児を防止する。
@@ -89,6 +91,15 @@ Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗
 ```bash
 python3 -m scripts.html_review_workbench.cli ingest-review \
   --root <output-dir>
+```
+
+確認が必要なコメントへagent replyを書き戻す場合は、`ingest-review` の分類結果から対象thread idを確認し、同じ成果物rootへ `add-reply` を実行する。
+
+```bash
+python3 -m scripts.html_review_workbench.cli add-reply \
+  --root <output-dir> \
+  --thread-id <thread-id> \
+  --body "<agent reply body>"
 ```
 
 document modelへ反映する場合は、完全一致置換に限定して明示的に実行する。
@@ -106,8 +117,8 @@ python3 -m scripts.html_review_workbench.cli ingest-review \
 - `check-model` が `status: ok` 相当の成功終了を返している。
 - preview有効時は、レビュー用URLをユーザーへ提示している。
 - レビュー取り込み後、`annotations/review-cycle-state.json` が生成されている。
-- `needs_clarification` のコメントにはHTMLコメントスレッド上のagent replyが追加されている。
-- コメント反映でユーザー確認が必要な場合は、チャットだけでなくHTMLコメントへ返信している。
+- `needs_clarification` のコメントには、`add-reply` によりHTMLコメントスレッド上のagent replyが追加されている。
+- コメント反映でユーザー確認が必要な場合は、チャットだけでなくHTMLコメントへ返信済みであることを確認している。
 
 ## ガード
 

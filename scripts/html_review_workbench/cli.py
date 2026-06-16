@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.html_review_workbench.comment_store import CommentStoreError
+from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError
 from scripts.html_review_workbench.image_assets import ImageAssetError, attach_image_to_model
 from scripts.html_review_workbench.ingest_review import ReviewIngestionError, ingest_review as run_ingest_review
 from scripts.html_review_workbench.model_builder import ModelBuildError, build_model_from_source
@@ -43,7 +43,7 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
     "preview": {
         "purpose": "Start or describe a session-scoped preview runtime.",
         "required_options": ("--root",),
-        "optional_options": ("--mode", "--owner-session", "--owner-pid", "--idle-timeout"),
+        "optional_options": ("--mode", "--owner-session", "--owner-pid", "--idle-timeout", "--owner-grace"),
     },
     "ingest-review": {
         "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
@@ -53,6 +53,11 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
     "validate": {
         "purpose": "Validate a generated HTML bundle.",
         "required_options": ("--root",),
+    },
+    "add-reply": {
+        "purpose": "Add an agent reply to a comment thread in comments.json.",
+        "required_options": ("--root", "--thread-id", "--body"),
+        "optional_options": ("--comments", "--kind", "--author"),
     },
 }
 
@@ -126,6 +131,7 @@ def preview(args: argparse.Namespace) -> int:
             owner_session=args.owner_session,
             owner_pid=args.owner_pid,
             idle_timeout=args.idle_timeout,
+            owner_grace=args.owner_grace,
         )
     except PreviewConfigurationError as exc:
         print(json.dumps({"status": "failed", "error": str(exc), "root": args.root, "mode": args.mode}, ensure_ascii=False))
@@ -154,6 +160,36 @@ def validate(args: argparse.Namespace) -> int:
     result = validate_bundle(Path(args.root))
     print(json.dumps(result.to_payload(), ensure_ascii=False))
     return 0 if result.ok else 1
+
+
+def add_reply(args: argparse.Namespace) -> int:
+    try:
+        store = CommentStore(Path(args.root), args.comments)
+        payload = store.read("document")
+        document_id = payload["document_id"]
+        reply = store.add_reply(
+            document_id=document_id,
+            thread_id=args.thread_id,
+            author=args.author,
+            role="agent",
+            kind=args.kind,
+            body=args.body,
+        )
+    except CommentStoreError as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "thread_id": args.thread_id,
+                "reply_id": reply["id"],
+                "thread_status": "needs_user_reply",
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -210,6 +246,7 @@ def build_parser() -> argparse.ArgumentParser:
     preview_parser.add_argument("--owner-session")
     preview_parser.add_argument("--owner-pid", type=int)
     preview_parser.add_argument("--idle-timeout", type=float, default=3600.0)
+    preview_parser.add_argument("--owner-grace", type=float, default=300.0)
     preview_parser.set_defaults(func=preview)
 
     ingest_parser = subparsers.add_parser(
@@ -231,6 +268,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("--root", required=True)
     validate_parser.set_defaults(func=validate)
+
+    add_reply_parser = subparsers.add_parser(
+        "add-reply",
+        help=str(COMMAND_CONTRACT["add-reply"]["purpose"]),
+        description=str(COMMAND_CONTRACT["add-reply"]["purpose"]),
+    )
+    add_reply_parser.add_argument("--root", required=True)
+    add_reply_parser.add_argument("--thread-id", required=True)
+    add_reply_parser.add_argument("--body", required=True)
+    add_reply_parser.add_argument("--comments", default="annotations/comments.json")
+    add_reply_parser.add_argument("--kind", default="answer")
+    add_reply_parser.add_argument("--author", default="agent")
+    add_reply_parser.set_defaults(func=add_reply)
 
     return parser
 
