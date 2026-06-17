@@ -22,12 +22,15 @@ Reviewable HTML Workbench solves this by putting the review conversation **insid
 
 Comments are attached to exact document ranges and persisted as structured JSON, so nothing is lost between iterations. When you're satisfied, export the final document as a single self-contained HTML file.
 
-The plugin includes two skills. `visual-html-renderer` creates, validates, renders, and previews visual HTML documents. `reviewable-design-doc` builds review-ready design documents and ingests review comments back into the agent workflow — including agent replies, comment classification, and review-cycle state tracking.
+The plugin includes three skills. `visual-html-renderer` creates reviewable visual HTML documents. `reviewable-design-doc` builds review-ready design documents and feeds browser comments back into the agent workflow. `plan-preview` gives Plan Mode proposals a temporary HTML preview URL before implementation starts.
 
 ## Features
 
 - **Inline Review Comments**: select any text or image in the preview to leave a comment. Comments are highlighted in the document with margin cards showing status, replies, and threading.
-- **Review Ingestion**: the agent reads `annotations/comments.json`, classifies each comment (actionable, clarification, already addressed, etc.), writes agent replies, and tracks review-cycle state — so the review conversation stays structured across iterations.
+- **Automatic Agent Replies**: when you add a comment in the browser, the agent can read the selected text and surrounding document context, then write its reply back into the same thread.
+- **Resolution-Gated Updates**: clarification threads stay in the document until you resolve them. Once the thread is resolved, the agent can apply the agreed document changes and notify the browser.
+- **Plan Preview URLs**: when a plan needs visual review, the agent can include a temporary Reviewable HTML Workbench preview URL directly in the plan text.
+- **Review Ingestion**: comments are classified as actionable, clarification, already addressed, and related states so the review conversation stays structured across iterations.
 - **Publish & Download**: switch to a clean reading view with no review UI, then download a single self-contained HTML file with all CSS and images embedded. The exported file auto-detects OS light/dark theme.
 - **Document Model**: schema-driven document input for predictable HTML generation.
 - **HTML Rendering**: produces `index.html`, copied assets, and `renderer-manifest.json`.
@@ -78,61 +81,57 @@ codex plugin marketplace add ./reviewable-html-workbench
 
 ## Quick Start
 
-The plugin is used by agents inside Claude Code or Codex CLI. A typical workflow:
+You use Reviewable HTML Workbench by asking Claude Code or Codex CLI for a reviewable artifact. You do not normally run the Python commands yourself; the agent uses them behind the scenes and gives you a browser URL.
 
-### 1. Agent generates the document
+### 1. Ask for a reviewable HTML document
 
-The agent creates a document model, renders it to HTML, and starts a preview server:
+Use a natural request in your agent session:
 
-```bash
-python3 -m scripts.html_review_workbench.cli build-model \
-  --text "Write a short reviewable design note." \
-  --title "Example Design Note" \
-  --document-id example-design-note \
-  --output output/tmp/example/document-model.json
-
-python3 -m scripts.html_review_workbench.cli render \
-  --model output/tmp/example/document-model.json \
-  --output output/tmp/example/bundle
-
-python3 -m scripts.html_review_workbench.cli preview \
-  --root output/tmp/example/bundle --mode auto
+```text
+設計資料をレビュー可能なHTMLで作って
 ```
 
-The agent shares the preview URL with you.
+or:
 
-### 2. You review in the browser
-
-Open the preview URL, select any text or image, and leave comments directly in the document. Comments are saved to `annotations/comments.json`.
-
-### 3. Agent reads and replies
-
-Tell the agent you've added comments. The agent ingests them, reads each comment in context, and writes replies back to the same comment threads:
-
-```bash
-python3 -m scripts.html_review_workbench.cli ingest-review \
-  --root output/tmp/example/bundle
-
-python3 -m scripts.html_review_workbench.cli add-reply \
-  --root output/tmp/example/bundle \
-  --thread-id <comment-id> \
-  --body "Reply text based on the comment content and document context"
+```text
+この調査結果を図示つきHTMLでプレビューして
 ```
 
-You see the agent's replies in the browser, in the same comment thread where you left your review.
+The agent creates the document, validates it, starts a session-scoped preview, and returns a URL.
 
-### 4. Iterate
+### 2. Review in the browser
 
-The agent updates the document based on your feedback, re-renders, and you continue reviewing until the document is ready.
+Open the preview URL. Select text or images, add comments where the issue appears, and keep the review context inside the document instead of scattering it across chat messages.
+
+### 3. Let the agent answer comments
+
+When comments are added, the agent can read them, classify what needs action or clarification, and write replies into the same browser threads. You can read the agent reply beside the original selected text.
+
+### 4. Resolve threads to trigger updates
+
+If the agent needs clarification, answer in the thread. When the thread is resolved, the agent can apply the agreed document changes, re-render the HTML, and show a browser notification so you can reload when ready.
+
+### 5. Preview plans before implementation
+
+For implementation plans, ask for a visual plan preview:
+
+```text
+この計画をHTMLでプレビューして
+```
+
+The plan text can include a temporary `Plan preview:` URL, making phases, dependencies, and test coverage easier to inspect before work starts.
 
 ## Skills
 
 | Skill | Purpose | Trigger examples |
 |---|---|---|
-| `visual-html-renderer` | Generate, validate, and preview final HTML bundles from document models. | `html出力して`, `HTMLにして`, `HTMLで出して`, `この内容をHTMLで出して`, `HTMLでプレビューして`, `HTMLレンダラー`, `HTML出力を共通化`, `図示つきHTML`, `visual HTML renderer` |
-| `reviewable-design-doc` | Create review-ready design documents and ingest review comments back into the workflow. | `レビュー可能な設計資料`, `設計資料をHTMLで`, `design doc`, `reviewable design doc`, `レビュー終わったので確認して`, `コメントを反映して` |
+| `visual-html-renderer` | Turn content into a polished, reviewable HTML preview with diagrams, images, comments, and publish/download controls. | `html出力して`, `HTMLにして`, `HTMLで出して`, `HTMLでプレビューして`, `図示つきHTML`, `visual HTML renderer` |
+| `reviewable-design-doc` | Create a review-ready design document, watch browser comments, reply in-thread, and apply resolved feedback. | `レビュー可能な設計資料`, `設計資料をHTMLで`, `design doc`, `reviewable design doc`, `レビュー終わったので確認して`, `コメントを反映して` |
+| `plan-preview` | Add a temporary Reviewable HTML Workbench preview URL to a proposed plan before implementation starts. | `planをグラフィカルに見たい`, `planを図で確認したい`, `graphical plan review`, `この計画をHTMLでプレビューして` |
 
-## CLI Reference
+## Agent / Developer CLI Reference
+
+These commands are the internal interface used by the skills and by plugin developers. End users normally interact through Claude Code or Codex prompts and browser review.
 
 All commands are exposed through:
 
@@ -147,9 +146,14 @@ python3 -m scripts.html_review_workbench.cli <command>
 | `check-model` | Check whether a document model is ready for final HTML rendering. |
 | `attach-image` | Attach a generated image asset to an image-capable block in a document model. |
 | `preview` | Start or describe a session-scoped preview runtime. |
+| `plan-preview` | Create an ephemeral HTML preview for a proposed plan. |
+| `plan-preview-stop` | Stop and clean up an ephemeral plan preview. |
 | `ingest-review` | Read review comments, classify them, write agent replies, and save review-cycle state. |
 | `validate` | Validate a generated HTML bundle. |
 | `add-reply` | Add an agent reply to a comment thread in `comments.json`. |
+| `check-gates` | Check whether unresolved clarification threads block document updates. |
+| `watch-comments` | Stream browser comment change events from a running preview. |
+| `notify-update` | Notify the browser that the document has been updated. |
 
 ## Schemas
 
@@ -205,10 +209,23 @@ Reviewable HTML Workbench は、Claude Code / Codex CLI 向けの HTML レビュ
 
 完成したら、レビュー要素を除いた読者向けの HTML を 1 ファイルでダウンロードできます（CSS・画像埋め込み済み、OS テーマ自動検知対応）。
 
-2つの skill を含みます。
+3つの skill を含みます。
 
 - `visual-html-renderer`: HTML生成、図示、Preview Runtime、bundle検証。
-- `reviewable-design-doc`: レビュー可能な設計資料作成、コメント取り込み、agent返信、設計反映。
+- `reviewable-design-doc`: レビュー可能な設計資料作成、コメント自動検知、agent返信、解決後の設計反映。
+- `plan-preview`: Plan Mode の計画本文に一時HTMLプレビューURLを追加。
+
+基本的な使い方:
+
+```text
+設計資料をレビュー可能なHTMLで作って
+```
+
+agent が preview URL を返すので、ブラウザで開いて本文にコメントします。コメントを入れると agent が同じコメントスレッドへ返信し、解決状態になった指摘はドキュメントへ反映します。計画を確認したい場合は次のように依頼します。
+
+```text
+この計画をHTMLでプレビューして
+```
 
 インストール:
 
