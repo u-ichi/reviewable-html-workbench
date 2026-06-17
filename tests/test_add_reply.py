@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.request
 from pathlib import Path
+
+from scripts.html_review_workbench.preview_server import start_preview
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +81,33 @@ class AddReplyCliTest(unittest.TestCase):
             self.assertEqual(reply["kind"], "implementation_note")
             self.assertEqual(reply["body"], "Implemented by updating the renderer.")
 
+    def test_add_reply_publishes_agent_comment_updated_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            _write_comments(root, [_thread("cmt-1")])
+
+            session = start_preview(root, "local", owner_pid=os.getpid(), idle_timeout=0)
+            try:
+                _run_cli(
+                    "add-reply",
+                    "--root",
+                    str(root),
+                    "--thread-id",
+                    "cmt-1",
+                    "--body",
+                    "Applied this change.",
+                )
+
+                event = _read_sse_event(session.url.replace("/index.html", "/events"))
+                self.assertEqual(event["event"], "comment_updated")
+                self.assertEqual(event["data"]["source"], "agent")
+                self.assertEqual(event["data"]["thread_id"], "cmt-1")
+            finally:
+                self.assertIsNotNone(session.process)
+                session.process.terminate()
+                session.process.wait(timeout=5)
+
     def test_add_reply_coexists_with_ingest_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -124,6 +155,24 @@ def _write_comments(root: Path, threads: list[dict[str, object]]) -> None:
 
 def _read_comments(root: Path) -> dict[str, object]:
     return json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
+
+
+def _read_sse_event(url: str) -> dict[str, object]:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        event: dict[str, object] = {}
+        data = ""
+        while True:
+            line = response.readline().decode("utf-8").strip()
+            if line == "":
+                break
+            if line.startswith("id: "):
+                event["id"] = line[4:]
+            elif line.startswith("event: "):
+                event["event"] = line[7:]
+            elif line.startswith("data: "):
+                data = line[6:]
+        event["data"] = json.loads(data)
+        return event
 
 
 def _thread(thread_id: str, *, comment: str = "Please update this section.") -> dict[str, object]:

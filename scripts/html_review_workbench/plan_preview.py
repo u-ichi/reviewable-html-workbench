@@ -1,0 +1,365 @@
+"""Ephemeral plan preview support for Plan Mode helper views."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from html import escape
+from pathlib import Path
+from typing import Any
+
+from scripts.html_review_workbench.preview_server import PreviewConfigurationError, PreviewMode, start_preview
+from scripts.html_review_workbench.render import render_bundle
+
+
+MAX_PAYLOAD_BYTES = 512 * 1024
+MARKER_FILE = ".rhw-plan-preview"
+ROOT_PREFIX = "rhw-plan-preview-"
+DEFAULT_TTL_SECONDS = 1800.0
+_CLEANUP_WATCHERS: list[subprocess.Popen[bytes]] = []
+
+
+class PlanPreviewError(ValueError):
+    """Raised when a plan preview cannot be created or cleaned up."""
+
+
+@dataclass(frozen=True)
+class PlanPreviewResult:
+    id: str
+    url: str
+    root: Path
+    pid: int
+    ttl: float
+    expires_at: str
+    stop_command: str
+    process: subprocess.Popen[bytes] | None = None
+    cleanup_process: subprocess.Popen[bytes] | None = None
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "status": "running",
+            "ephemeral": True,
+            "id": self.id,
+            "url": self.url,
+            "root": str(self.root),
+            "pid": self.pid,
+            "ttl": self.ttl,
+            "expires_at": self.expires_at,
+            "stop_command": self.stop_command,
+        }
+
+
+def read_payload(source: str | None) -> dict[str, Any]:
+    if source in (None, "-"):
+        raw = sys.stdin.buffer.read(MAX_PAYLOAD_BYTES + 1)
+    else:
+        path = Path(source)
+        raw = path.read_bytes()
+    if len(raw) > MAX_PAYLOAD_BYTES:
+        raise PlanPreviewError("plan preview payload exceeds 512 KiB")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise PlanPreviewError(f"plan preview payload is invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise PlanPreviewError("plan preview payload must be a JSON object")
+    _reject_remote_assets(payload)
+    return payload
+
+
+def create_plan_preview(
+    payload: dict[str, Any],
+    ttl: float = DEFAULT_TTL_SECONDS,
+    mode: PreviewMode = "auto",
+    preview_starter: Any = start_preview,
+    cleanup_starter: Any = None,
+) -> PlanPreviewResult:
+    if ttl <= 0:
+        raise PlanPreviewError("ttl must be positive")
+    if cleanup_starter is None:
+        cleanup_starter = _start_cleanup_watcher
+    preview_id = uuid.uuid4().hex[:12]
+    root = Path(tempfile.mkdtemp(prefix=ROOT_PREFIX)).resolve()
+    _assert_plan_preview_root(root)
+    (root / MARKER_FILE).write_text(
+        json.dumps({"id": preview_id, "created_at": _now_iso()}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    model = build_plan_preview_model(payload, preview_id)
+    model_path = root / "document-model.json"
+    model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    render_bundle(model_path, root)
+    session = preview_starter(root, mode, idle_timeout=ttl)
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
+    cleanup_process = cleanup_starter(root, session.pid, ttl)
+    return PlanPreviewResult(
+        id=preview_id,
+        url=session.url,
+        root=root,
+        pid=session.pid,
+        ttl=ttl,
+        expires_at=expires_at,
+        stop_command=(
+            "python3 -m scripts.html_review_workbench.cli plan-preview-stop "
+            f"--root {root} --pid {session.pid}"
+        ),
+        process=session.process,
+        cleanup_process=cleanup_process,
+    )
+
+
+def build_plan_preview_model(payload: dict[str, Any], preview_id: str) -> dict[str, Any]:
+    title = _string(payload.get("title"), "Plan Preview")
+    summary = _string(payload.get("summary"), "Graphical preview of the proposed plan.")
+    blocks: list[dict[str, Any]] = [
+        {
+            "id": "plan-summary",
+            "type": "html",
+            "heading_level": 2,
+            "title": "Summary",
+            "content": _paragraph(summary),
+            "review_required": True,
+        }
+    ]
+
+    phase_items = _items(payload.get("phases"))
+    if phase_items:
+        blocks.append(_list_block("plan-phases", "Plan Phases", phase_items))
+
+    key_changes = _items(payload.get("key_changes")) or _section_items(payload.get("sections"))
+    if key_changes:
+        blocks.append(_list_block("key-changes", "Key Changes", key_changes))
+
+    flow = _flow(payload.get("flow"))
+    if flow:
+        blocks.append(
+            {
+                "id": "plan-flow",
+                "type": "diagram",
+                "heading_level": 2,
+                "title": "Plan Flow",
+                "content": _flow_to_mermaid(flow),
+                "review_required": True,
+            }
+        )
+
+    tests = _items(payload.get("test_plan") or payload.get("tests"))
+    if tests:
+        blocks.append(_list_block("test-plan", "Test Plan", tests))
+
+    assumptions = _items(payload.get("assumptions"))
+    if assumptions:
+        blocks.append(_list_block("assumptions", "Assumptions", assumptions))
+
+    return {
+        "schema_version": "1.0",
+        "document_id": f"plan-preview-{preview_id}",
+        "title": title,
+        "generated_at": _now_iso(),
+        "summary": summary,
+        "metadata": {
+            "status": "draft",
+            "status_label": "Plan preview",
+            "eyebrow": "RHW Plan Preview",
+            "lang": "ja",
+        },
+        "blocks": blocks,
+    }
+
+
+def stop_plan_preview(
+    root: Path,
+    pid: int | None = None,
+    process: subprocess.Popen[bytes] | None = None,
+    cleanup_process: subprocess.Popen[bytes] | None = None,
+) -> dict[str, object]:
+    root = root.resolve()
+    _assert_plan_preview_root(root)
+    stopped = False
+    if pid is not None and _pid_is_alive(pid):
+        try:
+            os.kill(pid, signal.SIGTERM)
+            stopped = True
+        except PermissionError as exc:
+            raise PlanPreviewError(f"cannot stop plan preview pid {pid}: {exc}") from exc
+    if process is not None:
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.kill(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+    if cleanup_process is not None and cleanup_process.poll() is None:
+        try:
+            os.kill(cleanup_process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        cleanup_process.wait(timeout=5)
+    _cleanup_root(root)
+    return {"status": "stopped", "root": str(root), "pid": pid, "process_signalled": stopped}
+
+
+def _list_block(block_id: str, title: str, items: list[str]) -> dict[str, Any]:
+    content = "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
+    return {
+        "id": block_id,
+        "type": "html",
+        "heading_level": 2,
+        "title": title,
+        "content": content,
+        "review_required": True,
+    }
+
+
+def _paragraph(text: str) -> str:
+    return f"<p>{escape(text)}</p>"
+
+
+def _items(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    items: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            items.append(item)
+        elif isinstance(item, dict):
+            title = _string(item.get("title") or item.get("step") or item.get("name"), "")
+            detail = _string(item.get("detail") or item.get("description"), "")
+            if title and detail:
+                items.append(f"{title}: {detail}")
+            elif title:
+                items.append(title)
+    return items
+
+
+def _section_items(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    items: list[str] = []
+    for section in value:
+        if not isinstance(section, dict):
+            continue
+        title = _string(section.get("title"), "Section")
+        for item in _items(section.get("items")):
+            items.append(f"{title}: {item}")
+    return items
+
+
+def _flow(value: object) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    flow: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        source = _string(item.get("from"), "")
+        target = _string(item.get("to"), "")
+        if not source or not target:
+            continue
+        flow.append({"from": source, "to": target, "label": _string(item.get("label"), "")})
+    return flow
+
+
+def _flow_to_mermaid(flow: list[dict[str, str]]) -> str:
+    labels: dict[str, str] = {}
+    lines = ["flowchart TD"]
+    for edge in flow:
+        for label in [edge["from"], edge["to"]]:
+            labels.setdefault(label, f"n{len(labels) + 1}")
+    for label, node_id in labels.items():
+        lines.append(f'  {node_id}["{_mermaid_label(label)}"]')
+    for edge in flow:
+        source = labels[edge["from"]]
+        target = labels[edge["to"]]
+        label = edge.get("label") or ""
+        if label:
+            lines.append(f'  {source} -->|{_mermaid_label(label)}| {target}')
+        else:
+            lines.append(f"  {source} --> {target}")
+    return "\n".join(lines)
+
+
+def _string(value: object, default: str) -> str:
+    return value if isinstance(value, str) and value.strip() else default
+
+
+def _mermaid_label(value: str) -> str:
+    return value.replace('"', "'").replace("[", "(").replace("]", ")").replace("\n", " ")
+
+
+def _reject_remote_assets(payload: dict[str, Any]) -> None:
+    for key in ("assets", "images", "remote_assets", "remote_asset_urls"):
+        if key in payload:
+            raise PlanPreviewError(f"plan preview payload must not include {key}")
+
+
+def _assert_plan_preview_root(root: Path) -> None:
+    resolved = root.resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    if temp_root not in resolved.parents:
+        raise PlanPreviewError("plan preview root must be under the system temp directory")
+    if not resolved.name.startswith(ROOT_PREFIX):
+        raise PlanPreviewError(f"plan preview root must start with {ROOT_PREFIX}")
+    if not (resolved / MARKER_FILE).exists() and resolved.exists():
+        # Creation path calls this before writing the marker.
+        if any(resolved.iterdir()):
+            raise PlanPreviewError("plan preview root is missing marker")
+
+
+def _cleanup_root(root: Path) -> None:
+    _assert_plan_preview_root(root)
+    if not (root / MARKER_FILE).exists():
+        raise PlanPreviewError("refusing to clean unmarked plan preview root")
+    shutil.rmtree(root)
+
+
+def _start_cleanup_watcher(root: Path, pid: int, ttl: float) -> subprocess.Popen[bytes]:
+    code = (
+        "import os, signal, shutil, sys, time\n"
+        "pid=int(sys.argv[1]); root=sys.argv[2]; ttl=float(sys.argv[3])\n"
+        "time.sleep(ttl)\n"
+        "try:\n"
+        "    os.kill(pid, signal.SIGTERM)\n"
+        "except ProcessLookupError:\n"
+        "    pass\n"
+        "except PermissionError:\n"
+        "    pass\n"
+        "marker=os.path.join(root, '.rhw-plan-preview')\n"
+        "if os.path.basename(root).startswith('rhw-plan-preview-') and os.path.exists(marker):\n"
+        "    shutil.rmtree(root, ignore_errors=True)\n"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", code, str(pid), str(root), str(ttl)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    _CLEANUP_WATCHERS.append(process)
+    return process
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()

@@ -46,6 +46,32 @@ codex plugin marketplace upgrade reviewable-html-workbench-local
 
 `upgrade` は登録済み marketplace cache を更新する操作なので、作業 agent が実行する場合はユーザー承認を取る。
 
+## dev mode
+
+ローカル開発中に package cache へ毎回 copy し直さず、現在の checkout を plugin 読み込み元にしたい場合は
+`bin/plugin-dev-switch.sh` を使う。
+
+```bash
+# Claude / Codex のインストール済み cache をまとめて確認
+bin/plugin-dev-switch.sh status
+
+# Claude / Codex のインストール済み cache をまとめて dev に切り替える
+bin/plugin-dev-switch.sh dev
+
+# Claude / Codex のインストール済み cache をまとめて package copy に戻す
+bin/plugin-dev-switch.sh package
+```
+
+`dev` は Claude 側の `~/.claude/plugins/cache/...` をこの repo への symlink に差し替える。
+Codex 側は先に `codex plugin add reviewable-html-workbench@reviewable-html-workbench-local --json` で
+installed state を作り、その後
+`~/.codex/plugins/cache/reviewable-html-workbench-local/reviewable-html-workbench/<version>` は
+実ディレクトリのまま保持し、その中の `.codex-plugin`、`skills`、`scripts`、`templates` などを
+この repo への symlink に差し替える。Codex は version ディレクトリ自体が symlink だと
+installed 判定から外すため、この形にする。これにより、version bump や marketplace upgrade を待たずに
+次の agent セッションの skill discovery が checkout 上の `skills/` と manifest を読む。
+既存セッションに読み込み済みの skill 一覧は動的更新されないため、切り替え後は新しいセッションで確認する。
+
 ## base repo との境界
 
 - plugin repo: skill本文、`agents/openai.yaml`、HTML生成/preview/review取り込み script、fixture test を管理する。

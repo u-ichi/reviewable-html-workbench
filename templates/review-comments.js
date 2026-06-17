@@ -33,6 +33,10 @@
       publishExit: "編集に戻る",
       publishExitLabel: "公開プレビュー",
       publishToast: "公開用HTMLを書き出しました",
+      agentReplied: "エージェントが返信しました",
+      docUpdated: "ドキュメントが更新されました。リロードして最新版を確認できます",
+      reloadBtn: "リロード",
+      closeBtn: "閉じる",
     },
     en: {
       cardState: { open: "Open", reply: "Has reply", resolved: "Resolved" },
@@ -65,6 +69,10 @@
       publishExit: "Back to edit",
       publishExitLabel: "Published preview",
       publishToast: "Published HTML exported",
+      agentReplied: "Agent replied",
+      docUpdated: "Document has been updated. Reload to see the latest version.",
+      reloadBtn: "Reload",
+      closeBtn: "Close",
     },
   });
 
@@ -132,7 +140,10 @@
   ui.exportButton.addEventListener("click", exportComments);
   ui.importInput.addEventListener("change", importComments);
 
-  loadComments().then(schedulePositionCards);
+  loadComments().then(function () {
+    schedulePositionCards();
+    initEventSource();
+  });
 
   function createUi() {
     const root = document.createElement("div");
@@ -1589,5 +1600,120 @@
     } catch (_error) {
       // localStorage can be disabled in strict browser modes; comments still render.
     }
+  }
+
+  function initEventSource() {
+    if (typeof EventSource === "undefined") {
+      return;
+    }
+    var es = new EventSource("/events");
+    es.addEventListener("comment_updated", function (event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.source === "browser") {
+          return;
+        }
+      } catch (_error) {
+        // continue with refresh
+      }
+      fetchAndMergeComments();
+    });
+    es.addEventListener("document_updated", function (event) {
+      var message = t.docUpdated;
+      try {
+        var data = JSON.parse(event.data);
+        if (data.message) {
+          message = data.message;
+        }
+      } catch (_error) {
+        // use default message
+      }
+      showUpdateBanner(message);
+    });
+    es.addEventListener("error", function () {
+      // EventSource auto-reconnects; no action needed
+    });
+  }
+
+  async function fetchAndMergeComments() {
+    try {
+      var response = await fetch(COMMENTS_URL, { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+      var payload = normalizeComments(await response.json());
+      mergeRemoteComments(payload);
+    } catch (_error) {
+      // fetch failed; skip this update
+    }
+  }
+
+  function mergeRemoteComments(newPayload) {
+    var oldThreads = state.comments.comments;
+    var newThreads = newPayload.comments;
+    var oldMap = {};
+    oldThreads.forEach(function (thread) { oldMap[thread.id] = thread; });
+    var hasNewAgentReply = false;
+    var changed = false;
+
+    newThreads.forEach(function (newThread) {
+      var old = oldMap[newThread.id];
+      if (!old) {
+        state.comments.comments.push(newThread);
+        hasNewAgentReply = true;
+        changed = true;
+        return;
+      }
+      var oldReplyCount = (old.replies || []).length;
+      var newReplyCount = (newThread.replies || []).length;
+      if (newReplyCount > oldReplyCount) {
+        var addedReplies = newThread.replies.slice(oldReplyCount);
+        old.replies = newThread.replies;
+        var hasAgent = addedReplies.some(function (r) { return r.role === "agent"; });
+        if (hasAgent) {
+          hasNewAgentReply = true;
+        }
+        changed = true;
+      }
+      if (old.status !== newThread.status) {
+        old.status = newThread.status;
+        changed = true;
+      }
+    });
+
+    if (!changed) {
+      return;
+    }
+    writeLocalComments();
+    renderComments();
+    if (hasNewAgentReply) {
+      toast(t.agentReplied);
+    }
+  }
+
+  function showUpdateBanner(message) {
+    var existing = document.getElementById("reviewUpdateBanner");
+    if (existing) {
+      existing.remove();
+    }
+    var banner = document.createElement("div");
+    banner.id = "reviewUpdateBanner";
+    banner.className = "review-update-banner";
+    banner.innerHTML = [
+      '<svg class="rub-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>',
+      '<span class="rub-message">' + escapeHtml(message) + '</span>',
+      '<button type="button" class="rub-reload">' + escapeHtml(t.reloadBtn) + '</button>',
+      '<button type="button" class="rub-close" aria-label="close">×</button>',
+    ].join("");
+    document.body.appendChild(banner);
+    banner.querySelector(".rub-reload").addEventListener("click", function () {
+      window.location.reload();
+    });
+    banner.querySelector(".rub-close").addEventListener("click", function () {
+      banner.remove();
+    });
+    window.requestAnimationFrame(function () {
+      banner.classList.add("show");
+    });
   }
 })();

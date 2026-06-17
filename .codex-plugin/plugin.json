@@ -1,6 +1,6 @@
 {
   "name": "reviewable-html-workbench",
-  "version": "1.7.1",
+  "version": "1.9.0",
   "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
   "author": {
     "name": "u1",
@@ -31,7 +31,9 @@
     "defaultPrompt": [
       "設計資料をレビュー可能なHTMLで作って",
       "HTMLレビューコメントを確認して反映して",
-      "図示つきHTMLレポートを生成して"
+      "図示つきHTMLレポートを生成して",
+      "planをグラフィカルに確認したい",
+      "この計画をHTMLでプレビューして"
     ],
     "brandColor": "#2563EB"
   }

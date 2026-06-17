@@ -25,7 +25,8 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 8. `render` CLIでHTML bundleを生成する。
 9. `validate` CLIでHTML bundleを検証する。
 10. ユーザー向け最終HTMLでは既定で `preview` CLIを `--mode auto` で起動し、返却JSONの `url` と `stop_command` を最終応答に必ず書く。
-11. ユーザーがコメントを入れたら「レビューコメントへの対応」セクションに従う。
+11. preview 起動直後に、Monitor ツールで `watch-comments` を開始する。これによりブラウザからのコメントを自動検知できるようになる。Monitor 起動コマンド: `python3 -m scripts.html_review_workbench.cli watch-comments --root <output-dir>`。イベント受信後の処理は「コメント自動回答と解決待ちゲート」セクションに従う。
+12. ユーザーがコメントを入れたら「レビューコメントへの対応」セクションに従う。
 
 ## 設計資料モデル作成の規約
 
@@ -61,6 +62,65 @@ IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で 
 - ユーザーはブラウザ上でコメントと回答をセットで読む。チャットに書いた回答は、コメントの文脈から切り離される。
 - 複数コメントがある場合、チャットでは各コメントへの回答の対応関係が崩れる。
 - HTML 上の回答はコメントスレッドに紐づいて永続化される。チャットの回答はセッション終了で消える。
+
+## コメント自動回答と解決待ちゲート
+
+preview server 起動後に必ず実行する。手順 11 で Monitor ツールによる `watch-comments` を起動し、以下のフローでコメントの自動検知・回答・解決待ちを行う。
+
+### watch-comments の起動
+
+preview server 起動後、以下で SSE イベント監視を開始する。
+
+```bash
+python3 -m scripts.html_review_workbench.cli watch-comments \
+  --root <output-dir>
+```
+
+agent は Monitor ツールでこのプロセスの stdout を監視する。各行は 1 行 JSON のイベント。
+
+### 自動回答フロー
+
+`watch-comments` から `comment_updated` イベントを受信したら:
+
+1. `ingest-review --root <dir>` でコメントを分類する。
+2. `needs_clarification` コメントについて、`comment` と `selected_text` を読み、設計資料の文脈を踏まえて実質的な回答を作成する。
+3. `add-reply --root <dir> --thread-id <id> --body "<reply>"` で HTML コメントスレッドに書き戻す。
+4. 回答本文をコンソール（会話）にも出力する。ユーザーはブラウザとコンソールの両方で回答を確認できる。
+5. `actionable` コメントにはまだ設計変更を適用しない。回答で受領を伝え、スレッド解決後に反映する旨を書く。
+
+### 解決待ちゲート
+
+IMPORTANT: 未解決の `needs_clarification` スレッドがある間は、設計反映（ドキュメント修正）に進まない。
+
+修正判断の前に以下でゲートを確認する:
+
+```bash
+python3 -m scripts.html_review_workbench.cli check-gates \
+  --root <output-dir>
+```
+
+- `{"gate": "blocked", ...}` → 設計修正を行わない。コメントへの回答に専念する。
+- `{"gate": "open", "resolved_actionable": [...]}` → 解決済みの actionable スレッド内容を document model に反映してよい。
+
+### スレッド解決時の反映フロー
+
+ユーザーがスレッドを「解決」した `comment_updated` イベントを受信したら:
+
+1. `check-gates` でゲートが `open` であることを確認する。
+2. `resolved_actionable` の各スレッドについて、スレッド全体の議論を読み、修正が必要か判断する。
+3. 必要な修正を document model に適用する。
+4. `render` CLI で再生成する。
+5. `notify-update --root <dir> --message "コメント反映済み"` でブラウザに更新通知を送る。
+
+### 修正完了のブラウザ通知
+
+`notify-update` を実行すると、preview server 経由でブラウザに SSE イベントが送られ、画面上部にバナーが表示される。ユーザーは自分のタイミングでリロードして確認できる。自動リロードはしない。
+
+```bash
+python3 -m scripts.html_review_workbench.cli notify-update \
+  --root <output-dir> \
+  --message "コメント反映済み。リロードして確認してください"
+```
 
 ## CodexでのCLI呼び出し
 
@@ -128,6 +188,28 @@ python3 -m scripts.html_review_workbench.cli ingest-review \
   --root <output-dir> \
   --model <document-model.json> \
   --apply-model
+```
+
+解決待ちゲートの確認:
+
+```bash
+python3 -m scripts.html_review_workbench.cli check-gates \
+  --root <output-dir>
+```
+
+コメント変更の SSE 監視（Monitor ツールで stdout を監視する）:
+
+```bash
+python3 -m scripts.html_review_workbench.cli watch-comments \
+  --root <output-dir>
+```
+
+ドキュメント更新通知をブラウザへ送信:
+
+```bash
+python3 -m scripts.html_review_workbench.cli notify-update \
+  --root <output-dir> \
+  --message "コメント反映済み"
 ```
 
 ## 完了時の確認

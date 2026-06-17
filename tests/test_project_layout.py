@@ -62,7 +62,7 @@ class ProjectLayoutTest(unittest.TestCase):
         self.assertIn("Write", interface["capabilities"])
 
     def test_required_skills_exist(self) -> None:
-        for skill in ["visual-html-renderer", "reviewable-design-doc"]:
+        for skill in ["visual-html-renderer", "reviewable-design-doc", "plan-preview"]:
             path = ROOT / "skills" / skill / "SKILL.md"
             self.assertTrue(path.exists(), skill)
             text = path.read_text(encoding="utf-8")
@@ -93,9 +93,14 @@ class ProjectLayoutTest(unittest.TestCase):
                 "render",
                 "check-model",
                 "preview",
+                "plan-preview",
+                "plan-preview-stop",
                 "ingest-review",
                 "add-reply",
                 "validate",
+                "check-gates",
+                "watch-comments",
+                "notify-update",
             },
         )
         self.assertEqual(cli.COMMAND_CONTRACT["build-model"]["required_options"], ("--output",))
@@ -103,9 +108,15 @@ class ProjectLayoutTest(unittest.TestCase):
         self.assertEqual(cli.COMMAND_CONTRACT["render"]["required_options"], ("--model", "--output"))
         self.assertEqual(cli.COMMAND_CONTRACT["check-model"]["required_options"], ("--model",))
         self.assertEqual(cli.COMMAND_CONTRACT["preview"]["required_options"], ("--root",))
+        self.assertEqual(cli.COMMAND_CONTRACT["plan-preview"]["required_options"], ())
+        self.assertEqual(cli.COMMAND_CONTRACT["plan-preview"]["optional_options"], ("--payload", "--ttl", "--mode"))
+        self.assertEqual(cli.COMMAND_CONTRACT["plan-preview-stop"]["required_options"], ("--root",))
         self.assertEqual(cli.COMMAND_CONTRACT["ingest-review"]["required_options"], ("--root",))
         self.assertEqual(cli.COMMAND_CONTRACT["add-reply"]["required_options"], ("--root", "--thread-id", "--body"))
         self.assertEqual(cli.COMMAND_CONTRACT["validate"]["required_options"], ("--root",))
+        self.assertEqual(cli.COMMAND_CONTRACT["check-gates"]["required_options"], ("--root",))
+        self.assertEqual(cli.COMMAND_CONTRACT["watch-comments"]["required_options"], ("--root",))
+        self.assertEqual(cli.COMMAND_CONTRACT["notify-update"]["required_options"], ("--root",))
 
         help_text = cli.build_parser().format_help()
         for command in cli.COMMAND_CONTRACT:

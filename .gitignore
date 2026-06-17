@@ -27,5 +27,6 @@ __pycache__/
 
 # Generated artifacts
 output/
+tmp/
 .codegraph/
 docs/goals/*/.goalbuddy-board/

@@ -1,0 +1,13 @@
+display_name: Plan Preview
+short_description: Plan Mode の計画を一時HTML previewで視覚確認する。
+default_prompt: planをグラフィカルに確認したい
+trigger_examples:
+  - planをグラフィカルに見たい
+  - planを図で確認したい
+  - proposed_planをプレビューして
+  - 計画URLを入れて
+  - graphical plan review
+entrypoint: python3 -m scripts.html_review_workbench.cli
+working_directory: plugin_root
+workflow:
+  - plan-preview

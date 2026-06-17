@@ -236,6 +236,44 @@ class PreviewServerTest(unittest.TestCase):
 
                 written = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
                 self.assertEqual(written["comments"][0]["id"], "cmt-1")
+
+                event = _read_sse_event(session.url.replace("/index.html", "/events"))
+                self.assertEqual(event["event"], "comment_updated")
+                self.assertEqual(event["data"]["source"], "browser")
+            finally:
+                self.assertIsNotNone(session.process)
+                session.process.terminate()
+                session.process.wait(timeout=5)
+
+    def test_preview_server_posts_custom_events_to_sse(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+
+            session = start_preview(root, "local", owner_pid=os.getpid(), idle_timeout=0)
+            try:
+                events_url = session.url.replace("/index.html", "/events")
+                request = urllib.request.Request(
+                    events_url,
+                    data=json.dumps(
+                        {
+                            "type": "document_updated",
+                            "message": "Rendered new document model.",
+                            "source": "agent",
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                    result = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(result["event_type"], "document_updated")
+
+                event = _read_sse_event(events_url)
+                self.assertEqual(event["event"], "document_updated")
+                self.assertEqual(event["data"]["source"], "agent")
+                self.assertEqual(event["data"]["message"], "Rendered new document model.")
             finally:
                 self.assertIsNotNone(session.process)
                 session.process.terminate()
@@ -277,6 +315,24 @@ class PreviewServerTest(unittest.TestCase):
 def _read_json_url(url: str) -> object:
     with urllib.request.urlopen(url, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def _read_sse_event(url: str) -> dict[str, object]:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        event: dict[str, object] = {}
+        data = ""
+        while True:
+            line = response.readline().decode("utf-8").strip()
+            if line == "":
+                break
+            if line.startswith("id: "):
+                event["id"] = line[4:]
+            elif line.startswith("event: "):
+                event["event"] = line[7:]
+            elif line.startswith("data: "):
+                data = line[6:]
+        event["data"] = json.loads(data)
+        return event
 
 
 if __name__ == "__main__":

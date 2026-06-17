@@ -16,8 +16,15 @@ from scripts.html_review_workbench.image_assets import ImageAssetError, attach_i
 from scripts.html_review_workbench.ingest_review import ReviewIngestionError, ingest_review as run_ingest_review
 from scripts.html_review_workbench.model_builder import ModelBuildError, build_model_from_source
 from scripts.html_review_workbench.model_quality import check_model_quality
+from scripts.html_review_workbench.plan_preview import (
+    PlanPreviewError,
+    create_plan_preview,
+    read_payload as read_plan_preview_payload,
+    stop_plan_preview,
+)
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
+from scripts.html_review_workbench.resolution_gate import check_gate as run_check_gate
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
@@ -45,6 +52,16 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "required_options": ("--root",),
         "optional_options": ("--mode", "--owner-session", "--owner-pid", "--idle-timeout", "--owner-grace"),
     },
+    "plan-preview": {
+        "purpose": "Create an ephemeral localhost preview for a proposed plan.",
+        "required_options": (),
+        "optional_options": ("--payload", "--ttl", "--mode"),
+    },
+    "plan-preview-stop": {
+        "purpose": "Stop and clean up an ephemeral plan preview.",
+        "required_options": ("--root",),
+        "optional_options": ("--pid",),
+    },
     "ingest-review": {
         "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
         "required_options": ("--root",),
@@ -58,6 +75,21 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "purpose": "Add an agent reply to a comment thread in comments.json.",
         "required_options": ("--root", "--thread-id", "--body"),
         "optional_options": ("--comments", "--kind", "--author"),
+    },
+    "check-gates": {
+        "purpose": "Check whether the resolution gate is open or blocked by unresolved clarification threads.",
+        "required_options": ("--root",),
+        "optional_options": ("--comments", "--state"),
+    },
+    "watch-comments": {
+        "purpose": "Stream comment change events from a running preview server via SSE.",
+        "required_options": ("--root",),
+        "optional_options": ("--url",),
+    },
+    "notify-update": {
+        "purpose": "Notify the preview server that the document has been updated.",
+        "required_options": ("--root",),
+        "optional_options": ("--url", "--message"),
     },
 }
 
@@ -140,6 +172,27 @@ def preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def plan_preview(args: argparse.Namespace) -> int:
+    try:
+        payload = read_plan_preview_payload(args.payload)
+        result = create_plan_preview(payload, ttl=args.ttl, mode=args.mode)
+    except (OSError, PreviewConfigurationError, PlanPreviewError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(json.dumps(result.to_payload(), ensure_ascii=False))
+    return 0
+
+
+def plan_preview_stop(args: argparse.Namespace) -> int:
+    try:
+        result = stop_plan_preview(Path(args.root), pid=args.pid)
+    except (OSError, PlanPreviewError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc), "root": args.root}, ensure_ascii=False))
+        return 2
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
 def ingest_review(args: argparse.Namespace) -> int:
     try:
         result = run_ingest_review(
@@ -163,8 +216,9 @@ def validate(args: argparse.Namespace) -> int:
 
 
 def add_reply(args: argparse.Namespace) -> int:
+    root = Path(args.root)
     try:
-        store = CommentStore(Path(args.root), args.comments)
+        store = CommentStore(root, args.comments)
         payload = store.read("document")
         document_id = payload["document_id"]
         reply = store.add_reply(
@@ -178,6 +232,7 @@ def add_reply(args: argparse.Namespace) -> int:
     except CommentStoreError as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         return 2
+    _publish_comment_updated(root, args.thread_id)
     print(
         json.dumps(
             {
@@ -190,6 +245,66 @@ def add_reply(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _publish_comment_updated(root: Path, thread_id: str) -> None:
+    """Notify an active preview session that comments changed."""
+    from scripts.html_review_workbench.preview_server import find_active_session
+    from scripts.html_review_workbench.watch_comments import post_event
+
+    session = find_active_session(root.resolve())
+    if session is None:
+        return
+    bind = session.get("bind")
+    port = session.get("port")
+    if not isinstance(bind, str) or not isinstance(port, int):
+        return
+    try:
+        post_event(
+            f"http://{bind}:{port}",
+            "comment_updated",
+            {"source": "agent", "thread_id": thread_id},
+        )
+    except (ConnectionRefusedError, ConnectionResetError, OSError, ValueError, json.JSONDecodeError):
+        return
+
+
+def check_gates(args: argparse.Namespace) -> int:
+    result = run_check_gate(
+        Path(args.root),
+        comments_path=args.comments,
+        state_path=args.state,
+    )
+    print(json.dumps(result.to_payload(), ensure_ascii=False))
+    return 0
+
+
+def watch_comments(args: argparse.Namespace) -> int:
+    from scripts.html_review_workbench.watch_comments import run_watch
+    from scripts.html_review_workbench.preview_server import find_active_session
+    root = Path(args.root).resolve()
+    url = args.url
+    if not url:
+        session = find_active_session(root)
+        if session is None:
+            print(json.dumps({"status": "failed", "error": "no active preview session found"}, ensure_ascii=False))
+            return 2
+        url = f"http://{session['bind']}:{session['port']}"
+    return run_watch(url)
+
+
+def notify_update(args: argparse.Namespace) -> int:
+    from scripts.html_review_workbench.watch_comments import send_notify
+    from scripts.html_review_workbench.preview_server import find_active_session
+    root = Path(args.root).resolve()
+    url = args.url
+    if not url:
+        session = find_active_session(root)
+        if session is None:
+            print(json.dumps({"status": "failed", "error": "no active preview session found"}, ensure_ascii=False))
+            return 2
+        url = f"http://{session['bind']}:{session['port']}"
+    return send_notify(url, message=args.message)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -249,6 +364,25 @@ def build_parser() -> argparse.ArgumentParser:
     preview_parser.add_argument("--owner-grace", type=float, default=300.0)
     preview_parser.set_defaults(func=preview)
 
+    plan_preview_parser = subparsers.add_parser(
+        "plan-preview",
+        help=str(COMMAND_CONTRACT["plan-preview"]["purpose"]),
+        description=str(COMMAND_CONTRACT["plan-preview"]["purpose"]),
+    )
+    plan_preview_parser.add_argument("--payload", default="-")
+    plan_preview_parser.add_argument("--ttl", type=float, default=1800.0)
+    plan_preview_parser.add_argument("--mode", choices=["auto", "tailscale", "local"], default="auto")
+    plan_preview_parser.set_defaults(func=plan_preview)
+
+    plan_preview_stop_parser = subparsers.add_parser(
+        "plan-preview-stop",
+        help=str(COMMAND_CONTRACT["plan-preview-stop"]["purpose"]),
+        description=str(COMMAND_CONTRACT["plan-preview-stop"]["purpose"]),
+    )
+    plan_preview_stop_parser.add_argument("--root", required=True)
+    plan_preview_stop_parser.add_argument("--pid", type=int)
+    plan_preview_stop_parser.set_defaults(func=plan_preview_stop)
+
     ingest_parser = subparsers.add_parser(
         "ingest-review",
         help=str(COMMAND_CONTRACT["ingest-review"]["purpose"]),
@@ -281,6 +415,35 @@ def build_parser() -> argparse.ArgumentParser:
     add_reply_parser.add_argument("--kind", default="answer")
     add_reply_parser.add_argument("--author", default="agent")
     add_reply_parser.set_defaults(func=add_reply)
+
+    check_gates_parser = subparsers.add_parser(
+        "check-gates",
+        help=str(COMMAND_CONTRACT["check-gates"]["purpose"]),
+        description=str(COMMAND_CONTRACT["check-gates"]["purpose"]),
+    )
+    check_gates_parser.add_argument("--root", required=True)
+    check_gates_parser.add_argument("--comments", default="annotations/comments.json")
+    check_gates_parser.add_argument("--state", default="annotations/review-cycle-state.json")
+    check_gates_parser.set_defaults(func=check_gates)
+
+    watch_comments_parser = subparsers.add_parser(
+        "watch-comments",
+        help=str(COMMAND_CONTRACT["watch-comments"]["purpose"]),
+        description=str(COMMAND_CONTRACT["watch-comments"]["purpose"]),
+    )
+    watch_comments_parser.add_argument("--root", required=True)
+    watch_comments_parser.add_argument("--url")
+    watch_comments_parser.set_defaults(func=watch_comments)
+
+    notify_update_parser = subparsers.add_parser(
+        "notify-update",
+        help=str(COMMAND_CONTRACT["notify-update"]["purpose"]),
+        description=str(COMMAND_CONTRACT["notify-update"]["purpose"]),
+    )
+    notify_update_parser.add_argument("--root", required=True)
+    notify_update_parser.add_argument("--url")
+    notify_update_parser.add_argument("--message", default="")
+    notify_update_parser.set_defaults(func=notify_update)
 
     return parser
 

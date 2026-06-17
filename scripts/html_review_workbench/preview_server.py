@@ -22,6 +22,7 @@ from typing import Callable, Literal
 from urllib.parse import urlparse
 
 from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError, empty_comments
+from scripts.html_review_workbench.event_bus import EventBus, format_sse
 from scripts.html_review_workbench.preview_host_resolve import detect_tailscale_ipv4
 
 
@@ -221,6 +222,7 @@ def _validate_bind(bind: str) -> str:
 
 class ReviewPreviewHandler(SimpleHTTPRequestHandler):
     comments_route = "/annotations/comments.json"
+    events_route = "/events"
     _last_activity: float = 0.0
     _lock = threading.Lock()
 
@@ -236,21 +238,24 @@ class ReviewPreviewHandler(SimpleHTTPRequestHandler):
                 return 0.0
             return time.monotonic() - cls._last_activity
 
-    def __init__(self, *args: object, root: Path, **kwargs: object) -> None:
+    def __init__(self, *args: object, root: Path, event_bus: EventBus, **kwargs: object) -> None:
         self.root = root.resolve()
         self.store = CommentStore(self.root)
+        self.event_bus = event_bus
         super().__init__(*args, directory=str(self.root), **kwargs)
 
     def end_headers(self) -> None:
-        # Live review server: never let the browser serve a stale index.html/assets/comments
-        # from cache (otherwise re-rendered content / new comments don't show on reload).
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_GET(self) -> None:
         self.touch_activity()
-        if self._path() == self.comments_route:
+        path = self._path()
+        if path == self.comments_route:
             self._send_json(self.store.read(self._document_id()))
+            return
+        if path == self.events_route:
+            self._handle_sse()
             return
         super().do_GET()
 
@@ -265,7 +270,45 @@ class ReviewPreviewHandler(SimpleHTTPRequestHandler):
         except (json.JSONDecodeError, CommentStoreError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
+        source = self.headers.get("X-Comment-Source", "browser")
+        self.event_bus.publish("comment_updated", {"source": source})
         self._send_json({"ok": True, "path": "annotations/comments.json"})
+
+    def do_POST(self) -> None:
+        self.touch_activity()
+        if self._path() != self.events_route:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            body = json.loads(self.rfile.read(_content_length(self)).decode("utf-8"))
+        except (json.JSONDecodeError, CommentStoreError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        event_type = body.get("type", "custom")
+        data = {k: v for k, v in body.items() if k != "type"}
+        self.event_bus.publish(event_type, data)
+        self._send_json({"ok": True, "event_type": event_type})
+
+    def _handle_sse(self) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        last_id_str = self.headers.get("Last-Event-ID", "0")
+        try:
+            last_id = int(last_id_str)
+        except ValueError:
+            last_id = 0
+
+        try:
+            for event in self.event_bus.subscribe(last_event_id=last_id):
+                self.wfile.write(format_sse(event))
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
 
     def _send_json(self, payload: dict[str, object], status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -304,8 +347,10 @@ def serve(
     if not root.is_dir():
         raise PreviewConfigurationError(f"preview root does not exist: {root}")
     handler_class = ReviewPreviewHandler
-    handler = partial(handler_class, root=root)
+    event_bus = EventBus()
+    handler = partial(handler_class, root=root, event_bus=event_bus)
     with ThreadingHTTPServer((bind, port), handler) as server:
+        server.event_bus = event_bus
         actual_port = server.server_address[1]
         sys.stdout.buffer.write(
             json.dumps({"ready": True, "port": actual_port}).encode() + b"\n"
@@ -399,6 +444,27 @@ def _pid_is_alive(pid: int) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def find_active_session(root: Path) -> dict[str, object] | None:
+    """Return the manifest of the most recently created running preview session under *root*, or None."""
+    annotations = root / "annotations"
+    if not annotations.is_dir():
+        return None
+    newest: dict[str, object] | None = None
+    newest_ts = ""
+    for manifest_path in annotations.glob("preview-session-*.json"):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        pid = manifest.get("pid")
+        if isinstance(pid, int) and _pid_is_alive(pid):
+            ts = str(manifest.get("created_at", ""))
+            if ts > newest_ts:
+                newest_ts = ts
+                newest = manifest
+    return newest
 
 
 def _build_parser() -> argparse.ArgumentParser:

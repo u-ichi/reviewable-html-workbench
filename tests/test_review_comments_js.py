@@ -111,6 +111,80 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('event.key === "Escape"', publish_block)
         self.assertIn("is-published", publish_block)
 
+    def test_sse_functions_exist(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        for function_name in [
+            "initEventSource",
+            "fetchAndMergeComments",
+            "mergeRemoteComments",
+            "showUpdateBanner",
+        ]:
+            self.assertIn(f"function {function_name}", script)
+
+    def test_sse_i18n_keys_exist(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        ja_block = script[script.index("ja: {") : script.index("},\n    en: {")]
+        en_block = script[script.index("en: {") : script.index("},\n  });")]
+
+        for key in ["agentReplied", "docUpdated", "reloadBtn", "closeBtn"]:
+            self.assertIn(f"{key}:", ja_block, f"Missing ja i18n key: {key}")
+            self.assertIn(f"{key}:", en_block, f"Missing en i18n key: {key}")
+
+    def test_event_source_initialized_after_load(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        load_block = script[script.index("loadComments().then") : script.index("function createUi")]
+
+        self.assertIn("loadComments().then(function ()", load_block)
+        self.assertIn("schedulePositionCards();", load_block)
+        self.assertIn("initEventSource();", script)
+
+    def test_event_source_opens_events_endpoint(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        init_block = script[script.index("function initEventSource()") : script.index("function fetchAndMergeComments")]
+
+        self.assertIn('if (typeof EventSource === "undefined")', init_block)
+        self.assertIn('var es = new EventSource("/events");', init_block)
+        self.assertIn('es.addEventListener("comment_updated"', init_block)
+        self.assertIn('es.addEventListener("document_updated"', init_block)
+
+    def test_comment_updated_refreshes_remote_comments_except_browser_source(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        init_block = script[script.index("function initEventSource()") : script.index("function fetchAndMergeComments")]
+        fetch_block = script[script.index("async function fetchAndMergeComments()") : script.index("function mergeRemoteComments")]
+
+        self.assertIn("var data = JSON.parse(event.data);", init_block)
+        self.assertIn('if (data.source === "browser")', init_block)
+        self.assertIn("return;", init_block)
+        self.assertIn("fetchAndMergeComments();", init_block)
+        self.assertIn('fetch(COMMENTS_URL, { cache: "no-store" })', fetch_block)
+        self.assertIn("mergeRemoteComments(payload);", fetch_block)
+
+    def test_remote_comment_merge_rerenders_counts_and_notifies_agent_replies(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        merge_block = script[script.index("function mergeRemoteComments") : script.index("function showUpdateBanner")]
+
+        self.assertIn("state.comments.comments.push(newThread);", merge_block)
+        self.assertIn("old.replies = newThread.replies;", merge_block)
+        self.assertIn("old.status = newThread.status;", merge_block)
+        self.assertIn("var hasAgent = addedReplies.some", merge_block)
+        self.assertIn("changed = true;", merge_block)
+        self.assertIn("renderComments();", merge_block)
+        self.assertIn("toast(t.agentReplied);", merge_block)
+        self.assertNotIn("updateCardStatus(old.id, newThread)", merge_block)
+
+    def test_document_updated_banner_requires_manual_reload(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        document_event_block = script[
+            script.index('es.addEventListener("document_updated"') : script.index('es.addEventListener("error"')
+        ]
+        banner_block = script[script.index("function showUpdateBanner") :]
+
+        self.assertIn("showUpdateBanner(message);", document_event_block)
+        self.assertNotIn("window.location.reload()", document_event_block)
+        self.assertIn('class="rub-reload"', banner_block)
+        self.assertIn('banner.querySelector(".rub-reload").addEventListener("click"', banner_block)
+        self.assertIn("window.location.reload();", banner_block)
+
 
 if __name__ == "__main__":
     unittest.main()

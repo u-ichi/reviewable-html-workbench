@@ -55,6 +55,7 @@ class CodexSkillIntegrationTest(unittest.TestCase):
     def test_openai_metadata_matches_skill_docs(self) -> None:
         visual = _read_simple_yaml(ROOT / "skills/visual-html-renderer/agents/openai.yaml")
         reviewable = _read_simple_yaml(ROOT / "skills/reviewable-design-doc/agents/openai.yaml")
+        plan_preview = _read_simple_yaml(ROOT / "skills/plan-preview/agents/openai.yaml")
 
         self.assertEqual(visual["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
         self.assertEqual(visual["working_directory"], "plugin_root")
@@ -68,6 +69,12 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertEqual(reviewable["working_directory"], "plugin_root")
         self.assertEqual(reviewable["workflow"], ["attach-image", "check-model", "render", "validate", "preview", "ingest-review"])
         self.assertIn("コメントを反映して", reviewable["trigger_examples"])
+
+        self.assertEqual(plan_preview["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
+        self.assertEqual(plan_preview["working_directory"], "plugin_root")
+        self.assertEqual(plan_preview["workflow"], ["plan-preview"])
+        self.assertIn("planをグラフィカルに見たい", plan_preview["trigger_examples"])
+        self.assertIn("graphical plan review", plan_preview["trigger_examples"])
 
     def test_visual_skill_handles_natural_html_output_request_without_model_argument(self) -> None:
         visual = (ROOT / "skills/visual-html-renderer/SKILL.md").read_text(encoding="utf-8")
@@ -95,6 +102,23 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("source-capture draft", reviewable)
         self.assertIn("返却JSONの `url`", reviewable)
         self.assertNotIn("--owner-pid $$", reviewable)
+
+    def test_plan_preview_skill_guides_plan_mode_without_user_cli(self) -> None:
+        plan_preview = (ROOT / "skills/plan-preview/SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("Plan Mode", plan_preview)
+        self.assertIn("`<proposed_plan>`", plan_preview)
+        self.assertIn("graphical plan review", plan_preview)
+        self.assertIn("python3 -m scripts.html_review_workbench.cli plan-preview", plan_preview)
+        self.assertIn("--mode auto", plan_preview)
+        self.assertIn("Tailscale IPv4 を検出できる場合は Tailscale URL を優先", plan_preview)
+        self.assertIn("HTML_REVIEW_WORKBENCH_TAILSCALE_IP", plan_preview)
+        self.assertIn("Plan preview: http://<tailscale-ip-or-127.0.0.1>:<port>/index.html", plan_preview)
+        self.assertIn("Plan preview: unavailable (<short reason>)", plan_preview)
+        self.assertIn("ユーザーに CLI を実行させない", plan_preview)
+        self.assertIn("正式な実装基準は `<proposed_plan>`", plan_preview)
+        self.assertIn("Plan Mode の前にhookを自動追加しない", plan_preview)
+        self.assertNotIn("Tailscale / 外部公開", plan_preview)
 
     def test_same_fixture_keeps_artifact_structure_across_skill_workflows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

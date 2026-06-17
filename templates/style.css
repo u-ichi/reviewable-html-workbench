@@ -1078,3 +1078,67 @@ textarea.cmt-input, input.cmt-input {
     margin: var(--sp-4);
   }
 }
+
+/* ---------- SSE UPDATE BANNER & ANIMATIONS --------------- */
+.review-update-banner {
+  position: fixed;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--open-bg);
+  color: var(--open);
+  border: 1px solid var(--open-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-3);
+  font: var(--fs-small)/1.4 var(--font-sans);
+  transition: transform .3s ease, opacity .3s ease;
+  opacity: 0;
+  max-width: min(480px, 90vw);
+}
+.review-update-banner.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.review-update-banner .rub-icon {
+  flex: none; width: 18px; height: 18px;
+}
+.review-update-banner .rub-message {
+  flex: 1;
+  font-weight: 550;
+  color: var(--ink);
+}
+.review-update-banner .rub-reload {
+  appearance: none; border: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-caption); font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  background: var(--open);
+  color: #fff;
+  white-space: nowrap;
+}
+.review-update-banner .rub-reload:hover { opacity: .85; }
+.review-update-banner .rub-close {
+  appearance: none; border: none; background: none; cursor: pointer;
+  color: var(--ink-3);
+  padding: 2px;
+  line-height: 1;
+  font-size: 16px;
+}
+.review-update-banner .rub-close:hover { color: var(--ink); }
+
+@keyframes new-reply-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(9,105,218,.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(9,105,218,0); }
+  100% { box-shadow: 0 0 0 0 rgba(9,105,218,0); }
+}
+.cmt.has-new-reply {
+  animation: new-reply-pulse 1s ease 3;
+}
+.cmt.new-thread-enter {
+  animation: new-reply-pulse .6s ease 1;
+}
