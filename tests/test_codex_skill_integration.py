@@ -11,6 +11,49 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+VISUAL_TRIGGER_EXAMPLES = [
+    "html出力して",
+    "HTMLにして",
+    "HTMLで出して",
+    "図示つきHTML",
+    "visual HTML renderer",
+    "render this as HTML",
+    "turn this into HTML",
+    "create an HTML preview",
+    "generate a visual HTML report",
+    "make this a reviewable HTML document",
+    "diagrammed HTML report",
+]
+
+REVIEWABLE_TRIGGER_EXAMPLES = [
+    "レビュー可能な設計資料",
+    "設計資料をHTMLで",
+    "design doc",
+    "reviewable design doc",
+    "レビュー終わったので確認して",
+    "コメントを反映して",
+    "create a reviewable design doc",
+    "make a design doc in HTML",
+    "build a review-ready design document",
+    "ingest review comments",
+    "process review comments",
+    "reply to review comments",
+    "apply resolved comments",
+]
+
+PLAN_PREVIEW_TRIGGER_EXAMPLES = [
+    "planをグラフィカルに見たい",
+    "planを図で確認したい",
+    "graphical plan review",
+    "proposed_planをプレビューして",
+    "計画URLを入れて",
+    "preview this plan as HTML",
+    "show this plan visually",
+    "graphical plan preview",
+    "add a plan preview URL",
+    "preview the proposed plan",
+]
+
 
 class CodexSkillIntegrationTest(unittest.TestCase):
     def test_skill_docs_pin_cli_workflows(self) -> None:
@@ -60,21 +103,39 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertEqual(visual["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
         self.assertEqual(visual["working_directory"], "plugin_root")
         self.assertEqual(visual["workflow"], ["attach-image", "check-model", "render", "validate", "preview"])
-        self.assertIn("html出力して", visual["trigger_examples"])
-        self.assertIn("HTMLにして", visual["trigger_examples"])
-        self.assertIn("HTMLで出して", visual["trigger_examples"])
-        self.assertIn("図示つきHTML", visual["trigger_examples"])
+        for trigger in VISUAL_TRIGGER_EXAMPLES:
+            self.assertIn(trigger, visual["trigger_examples"])
 
         self.assertEqual(reviewable["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
         self.assertEqual(reviewable["working_directory"], "plugin_root")
         self.assertEqual(reviewable["workflow"], ["attach-image", "check-model", "render", "validate", "preview", "ingest-review"])
-        self.assertIn("コメントを反映して", reviewable["trigger_examples"])
+        for trigger in REVIEWABLE_TRIGGER_EXAMPLES:
+            self.assertIn(trigger, reviewable["trigger_examples"])
 
         self.assertEqual(plan_preview["entrypoint"], "python3 -m scripts.html_review_workbench.cli")
         self.assertEqual(plan_preview["working_directory"], "plugin_root")
         self.assertEqual(plan_preview["workflow"], ["plan-preview"])
-        self.assertIn("planをグラフィカルに見たい", plan_preview["trigger_examples"])
-        self.assertIn("graphical plan review", plan_preview["trigger_examples"])
+        for trigger in PLAN_PREVIEW_TRIGGER_EXAMPLES:
+            self.assertIn(trigger, plan_preview["trigger_examples"])
+
+    def test_trigger_examples_are_documented_in_skills_and_readme(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        skill_trigger_sets = [
+            (ROOT / "skills/visual-html-renderer/SKILL.md", VISUAL_TRIGGER_EXAMPLES),
+            (ROOT / "skills/reviewable-design-doc/SKILL.md", REVIEWABLE_TRIGGER_EXAMPLES),
+            (ROOT / "skills/plan-preview/SKILL.md", PLAN_PREVIEW_TRIGGER_EXAMPLES),
+        ]
+        for skill_path, triggers in skill_trigger_sets:
+            skill_text = skill_path.read_text(encoding="utf-8")
+            for trigger in triggers:
+                self.assertIn(trigger, skill_text)
+                self.assertIn(trigger, readme)
+
+    def test_skills_document_language_behavior(self) -> None:
+        for skill in ["visual-html-renderer", "reviewable-design-doc", "plan-preview"]:
+            text = (ROOT / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("## 言語方針 / Language behavior", text)
+            self.assertIn("Follow the language of the latest user request", text)
 
     def test_visual_skill_handles_natural_html_output_request_without_model_argument(self) -> None:
         visual = (ROOT / "skills/visual-html-renderer/SKILL.md").read_text(encoding="utf-8")

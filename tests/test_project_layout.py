@@ -60,6 +60,9 @@ class ProjectLayoutTest(unittest.TestCase):
 
         self.assertTrue(interface["defaultPrompt"])
         self.assertIn("Write", interface["capabilities"])
+        self.assertIn("Create a reviewable design doc in HTML", interface["defaultPrompt"])
+        self.assertIn("Render this as a visual HTML report", interface["defaultPrompt"])
+        self.assertIn("Preview this plan as HTML", interface["defaultPrompt"])
 
     def test_required_skills_exist(self) -> None:
         for skill in ["visual-html-renderer", "reviewable-design-doc", "plan-preview"]:

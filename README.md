@@ -65,19 +65,23 @@ claude --plugin-dir /path/to/reviewable-html-workbench
 
 ### Codex CLI
 
-Add the GitHub repository as a plugin marketplace and install:
+Add the GitHub repository as a plugin marketplace, inspect the configured marketplace name, then add the plugin:
 
 ```bash
 codex plugin marketplace add u-ichi/reviewable-html-workbench
-codex plugin install reviewable-html-workbench
+codex plugin list --available --json
+codex plugin add reviewable-html-workbench@<marketplace-name>
 ```
 
-Or clone and register locally:
+Or clone and register locally. The repo-local marketplace name is `reviewable-html-workbench-local`:
 
 ```bash
 git clone https://github.com/u-ichi/reviewable-html-workbench.git
 codex plugin marketplace add ./reviewable-html-workbench
+codex plugin add reviewable-html-workbench@reviewable-html-workbench-local
 ```
+
+Codex installs plugins as a whole plugin. It does not currently install only one language variant of this plugin. This plugin keeps one shared runtime and includes both English and Japanese skill instructions.
 
 ## Quick Start
 
@@ -88,13 +92,13 @@ You use Reviewable HTML Workbench by asking Claude Code or Codex CLI for a revie
 Use a natural request in your agent session:
 
 ```text
-設計資料をレビュー可能なHTMLで作って
+Create a reviewable design doc in HTML
 ```
 
 or:
 
 ```text
-この調査結果を図示つきHTMLでプレビューして
+Render this as a visual HTML report
 ```
 
 The agent creates the document, validates it, starts a session-scoped preview, and returns a URL.
@@ -116,18 +120,22 @@ If the agent needs clarification, answer in the thread. When the thread is resol
 For implementation plans, ask for a visual plan preview:
 
 ```text
-この計画をHTMLでプレビューして
+Preview this plan as HTML
 ```
 
 The plan text can include a temporary `Plan preview:` URL, making phases, dependencies, and test coverage easier to inspect before work starts.
+
+### Language behavior
+
+The skills are bilingual. If you ask in English, the agent should use English for progress updates, preview handoff text, review replies, and final responses. If you ask in Japanese, it should use Japanese. Source material and quoted text are not translated unless you explicitly ask for translation.
 
 ## Skills
 
 | Skill | Purpose | Trigger examples |
 |---|---|---|
-| `visual-html-renderer` | Turn content into a polished, reviewable HTML preview with diagrams, images, comments, and publish/download controls. | `html出力して`, `HTMLにして`, `HTMLで出して`, `HTMLでプレビューして`, `図示つきHTML`, `visual HTML renderer` |
-| `reviewable-design-doc` | Create a review-ready design document, watch browser comments, reply in-thread, and apply resolved feedback. | `レビュー可能な設計資料`, `設計資料をHTMLで`, `design doc`, `reviewable design doc`, `レビュー終わったので確認して`, `コメントを反映して` |
-| `plan-preview` | Add a temporary Reviewable HTML Workbench preview URL to a proposed plan before implementation starts. | `planをグラフィカルに見たい`, `planを図で確認したい`, `graphical plan review`, `この計画をHTMLでプレビューして` |
+| `visual-html-renderer` | Turn content into a polished, reviewable HTML preview with diagrams, images, comments, and publish/download controls. | `visual HTML renderer`, `render this as HTML`, `turn this into HTML`, `create an HTML preview`, `generate a visual HTML report`, `make this a reviewable HTML document`, `diagrammed HTML report` |
+| `reviewable-design-doc` | Create a review-ready design document, watch browser comments, reply in-thread, and apply resolved feedback. | `design doc`, `reviewable design doc`, `create a reviewable design doc`, `make a design doc in HTML`, `build a review-ready design document`, `ingest review comments`, `process review comments`, `reply to review comments`, `apply resolved comments` |
+| `plan-preview` | Add a temporary Reviewable HTML Workbench preview URL to a proposed plan before implementation starts. | `graphical plan review`, `graphical plan preview`, `preview this plan as HTML`, `show this plan visually`, `add a plan preview URL`, `preview the proposed plan` |
 
 ## Agent / Developer CLI Reference
 
@@ -209,25 +217,109 @@ Reviewable HTML Workbench は、Claude Code / Codex CLI 向けの HTML レビュ
 
 完成したら、レビュー要素を除いた読者向けの HTML を 1 ファイルでダウンロードできます（CSS・画像埋め込み済み、OS テーマ自動検知対応）。
 
+英語と日本語の両方の依頼に対応します。英語で依頼した場合は進捗、preview案内、レビューコメントへの返信、最終応答も英語に追従します。日本語で依頼した場合は日本語で返します。元資料や引用は、明示的に翻訳を依頼しない限り翻訳しません。
+
 3つの skill を含みます。
 
 - `visual-html-renderer`: HTML生成、図示、Preview Runtime、bundle検証。
 - `reviewable-design-doc`: レビュー可能な設計資料作成、コメント自動検知、agent返信、解決後の設計反映。
 - `plan-preview`: Plan Mode の計画本文に一時HTMLプレビューURLを追加。
 
-基本的な使い方:
+## 日本語での使い方
+
+通常は Python コマンドを直接実行せず、Claude Code や Codex CLI のチャットで自然に依頼します。agent が HTML bundle を生成し、検証し、ブラウザで開ける preview URL を返します。
+
+### 1. レビュー可能な HTML を作る
+
+設計資料をレビュー用 HTML として作りたい場合:
 
 ```text
 設計資料をレビュー可能なHTMLで作って
 ```
 
-agent が preview URL を返すので、ブラウザで開いて本文にコメントします。コメントを入れると agent が同じコメントスレッドへ返信し、解決状態になった指摘はドキュメントへ反映します。計画を確認したい場合は次のように依頼します。
+```text
+レビュー可能な設計資料
+```
+
+```text
+設計資料をHTMLで
+```
+
+調査結果や比較表を図示つき HTML にしたい場合:
+
+```text
+この調査結果を図示つきHTMLでプレビューして
+```
+
+```text
+html出力して
+```
+
+```text
+HTMLにして
+```
+
+```text
+HTMLで出して
+```
+
+```text
+HTMLでプレビューして
+```
+
+```text
+図示つきHTML
+```
+
+### 2. ブラウザでレビューする
+
+agent が返した preview URL をブラウザで開きます。本文や画像を選択して、修正してほしい箇所にコメントします。チャットではなく HTML 上にコメントを残すことで、指摘箇所と文脈が失われません。
+
+### 3. コメントを agent に確認・返信させる
+
+コメントを入れ終わったら、次のように依頼します。
+
+```text
+レビュー終わったので確認して
+```
+
+```text
+コメントを反映して
+```
+
+agent はコメント本文と選択範囲を読み、確認が必要なコメントには同じ HTML コメントスレッドへ返信します。チャットだけで回答して終わるのではなく、ブラウザ上のコメントと回答が対応する形で残ります。解決済みになった指摘は、document model に反映して再 render します。
+
+### 4. 実装前に計画を HTML で確認する
+
+計画の段階、依存関係、検証範囲を視覚的に確認したい場合:
 
 ```text
 この計画をHTMLでプレビューして
 ```
 
-インストール:
+```text
+planをグラフィカルに見たい
+```
+
+```text
+planを図で確認したい
+```
+
+```text
+proposed_planをプレビューして
+```
+
+```text
+計画URLを入れて
+```
+
+計画本文には一時的な `Plan preview:` URL が入り、実装前にフェーズや検証観点を確認できます。
+
+### 5. 日本語依頼時の言語方針
+
+日本語で依頼した場合、進捗、preview 案内、レビューコメントへの返信、最終応答は日本語になります。元資料や引用は、明示的に翻訳を依頼しない限り翻訳しません。
+
+### 6. インストール
 
 ```bash
 # Claude Code（GitHub から直接）
@@ -236,7 +328,11 @@ claude plugin install reviewable-html-workbench
 
 # Codex CLI（GitHub から直接）
 codex plugin marketplace add u-ichi/reviewable-html-workbench
+codex plugin list --available --json
+codex plugin add reviewable-html-workbench@<marketplace-name>
 ```
+
+Codex CLI は plugin 全体を導入する形で、現行の公開操作では言語だけを選んでインストールする方式ではありません。この plugin は同じ runtime に英語・日本語の skill 文書を同梱します。
 
 テストは次のコマンドで実行します。
 

@@ -1,7 +1,7 @@
 ---
 name: reviewable-design-doc
 description: |
-  要求・設計・アーキテクチャ・未決事項を整理し、レビュー可能な設計資料HTMLを作りたい時に使う。レビュー完了後はHTMLコメントを読み込み、設計へ反映し、確認が必要な場合はHTMLコメントスレッドへagent返信を書き戻す。Triggers: レビュー可能な設計資料, 設計資料をHTMLで, design doc, reviewable design doc, レビュー終わったので確認して, コメントを反映して。使用しない場面: 汎用HTMLレンダリングだけ、Notion投稿だけ、既存HTMLの見た目修正だけ。
+  要求・設計・アーキテクチャ・未決事項を整理し、レビュー可能な設計資料HTMLを作りたい時に使う。Use this skill to structure requirements, design, architecture, alternatives, decisions, and unresolved issues into a review-ready HTML design document. レビュー完了後はHTMLコメントを読み込み、設計へ反映し、確認が必要な場合はHTMLコメントスレッドへagent返信を書き戻す。Triggers: レビュー可能な設計資料, 設計資料をHTMLで, design doc, reviewable design doc, レビュー終わったので確認して, コメントを反映して, create a reviewable design doc, make a design doc in HTML, build a review-ready design document, ingest review comments, process review comments, reply to review comments, apply resolved comments。使用しない場面: 汎用HTMLレンダリングだけ、Notion投稿だけ、既存HTMLの見た目修正だけ。Do not use for: generic HTML rendering, Notion-only publishing, or small visual tweaks to existing HTML.
 argument-hint: "[設計対象またはdocument-model.json] [--review-mode standalone|review-server] [--preview auto|tailscale|local|off]"
 ---
 
@@ -12,6 +12,14 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 設計資料としてレビューできる構造を作り、最終HTML生成は `visual-html-renderer` に渡す。
 
 レビュー完了後は `annotations/comments.json` を読み、明確な指摘は設計へ反映し、確認・回答が必要な指摘は `add-reply` CLI でHTMLの同じコメントスレッドへ書き戻す（チャットへの回答ではなくHTML上の返信として）。
+
+## Role
+
+Create a design document that can be reviewed in the browser. This skill owns design structure, review intent, comment ingestion, and comment-thread replies. Final HTML rendering is delegated to `visual-html-renderer`. After review, read `annotations/comments.json`, apply clear resolved feedback, and write clarification replies back into the same HTML comment thread with `add-reply`.
+
+## 言語方針 / Language behavior
+
+Follow the language of the latest user request for progress updates, final responses, and review handoff text. レビューコメントへの返信は、原則としてそのコメント本文の言語に合わせる。日本語コメントには日本語で、英語コメントには英語で返信する。設計本文や引用内容は、ユーザーが翻訳を求めない限り勝手に翻訳しない。
 
 ## 基本手順
 
@@ -28,6 +36,17 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 11. preview 起動直後に、Monitor ツールで `watch-comments` を開始する。これによりブラウザからのコメントを自動検知できるようになる。Monitor 起動コマンド: `python3 -m scripts.html_review_workbench.cli watch-comments --root <output-dir>`。イベント受信後の処理は「コメント自動回答と解決待ちゲート」セクションに従う。
 12. ユーザーがコメントを入れたら「レビューコメントへの対応」セクションに従う。
 
+## Basic Workflow
+
+1. Clarify the design target, audience, review purpose, and completion criteria.
+2. Split the material into requirements, constraints, architecture, alternatives, decisions, unresolved issues, and review points.
+3. Create `document-model.json` from the start; do not create a `.md` draft as the design body.
+4. Choose renderer-supported HTML blocks for each design unit.
+5. Generate requested images with `imagegen` and attach them before rendering.
+6. Run `check-model`, `render`, `validate`, and `preview`.
+7. Start `watch-comments` after preview startup.
+8. When the user adds comments, ingest them, classify them, reply in the HTML thread, and apply resolved feedback only after gates allow it.
+
 ## 設計資料モデル作成の規約
 
 設計資料作成は、`.md` 原稿をHTMLへ変換する作業ではない。`reviewable-design-doc` は、設計内容を最初からレビュー可能なHTML bundleの情報設計として作る。
@@ -43,9 +62,13 @@ argument-hint: "[設計対象またはdocument-model.json] [--review-mode standa
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
 
+## Design Document Model Rules
+
+This skill does not convert a `.md` draft into HTML. It designs a reviewable HTML bundle from the beginning. Store new models under `output/tmp/<purpose>/document-model.json` or `output/<YYYY-MM-DD>_<name>/document-model.json`. If temporary natural-language input must be saved, use plain text filenames such as `source.txt`, `input.txt`, or `source-content.txt`. Use `heading_level: 2` for major sections and `heading_level: 3` for detailed subsections. Represent comparisons with tables, steps with ordered lists, parallel items with lists, commands and logs with code blocks, flows and dependencies with diagrams, and decisions or cautions with callouts.
+
 ## レビューコメントへの対応
 
-ユーザーが「コメント入れた」「レビューした」等でコメントの存在を知らせた時に開始する。文書作成（手順 1-10）とは独立したインタラクションであり、以下を毎回実行する。
+ユーザーが「コメント入れた」「レビューした」「ingest review comments」「process review comments」「reply to review comments」「apply resolved comments」等でコメントの存在を知らせた時に開始する。文書作成（手順 1-10）とは独立したインタラクションであり、以下を毎回実行する。
 
 IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で HTML コメントスレッドに書き戻す。チャットだけで回答を返して終わりにしてはならない。チャットでは補足や次のアクション提案のみ行い、コメントへの実質的な回答は HTML 側に書く。
 
@@ -62,6 +85,10 @@ IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で 
 - ユーザーはブラウザ上でコメントと回答をセットで読む。チャットに書いた回答は、コメントの文脈から切り離される。
 - 複数コメントがある場合、チャットでは各コメントへの回答の対応関係が崩れる。
 - HTML 上の回答はコメントスレッドに紐づいて永続化される。チャットの回答はセッション終了で消える。
+
+## Handling Review Comments
+
+Start this workflow when the user says comments were added or asks to `ingest review comments`, `process review comments`, `reply to review comments`, or `apply resolved comments`. Always run `ingest-review`, inspect each comment's `comment` and `selected_text`, write substantive clarification replies with `add-reply`, and apply actionable feedback only when the review gates allow it. Do not answer only in chat; the durable answer belongs in the HTML comment thread.
 
 ## コメント自動回答と解決待ちゲート
 
@@ -121,6 +148,10 @@ python3 -m scripts.html_review_workbench.cli notify-update \
   --root <output-dir> \
   --message "コメント反映済み。リロードして確認してください"
 ```
+
+## Automatic Comment Reply and Resolution Gate
+
+After preview startup, monitor browser comment events with `watch-comments`. On each `comment_updated` event, run `ingest-review`, identify clarification threads, write same-thread replies with `add-reply`, and avoid design edits while unresolved clarification threads remain. Before applying any document changes, run `check-gates`. Apply resolved actionable feedback to the document model, re-render, and use `notify-update` so the browser shows an update notice without forcing an automatic reload.
 
 ## CodexでのCLI呼び出し
 
@@ -212,6 +243,10 @@ python3 -m scripts.html_review_workbench.cli notify-update \
   --message "コメント反映済み"
 ```
 
+## CLI Usage in Codex
+
+Use the same shared CLI as `visual-html-renderer`. Resolve the renderer repo root from this `SKILL.md`: two levels above `skills/reviewable-design-doc/SKILL.md`. Run every `python3 -m scripts.html_review_workbench.cli ...` command from that repo root. If the current workspace does not contain `scripts/html_review_workbench/cli.py`, move to the renderer repo root instead of creating fallback HTML. Use `ingest-review`, `add-reply`, `check-gates`, `watch-comments`, and `notify-update` for review cycles.
+
 ## 完了時の確認
 
 - `index.html` と `renderer-manifest.json` が生成され、`validate` が `status: ok` を返している。
@@ -235,9 +270,17 @@ python3 -m scripts.html_review_workbench.cli notify-update \
 
 検証の完了条件: ユーザーがブラウザ上で agent の返信を読み、内容と表示の両方が意図通りであることを確認した時点。CLI が正しい JSON を返したことではない。
 
+## Real Scenario Verification
+
+Passing unit tests and receiving valid CLI JSON are prerequisites, not real scenario verification. For an operational check, the user must add a browser comment, the agent must ingest it, read `comment` and `selected_text`, write the actual answer with `add-reply`, and the user must confirm in the browser that both the reply text and display are correct.
+
 ## ガード
 
 - 設計として未確定の内容は確定事項と分けて書く。
 - レビューコメント機能は必須で有効化する。
 - IMPORTANT: レビューコメントに回答する時は `add-reply` で HTML コメントスレッドに書き戻す。チャットで回答内容を述べただけでは回答完了にならない。
 - HTML低レベル実装をこのskillに重複実装しない。
+
+## Guards
+
+Separate unresolved design ideas from confirmed decisions. Keep review comments enabled. When answering comments, use `add-reply` to write back into the HTML thread; a chat-only answer is not completion. Do not duplicate low-level HTML implementation inside this skill.
