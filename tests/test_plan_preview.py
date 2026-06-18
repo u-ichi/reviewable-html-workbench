@@ -28,11 +28,20 @@ class PlanPreviewTest(unittest.TestCase):
         self.assertEqual(model["title"], "Plan Preview Test")
         block_ids = [block["id"] for block in model["blocks"]]
         self.assertIn("plan-summary", block_ids)
+        self.assertIn("original-plan-text", block_ids)
         self.assertIn("plan-phases", block_ids)
         self.assertIn("key-changes", block_ids)
+        self.assertIn("plan-section-1", block_ids)
         self.assertIn("plan-flow", block_ids)
         self.assertIn("test-plan", block_ids)
         self.assertIn("assumptions", block_ids)
+        self.assertIn("supplemental-context", block_ids)
+        original = next(block for block in model["blocks"] if block["id"] == "original-plan-text")
+        self.assertEqual(original["type"], "code")
+        self.assertIn("## 元の計画本文", original["content"])
+        self.assertIn("CLIでは読み取りにくい依存関係もHTMLで補足する。", original["content"])
+        section = next(block for block in model["blocks"] if block["id"] == "plan-section-1")
+        self.assertIn("CLI本文だけでは表現しにくい詳細", section["content"])
         flow = next(block for block in model["blocks"] if block["id"] == "plan-flow")
         self.assertIn("flowchart TD", flow["content"])
         self.assertIn("CLI", flow["content"])
@@ -51,6 +60,8 @@ class PlanPreviewTest(unittest.TestCase):
                 html = response.read().decode("utf-8")
             self.assertIn("Plan Preview Test", html)
             self.assertIn("CLIを追加する", html)
+            self.assertIn("## 元の計画本文", html)
+            self.assertIn("CLIでは読み取りにくい依存関係もHTMLで補足する。", html)
         finally:
             if result.root.exists():
                 stop_plan_preview(result.root, result.pid, result.process, result.cleanup_process)
@@ -112,6 +123,16 @@ def _payload() -> dict[str, object]:
     return {
         "title": "Plan Preview Test",
         "summary": "Plan ModeでURLを自然に入れる。",
+        "source_text": "\n".join(
+            [
+                "## 元の計画本文",
+                "",
+                "- 実装範囲: plan-preview CLIで全文を保持する。",
+                "- 非範囲: 最終HTML成果物のrenderer flowへ流さない。",
+                "- 検証: unit testとlocal previewで本文欠落を確認する。",
+                "- 補足: CLIでは読み取りにくい依存関係もHTMLで補足する。",
+            ]
+        ),
         "phases": [
             {"title": "Phase 1", "detail": "CLIと一時previewを作る"},
             {"title": "Phase 2", "detail": "skill metadataを配布する"},
@@ -119,6 +140,16 @@ def _payload() -> dict[str, object]:
         "key_changes": [
             "CLIを追加する",
             "一時ディレクトリをTTLで消す",
+        ],
+        "sections": [
+            {
+                "title": "補助表示",
+                "content": "CLI本文だけでは表現しにくい詳細を、HTML上では補助情報として増やす。",
+                "items": [
+                    "元本文の情報は削らない",
+                    "構造化ビューは補助として使う",
+                ],
+            }
         ],
         "flow": [
             {"from": "Plan Mode", "to": "CLI", "label": "payload"},
@@ -130,6 +161,10 @@ def _payload() -> dict[str, object]:
         ],
         "assumptions": [
             "初期版ではhookを追加しない",
+        ],
+        "visual_notes": [
+            "全文ブロックを先に置く",
+            "図とリストで依存関係を追加表示する",
         ],
     }
 

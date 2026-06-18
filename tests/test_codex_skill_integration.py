@@ -44,6 +44,8 @@ REVIEWABLE_TRIGGER_EXAMPLES = [
 PLAN_PREVIEW_TRIGGER_EXAMPLES = [
     "planをグラフィカルに見たい",
     "planを図で確認したい",
+    "この計画をHTMLでプレビューして",
+    "計画をHTMLで確認したい",
     "graphical plan review",
     "proposed_planをプレビューして",
     "計画URLを入れて",
@@ -151,6 +153,9 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("attach-image", visual)
         self.assertIn("render` → `validate` → `preview", visual)
         self.assertIn("返却JSONの `url`", visual)
+        self.assertIn("Plan Mode 中の計画確認プレビュー", visual)
+        self.assertIn("`plan-preview` を使う", visual)
+        self.assertIn("Do not use this skill for Plan Mode proposal previews", visual)
         self.assertNotIn("--owner-pid $$", visual)
 
     def test_reviewable_design_doc_builds_model_and_reports_preview_url(self) -> None:
@@ -179,6 +184,14 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("ユーザーに CLI を実行させない", plan_preview)
         self.assertIn("正式な実装基準は `<proposed_plan>`", plan_preview)
         self.assertIn("Plan Mode の前にhookを自動追加しない", plan_preview)
+        self.assertIn("Plan Mode 中の計画確認プレビューは、このskillが優先入口", plan_preview)
+        self.assertIn("`visual-html-renderer` の `document-model.json`", plan_preview)
+        self.assertIn("During Plan Mode, use this skill for plan preview requests instead of `visual-html-renderer`", plan_preview)
+        self.assertIn("計画全文を `source_text` にそのまま入れる", plan_preview)
+        self.assertIn("全文の代替ではなくHTML上の補助ビュー", plan_preview)
+        self.assertIn("preview用に情報を削らない", plan_preview)
+        self.assertIn("HTML上では元の計画本文を全文表示", plan_preview)
+        self.assertIn("The HTML preview must show the original plan text in full", plan_preview)
         self.assertNotIn("Tailscale / 外部公開", plan_preview)
 
     def test_same_fixture_keeps_artifact_structure_across_skill_workflows(self) -> None:

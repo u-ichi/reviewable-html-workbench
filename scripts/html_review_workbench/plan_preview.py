@@ -132,13 +132,30 @@ def build_plan_preview_model(payload: dict[str, Any], preview_id: str) -> dict[s
         }
     ]
 
+    source_text = _first_string(payload, ("source_text", "proposed_plan", "plan_text", "full_text"))
+    if source_text:
+        blocks.append(
+            {
+                "id": "original-plan-text",
+                "type": "code",
+                "heading_level": 2,
+                "title": "Original Plan Text",
+                "content": source_text,
+                "language": "text",
+                "filename": "proposed_plan.txt",
+                "review_required": True,
+            }
+        )
+
     phase_items = _items(payload.get("phases"))
     if phase_items:
         blocks.append(_list_block("plan-phases", "Plan Phases", phase_items))
 
-    key_changes = _items(payload.get("key_changes")) or _section_items(payload.get("sections"))
+    key_changes = _items(payload.get("key_changes"))
     if key_changes:
         blocks.append(_list_block("key-changes", "Key Changes", key_changes))
+
+    blocks.extend(_section_blocks(payload.get("sections")))
 
     flow = _flow(payload.get("flow"))
     if flow:
@@ -160,6 +177,12 @@ def build_plan_preview_model(payload: dict[str, Any], preview_id: str) -> dict[s
     assumptions = _items(payload.get("assumptions"))
     if assumptions:
         blocks.append(_list_block("assumptions", "Assumptions", assumptions))
+
+    supplemental = _items(
+        payload.get("visual_notes") or payload.get("review_points") or payload.get("expanded_context")
+    )
+    if supplemental:
+        blocks.append(_list_block("supplemental-context", "Supplemental Context", supplemental))
 
     return {
         "schema_version": "1.0",
@@ -244,17 +267,34 @@ def _items(value: object) -> list[str]:
     return items
 
 
-def _section_items(value: object) -> list[str]:
+def _section_blocks(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    items: list[str] = []
-    for section in value:
+    blocks: list[dict[str, Any]] = []
+    for index, section in enumerate(value, 1):
         if not isinstance(section, dict):
             continue
-        title = _string(section.get("title"), "Section")
-        for item in _items(section.get("items")):
-            items.append(f"{title}: {item}")
-    return items
+        title = _string(section.get("title"), f"Section {index}")
+        content = _first_string(section, ("content", "body", "detail", "description", "summary"))
+        items = _items(section.get("items"))
+        html_parts: list[str] = []
+        if content:
+            html_parts.append(_paragraph(content))
+        if items:
+            html_parts.append("<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>")
+        if not html_parts:
+            continue
+        blocks.append(
+            {
+                "id": f"plan-section-{index}",
+                "type": "html",
+                "heading_level": 2,
+                "title": title,
+                "content": "".join(html_parts),
+                "review_required": True,
+            }
+        )
+    return blocks
 
 
 def _flow(value: object) -> list[dict[str, str]]:
@@ -293,6 +333,14 @@ def _flow_to_mermaid(flow: list[dict[str, str]]) -> str:
 
 def _string(value: object, default: str) -> str:
     return value if isinstance(value, str) and value.strip() else default
+
+
+def _first_string(values: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = values.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
 
 
 def _mermaid_label(value: str) -> str:
