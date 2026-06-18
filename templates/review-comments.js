@@ -511,21 +511,25 @@
     }
     ui.commentLayer.innerHTML = "";
     state.comments.comments.forEach((thread, index) => {
-      const card = document.createElement("aside");
-      const cardState = threadCardState(thread);
-      card.className = "cmt";
-      card.dataset.cstate = cardState;
-      card.dataset.for = thread.id || "";
-      card.id = cardId(thread.id);
-      card.tabIndex = 0;
-      card.innerHTML = cardInner(thread, index + 1);
-      bindCommentCard(card, thread);
-      ui.commentLayer.appendChild(card);
+      ui.commentLayer.appendChild(createCommentCard(thread, index + 1));
     });
     updateCommentCount();
     if (state.activeCommentId) {
       setActiveClasses(state.activeCommentId);
     }
+  }
+
+  function createCommentCard(thread, number) {
+    const card = document.createElement("aside");
+    const cardState = threadCardState(thread);
+    card.className = "cmt";
+    card.dataset.cstate = cardState;
+    card.dataset.for = thread.id || "";
+    card.id = cardId(thread.id);
+    card.tabIndex = 0;
+    card.innerHTML = cardInner(thread, number);
+    bindCommentCard(card, thread);
+    return card;
   }
 
   function cardInner(thread, number) {
@@ -598,16 +602,10 @@
       }
     });
     card.querySelector("[data-thread-resolve]")?.addEventListener("click", async () => {
-      thread.status = COMMENT_STATUS.resolved;
-      await saveComments();
-      renderComments();
-      activate(thread.id, false);
+      await updateThreadStatus(thread, COMMENT_STATUS.resolved);
     });
     card.querySelector("[data-thread-reopen]")?.addEventListener("click", async () => {
-      thread.status = COMMENT_STATUS.needsAgentReview;
-      await saveComments();
-      renderComments();
-      activate(thread.id, false);
+      await updateThreadStatus(thread, COMMENT_STATUS.needsAgentReview);
     });
     card.querySelector("[data-thread-delete]")?.addEventListener("click", async () => {
       state.comments.comments = state.comments.comments.filter((item) => item.id !== thread.id);
@@ -617,6 +615,51 @@
       await saveComments();
       renderComments();
     });
+  }
+
+  async function updateThreadStatus(thread, status) {
+    if (!thread || thread.status === status) {
+      return;
+    }
+    thread.status = status;
+    await saveComments();
+    refreshThreadDisplay(thread);
+    activate(thread.id, false);
+  }
+
+  function refreshThreadDisplay(thread) {
+    replaceCommentCard(thread);
+    updateThreadAnchors(thread);
+    updateBlockCommentState(thread.block_id);
+    updateCommentCount();
+    applyFilterVisibility();
+    setStatus(state.serverWritable ? "comments.json" : "standalone");
+    schedulePositionCards();
+  }
+
+  function replaceCommentCard(thread) {
+    const index = state.comments.comments.findIndex((item) => item.id === thread.id);
+    const current = document.getElementById(cardId(thread.id));
+    if (!current || index < 0) {
+      return;
+    }
+    current.replaceWith(createCommentCard(thread, index + 1));
+  }
+
+  function updateThreadAnchors(thread) {
+    document.querySelectorAll(commentSelector(thread.id)).forEach((element) => {
+      element.dataset.state = threadCardState(thread);
+    });
+  }
+
+  function updateBlockCommentState(blockId) {
+    const block = document.querySelector(`[data-review-block="${cssEscape(blockId)}"]`);
+    if (!block) {
+      return;
+    }
+    const blockThreads = state.comments.comments.filter((thread) => thread.block_id === blockId);
+    block.classList.toggle("has-review-comments", blockThreads.some((thread) => !isResolvedThread(thread)));
+    block.classList.toggle("has-review-replies", blockThreads.some(isNeedsUserReply));
   }
 
   function renderReplies(thread) {
@@ -1654,13 +1697,16 @@
     var oldMap = {};
     oldThreads.forEach(function (thread) { oldMap[thread.id] = thread; });
     var hasNewAgentReply = false;
+    var hasNewThread = false;
     var changed = false;
+    var changedExistingThreads = [];
 
     newThreads.forEach(function (newThread) {
       var old = oldMap[newThread.id];
       if (!old) {
         state.comments.comments.push(newThread);
         hasNewAgentReply = true;
+        hasNewThread = true;
         changed = true;
         return;
       }
@@ -1673,10 +1719,16 @@
         if (hasAgent) {
           hasNewAgentReply = true;
         }
+        if (changedExistingThreads.indexOf(old) === -1) {
+          changedExistingThreads.push(old);
+        }
         changed = true;
       }
       if (old.status !== newThread.status) {
         old.status = newThread.status;
+        if (changedExistingThreads.indexOf(old) === -1) {
+          changedExistingThreads.push(old);
+        }
         changed = true;
       }
     });
@@ -1685,7 +1737,11 @@
       return;
     }
     writeLocalComments();
-    renderComments();
+    if (hasNewThread) {
+      renderComments();
+    } else {
+      changedExistingThreads.forEach(refreshThreadDisplay);
+    }
     if (hasNewAgentReply) {
       toast(t.agentReplied);
     }

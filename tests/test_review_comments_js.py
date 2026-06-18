@@ -159,16 +159,41 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('fetch(COMMENTS_URL, { cache: "no-store" })', fetch_block)
         self.assertIn("mergeRemoteComments(payload);", fetch_block)
 
-    def test_remote_comment_merge_rerenders_counts_and_notifies_agent_replies(self) -> None:
+    def test_status_buttons_refresh_thread_without_full_document_rerender(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        resolve_block = script[
+            script.index('card.querySelector("[data-thread-resolve]")') :
+            script.index('card.querySelector("[data-thread-delete]")')
+        ]
+        status_block = script[script.index("async function updateThreadStatus") : script.index("function renderReplies")]
+
+        self.assertIn("await updateThreadStatus(thread, COMMENT_STATUS.resolved);", resolve_block)
+        self.assertIn("await updateThreadStatus(thread, COMMENT_STATUS.needsAgentReview);", resolve_block)
+        self.assertNotIn("renderComments();", resolve_block)
+        self.assertIn("await saveComments();", status_block)
+        self.assertIn("refreshThreadDisplay(thread);", status_block)
+        self.assertIn("function replaceCommentCard(thread)", status_block)
+        self.assertIn("current.replaceWith(createCommentCard(thread, index + 1));", status_block)
+        self.assertIn("function updateThreadAnchors(thread)", status_block)
+        self.assertIn("element.dataset.state = threadCardState(thread);", status_block)
+        self.assertIn("function updateBlockCommentState(blockId)", status_block)
+        self.assertIn('block.classList.toggle("has-review-comments"', status_block)
+        self.assertIn('block.classList.toggle("has-review-replies"', status_block)
+
+    def test_remote_comment_merge_refreshes_existing_threads_without_full_document_rerender(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
         merge_block = script[script.index("function mergeRemoteComments") : script.index("function showUpdateBanner")]
 
         self.assertIn("state.comments.comments.push(newThread);", merge_block)
         self.assertIn("old.replies = newThread.replies;", merge_block)
         self.assertIn("old.status = newThread.status;", merge_block)
+        self.assertIn("var hasNewThread = false;", merge_block)
+        self.assertIn("var changedExistingThreads = [];", merge_block)
         self.assertIn("var hasAgent = addedReplies.some", merge_block)
         self.assertIn("changed = true;", merge_block)
+        self.assertIn("if (hasNewThread) {", merge_block)
         self.assertIn("renderComments();", merge_block)
+        self.assertIn("changedExistingThreads.forEach(refreshThreadDisplay);", merge_block)
         self.assertIn("toast(t.agentReplied);", merge_block)
         self.assertNotIn("updateCardStatus(old.id, newThread)", merge_block)
 
