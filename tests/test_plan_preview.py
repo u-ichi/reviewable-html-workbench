@@ -54,6 +54,7 @@ class PlanPreviewTest(unittest.TestCase):
             self.assertEqual(result.root.parent, Path(tempfile.gettempdir()).resolve())
             self.assertTrue((result.root / MARKER_FILE).exists())
             self.assertTrue((result.root / "document-model.json").exists())
+            self.assertTrue((result.root / "renderer-manifest.json").exists())
             self.assertIn("plan-preview-stop", result.stop_command)
 
             with urllib.request.urlopen(result.url, timeout=5) as response:
@@ -94,6 +95,35 @@ class PlanPreviewTest(unittest.TestCase):
         finally:
             if result.root.exists():
                 stop_plan_preview(result.root)
+
+    def test_create_plan_preview_validates_bundle_before_starting_preview(self) -> None:
+        seen: dict[str, object] = {}
+
+        def fake_start_preview(root: Path, mode: str, idle_timeout: float) -> SimpleNamespace:
+            seen["started"] = True
+            return SimpleNamespace(
+                url="http://127.0.0.1:54321/index.html",
+                pid=os.getpid(),
+                process=None,
+            )
+
+        def fake_validate_bundle(root: Path) -> SimpleNamespace:
+            seen["root"] = root
+            return SimpleNamespace(ok=False, errors=["missing review blocks"], review_blocks=0)
+
+        with self.assertRaisesRegex(PlanPreviewError, "bundle validation failed"):
+            create_plan_preview(
+                _payload(),
+                ttl=60,
+                mode="local",
+                preview_starter=fake_start_preview,
+                cleanup_starter=lambda root, pid, ttl: None,
+                bundle_validator=fake_validate_bundle,
+            )
+        self.assertNotIn("started", seen)
+        root = seen.get("root")
+        self.assertIsInstance(root, Path)
+        self.assertFalse(root.exists())
 
     def test_read_payload_rejects_remote_assets(self) -> None:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as tmp:

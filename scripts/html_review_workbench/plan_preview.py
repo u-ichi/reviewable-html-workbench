@@ -19,6 +19,7 @@ from typing import Any
 
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, PreviewMode, start_preview
 from scripts.html_review_workbench.render import render_bundle
+from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
 MAX_PAYLOAD_BYTES = 512 * 1024
@@ -82,6 +83,7 @@ def create_plan_preview(
     mode: PreviewMode = "auto",
     preview_starter: Any = start_preview,
     cleanup_starter: Any = None,
+    bundle_validator: Any = validate_bundle,
 ) -> PlanPreviewResult:
     if ttl <= 0:
         raise PlanPreviewError("ttl must be positive")
@@ -97,8 +99,13 @@ def create_plan_preview(
 
     model = build_plan_preview_model(payload, preview_id)
     model_path = root / "document-model.json"
-    model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    render_bundle(model_path, root)
+    try:
+        model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        render_bundle(model_path, root)
+        _validate_rendered_bundle(root, bundle_validator)
+    except (OSError, ValueError, PlanPreviewError):
+        shutil.rmtree(root, ignore_errors=True)
+        raise
     session = preview_starter(root, mode, idle_timeout=ttl)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
     cleanup_process = cleanup_starter(root, session.pid, ttl)
@@ -198,6 +205,14 @@ def build_plan_preview_model(payload: dict[str, Any], preview_id: str) -> dict[s
         },
         "blocks": blocks,
     }
+
+
+def _validate_rendered_bundle(root: Path, bundle_validator: Any) -> None:
+    result = bundle_validator(root)
+    if result.ok:
+        return
+    details = "; ".join(str(error) for error in result.errors) or "unknown error"
+    raise PlanPreviewError(f"plan preview bundle validation failed: {details}")
 
 
 def stop_plan_preview(
