@@ -65,15 +65,21 @@ claude --plugin-dir /path/to/reviewable-html-workbench
 
 ### Codex CLI
 
-Add the GitHub repository as a plugin marketplace, inspect the configured marketplace name, then add the plugin:
+Add the GitHub repository as a plugin marketplace, then add the plugin. This
+repository's marketplace name is `reviewable-html-workbench-local`:
 
 ```bash
 codex plugin marketplace add u-ichi/reviewable-html-workbench
-codex plugin list --available --json
-codex plugin add reviewable-html-workbench@<marketplace-name>
+codex plugin add reviewable-html-workbench@reviewable-html-workbench-local
 ```
 
-Or clone and register locally. The repo-local marketplace name is `reviewable-html-workbench-local`:
+To verify the configured marketplace name, check the left column:
+
+```bash
+codex plugin marketplace list
+```
+
+Or clone and register locally:
 
 ```bash
 git clone https://github.com/u-ichi/reviewable-html-workbench.git
@@ -328,9 +334,10 @@ claude plugin install reviewable-html-workbench
 
 # Codex CLI（GitHub から直接）
 codex plugin marketplace add u-ichi/reviewable-html-workbench
-codex plugin list --available --json
-codex plugin add reviewable-html-workbench@<marketplace-name>
+codex plugin add reviewable-html-workbench@reviewable-html-workbench-local
 ```
+
+Codex CLI で marketplace 名を確認したい場合は `codex plugin marketplace list` の左列を見ます。
 
 Codex CLI は plugin 全体を導入する形で、現行の公開操作では言語だけを選んでインストールする方式ではありません。この plugin は同じ runtime に英語・日本語の skill 文書を同梱します。
 
