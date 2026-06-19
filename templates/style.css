@@ -613,6 +613,18 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .df-cap { margin-top: var(--sp-4); font-size: var(--fs-caption); color: var(--ink-3); }
 .df-raw { margin-top: 12px; font-size: 11px; color: var(--ink-faint); font-family: var(--font-mono); }
 
+/* ---------- 12b. STATE DIAGRAM FALLBACK -------------------- */
+.state-diagram { font-size: var(--fs-small); }
+.state-nodes { display: flex; align-items: stretch; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.state-nodes .node.state { background: var(--paper); border: 2px solid var(--line-2); border-radius: var(--r-md); padding: 8px 16px; text-align: center; min-width: 80px; }
+.state-nodes .node.state-pseudo { background: var(--ink); color: var(--paper); border-color: var(--ink); border-radius: 50%; width: 28px; height: 28px; min-width: 28px; padding: 0; display: grid; place-items: center; font-size: 14px; }
+.state-transitions { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
+.state-transitions th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
+.state-transitions td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
+.state-transitions td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
+.state-transitions .transition-label { color: var(--ink-2); font-style: italic; }
+.state-transitions .ink-faint { color: var(--ink-faint); }
+
 /* ---------- 13. GENERATED IMAGE --------------------------- */
 .figure { margin: var(--sp-5) 0; }
 .gen-image {

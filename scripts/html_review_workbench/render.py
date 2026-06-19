@@ -438,7 +438,9 @@ def _render_diagram(diagram: PlannedDiagram) -> str:
     source_path = escape(diagram.relative_path, quote=True)
     kind = escape(diagram.kind, quote=True)
     source = escape(diagram.source)
-    flow_html = _render_diagram_flow(diagram)
+    renderers = {"state": _render_diagram_state}
+    renderer = renderers.get(diagram.kind, _render_diagram_flow)
+    flow_html = renderer(diagram)
     return (
         '<div class="diagram-fallback" '
         f'data-diagram-kind="{kind}" data-diagram-source="{source_path}">\n'
@@ -566,6 +568,66 @@ def _diagram_endpoint(value: str) -> tuple[str, str]:
         return match.group("id"), match.group("label")
     token = re.sub(r"[^A-Za-z0-9_]+", "", cleaned) or cleaned
     return token, cleaned
+
+
+def _diagram_preview_state(source: str) -> tuple[list[str], list[tuple[str, str, str]]]:
+    states: list[str] = []
+    transitions: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+
+    def _add(name: str) -> None:
+        if name and name not in seen:
+            states.append(name)
+            seen.add(name)
+
+    for raw_line in source.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("stateDiagram") or line.startswith("%%"):
+            continue
+        m = re.match(
+            r"(\[\*\]|[A-Za-z0-9_]+)\s*-->\s*(\[\*\]|[A-Za-z0-9_]+)"
+            r"(?:\s*:\s*(.+))?",
+            line,
+        )
+        if m:
+            _add(m.group(1))
+            _add(m.group(2))
+            transitions.append((m.group(1), m.group(2), (m.group(3) or "").strip()))
+            continue
+        dm = re.match(r"([A-Za-z0-9_]+)\s*:\s*(.+)", line)
+        if dm:
+            _add(dm.group(1).strip())
+    return states, transitions
+
+
+def _render_diagram_state(diagram: PlannedDiagram) -> str:
+    states, transitions = _diagram_preview_state(diagram.source)
+    if not states:
+        return '<div class="state-diagram"><div class="node"><div class="n-t">Preview unavailable</div></div></div>'
+    parts: list[str] = []
+    parts.append('<div class="state-nodes">')
+    for state in states:
+        if state == "[*]":
+            parts.append('<div class="node state state-pseudo"><div class="n-t">●</div></div>')
+        else:
+            parts.append(f'<div class="node state"><div class="n-t">{escape(state)}</div></div>')
+    parts.append("</div>")
+    if transitions:
+        parts.append('<table class="state-transitions">')
+        parts.append("<thead><tr><th>From</th><th></th><th>To</th><th>Trigger</th></tr></thead>")
+        parts.append("<tbody>")
+        for from_s, to_s, label in transitions:
+            from_d = "●" if from_s == "[*]" else escape(from_s)
+            to_d = "●" if to_s == "[*]" else escape(to_s)
+            label_html = escape(label) if label else '<span class="ink-faint">&mdash;</span>'
+            parts.append(
+                f"<tr><td>{from_d}</td>"
+                f'<td class="arrow">→</td>'
+                f"<td>{to_d}</td>"
+                f'<td class="transition-label">{label_html}</td></tr>'
+            )
+        parts.append("</tbody></table>")
+    return f'  <div class="state-diagram">{"".join(parts)}</div>'
 
 
 def _review_block_diagram_metadata(diagram: PlannedDiagram | None) -> dict[str, str]:

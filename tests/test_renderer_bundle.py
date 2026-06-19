@@ -129,6 +129,37 @@ class RendererBundleTest(unittest.TestCase):
             self.assertEqual(manifest["review_blocks"][1]["diagram_kind"], "flow")
             self.assertTrue(validate_bundle(output_dir).ok)
 
+    def test_render_bundle_state_diagram_fallback(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "state-doc",
+            "title": "State Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "lifecycle",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "Lifecycle",
+                    "content": "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Processing : start\n  Processing --> Done : finish\n  Done --> [*]",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('data-diagram-kind="state"', html)
+            self.assertIn("state-diagram", html)
+            self.assertIn("state-transitions", html)
+            self.assertIn("state-nodes", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
     def test_render_bundle_uses_updated_callout_markup(self) -> None:
         model = {
             "schema_version": "1.0",
@@ -209,6 +240,7 @@ class RendererBundleTest(unittest.TestCase):
             {"id": "matrix", "type": "diagram", "content": "quadrantChart\nx-axis Low --> High"},
             {"id": "timeline", "type": "diagram", "content": "gantt\ndateFormat YYYY-MM-DD"},
             {"id": "concept", "type": "diagram", "content": "mindmap\n  root"},
+            {"id": "state", "type": "diagram", "content": "stateDiagram-v2\n  Idle --> Active"},
         ]
 
         plans = plan_diagrams(blocks)
@@ -218,6 +250,29 @@ class RendererBundleTest(unittest.TestCase):
         self.assertEqual(plans["matrix"].kind, "matrix")
         self.assertEqual(plans["timeline"].kind, "timeline")
         self.assertEqual(plans["concept"].kind, "concept")
+        self.assertEqual(plans["state"].kind, "state")
+
+    def test_diagram_preview_state_parses_transitions(self) -> None:
+        from scripts.html_review_workbench.render import _diagram_preview_state
+
+        source = (
+            "stateDiagram-v2\n"
+            "  [*] --> Idle\n"
+            "  Idle --> Processing : start\n"
+            "  Processing --> Done : finish\n"
+            "  Done --> [*]\n"
+        )
+        states, transitions = _diagram_preview_state(source)
+        self.assertEqual(states, ["[*]", "Idle", "Processing", "Done"])
+        self.assertEqual(
+            transitions,
+            [
+                ("[*]", "Idle", ""),
+                ("Idle", "Processing", "start"),
+                ("Processing", "Done", "finish"),
+                ("Done", "[*]", ""),
+            ],
+        )
 
 
 def _minimal_png_bytes() -> bytes:
