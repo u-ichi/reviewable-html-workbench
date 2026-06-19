@@ -846,7 +846,9 @@
     state.comments.comments.forEach((thread) => {
       const visible = shouldShowThreadByFilter(thread);
       document.querySelectorAll(commentSelector(thread.id)).forEach((highlight) => {
-        highlight.hidden = !visible;
+        highlight.querySelectorAll(".cx-num").forEach((badge) => {
+          badge.hidden = !visible;
+        });
       });
       const card = document.getElementById(cardId(thread.id));
       if (card) {

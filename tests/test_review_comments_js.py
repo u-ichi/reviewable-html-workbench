@@ -64,6 +64,14 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('document.querySelectorAll(".cx.is-active, .cmt.is-active")', script)
         self.assertIn("card.scrollIntoView({ behavior: \"smooth\", block: \"nearest\" })", script)
 
+    def test_filter_visibility_keeps_highlight_text_visible(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        filter_block = script[script.index("function applyFilterVisibility") : script.index("function shouldShowThreadByFilter")]
+
+        self.assertIn('highlight.querySelectorAll(".cx-num").forEach((badge) => {', filter_block)
+        self.assertIn("badge.hidden = !visible;", filter_block)
+        self.assertNotIn("highlight.hidden = !visible;", filter_block)
+
     def test_review_comments_js_does_not_mix_ingestion_classification_into_ui_status(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
         status_block = script[script.index("const COMMENT_STATUS") : script.index("const STATUS_VALUES")]
