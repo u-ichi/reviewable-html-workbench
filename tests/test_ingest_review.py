@@ -37,6 +37,8 @@ class IngestReviewTest(unittest.TestCase):
             self.assertEqual(result.payload["summary"]["blocked"], 1)
             self.assertEqual(result.payload["summary"]["already_addressed"], 1)
             self.assertEqual(result.payload["summary"]["replies_added"], 1)
+            self.assertIn("gate", result.payload)
+            self.assertIn("gate", result.payload["gate"])
 
             comments = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
             clarify = _find_thread(comments, "cmt-clarify")
@@ -102,6 +104,7 @@ class IngestReviewTest(unittest.TestCase):
             self.assertEqual(model["blocks"][0]["content"], "A minimal section for review workflow checks.")
             self.assertEqual(result.payload["model_updates"]["applied"], 1)
             self.assertEqual(result.payload["summary"]["replies_added"], 1)
+            self.assertIn("gate", result.payload)
             comments = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
             applied = _find_thread(comments, "cmt-replace")
             self.assertEqual(applied["status"], "resolved")

@@ -114,6 +114,7 @@ agent は Monitor ツールでこのプロセスの stdout を監視する。各
 3. `add-reply --root <dir> --thread-id <id> --body "<reply>"` で HTML コメントスレッドに書き戻す。
 4. 回答本文をコンソール（会話）にも出力する。ユーザーはブラウザとコンソールの両方で回答を確認できる。
 5. `actionable` コメントにはまだ設計変更を適用しない。回答で受領を伝え、スレッド解決後に反映する旨を書く。
+6. 自動回答が完了したら、設計変更には進まず停止する。`ingest-review` と `watch-comments` の出力に含まれる `gate` フィールドが `blocked` の場合、`document-model.json` を含むいかなる設計ファイルも変更してはならない。ゲートが `open` になるまで待機する。
 
 ### 解決待ちゲート
 
@@ -280,7 +281,26 @@ Passing unit tests and receiving valid CLI JSON are prerequisites, not real scen
 - レビューコメント機能は必須で有効化する。
 - IMPORTANT: レビューコメントに回答する時は `add-reply` で HTML コメントスレッドに書き戻す。チャットで回答内容を述べただけでは回答完了にならない。
 - HTML低レベル実装をこのskillに重複実装しない。
+- IMPORTANT: `comments.json` を Edit ツールや直接のファイル編集で変更してはならない。コメントの追加・返信は必ず `add-reply` CLI 経由で行う。CLI はスキーマ検証を通すため、不正なデータがファイルに書き込まれることを防ぐ。
 
 ## Guards
 
 Separate unresolved design ideas from confirmed decisions. Keep review comments enabled. When answering comments, use `add-reply` to write back into the HTML thread; a chat-only answer is not completion. Do not duplicate low-level HTML implementation inside this skill.
+
+IMPORTANT: Never edit `comments.json` directly with the Edit tool or any file-writing tool. All comment mutations must go through the `add-reply` CLI, which enforces schema validation and prevents malformed data from being written.
+
+### 禁止事項 / Prohibited Actions
+
+以下の操作は明示的に禁止する。違反するとデータ破損やレビュープロセスの破綻を引き起こす。
+
+1. `comments.json` を Edit/Write ツールで直接変更すること。reply の追加は `add-reply` CLI のみ。
+2. `check-gates` が `blocked` を返している状態で `document-model.json` を変更すること。
+3. `ingest-review` の出力に `"gate": {"gate": "blocked", ...}` が含まれている状態で設計変更に着手すること。
+4. `render` の stderr 警告を無視して次のステップに進むこと。
+
+The following actions are explicitly prohibited. Violations cause data corruption or review process breakdown.
+
+1. Editing `comments.json` directly with Edit/Write tools. Use `add-reply` CLI only.
+2. Modifying `document-model.json` while `check-gates` returns `blocked`.
+3. Starting design changes when `ingest-review` output contains `"gate": {"gate": "blocked", ...}`.
+4. Ignoring `render` stderr warnings and proceeding to the next step.

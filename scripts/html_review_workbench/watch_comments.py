@@ -6,10 +6,22 @@ import http.client
 import json
 import signal
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 
-def run_watch(server_url: str) -> int:
+def _check_gate_status(root: Path) -> dict[str, object] | None:
+    """Return gate payload or None on error."""
+    try:
+        from scripts.html_review_workbench.resolution_gate import check_gate
+
+        result = check_gate(root)
+        return result.to_payload()
+    except Exception:
+        return None
+
+
+def run_watch(server_url: str, root: Path | None = None) -> int:
     """Connect to the preview server SSE endpoint and print events to stdout."""
     parsed = urlparse(server_url)
     host = parsed.hostname or "127.0.0.1"
@@ -58,6 +70,10 @@ def run_watch(server_url: str) -> int:
                             data = {"raw": event_data}
                         if data.get("source") != "agent":
                             output = {"event": event_type, "id": event_id, "data": data}
+                            if root is not None:
+                                gate_info = _check_gate_status(root)
+                                if gate_info is not None:
+                                    output["gate"] = gate_info
                             print(json.dumps(output, ensure_ascii=False), flush=True)
                     if event_id:
                         last_event_id = event_id

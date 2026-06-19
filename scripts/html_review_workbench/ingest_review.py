@@ -114,6 +114,14 @@ def ingest_review(
     resolved_state_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    try:
+        from scripts.html_review_workbench.resolution_gate import check_gate as _check_gate
+
+        gate_result = _check_gate(root, comments_path=comments_path, state_path=state_path)
+        gate_payload = gate_result.to_payload()
+    except Exception:
+        gate_payload = {"gate": "unknown"}
+
     return ReviewIngestionResult(
         payload={
             "status": "ok",
@@ -122,6 +130,7 @@ def ingest_review(
             "state_path": state_path,
             "summary": state["summary"],
             "model_updates": model_update_result,
+            "gate": gate_payload,
         },
         comments_path=store.path,
         state_path=resolved_state_path,

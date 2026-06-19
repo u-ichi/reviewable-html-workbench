@@ -360,6 +360,7 @@ def serve(
             _start_owner_watchdog(server, owner_pid, handler_class, grace_seconds=owner_grace)
         if idle_timeout > 0:
             _start_idle_watchdog(server, handler_class, idle_timeout)
+        _start_comments_file_watcher(root, event_bus)
         server.serve_forever()
 
 
@@ -433,6 +434,33 @@ def _start_idle_watchdog(
                 return
 
     thread = threading.Thread(target=watch, name="preview-idle-watchdog", daemon=True)
+    thread.start()
+
+
+def _start_comments_file_watcher(
+    root: Path,
+    event_bus: EventBus,
+    interval: float = 2.0,
+) -> None:
+    comments_path = root / "annotations" / "comments.json"
+
+    def watch() -> None:
+        last_mtime = 0.0
+        try:
+            last_mtime = comments_path.stat().st_mtime
+        except OSError:
+            pass
+        while True:
+            time.sleep(interval)
+            try:
+                current_mtime = comments_path.stat().st_mtime
+            except OSError:
+                continue
+            if current_mtime != last_mtime:
+                last_mtime = current_mtime
+                event_bus.publish("comment_updated", {"source": "file_watcher"})
+
+    thread = threading.Thread(target=watch, name="comments-file-watcher", daemon=True)
     thread.start()
 
 

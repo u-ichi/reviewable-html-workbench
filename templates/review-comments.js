@@ -35,6 +35,7 @@
       publishToast: "公開用HTMLを書き出しました",
       agentReplied: "エージェントが返信しました",
       docUpdated: "ドキュメントが更新されました。リロードして最新版を確認できます",
+      saveError: "コメント保存エラー: ",
       reloadBtn: "リロード",
       closeBtn: "閉じる",
     },
@@ -71,6 +72,7 @@
       publishToast: "Published HTML exported",
       agentReplied: "Agent replied",
       docUpdated: "Document has been updated. Reload to see the latest version.",
+      saveError: "Comment save error: ",
       reloadBtn: "Reload",
       closeBtn: "Close",
     },
@@ -227,8 +229,19 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(state.comments, null, 2),
       });
-      state.serverWritable = response.ok;
-      setStatus(response.ok ? "comments.json" : "standalone");
+      if (response.ok) {
+        state.serverWritable = true;
+        setStatus("comments.json");
+      } else {
+        var errorMessage = "";
+        try {
+          var body = await response.json();
+          errorMessage = body.error || "";
+        } catch (_parseErr) { /* ignore */ }
+        state.serverWritable = false;
+        setStatus("standalone");
+        showSaveError(errorMessage);
+      }
       return response.ok;
     } catch (_error) {
       state.serverWritable = false;
@@ -1771,5 +1784,23 @@
     window.requestAnimationFrame(function () {
       banner.classList.add("show");
     });
+  }
+
+  function showSaveError(errorMessage) {
+    var existing = document.getElementById("reviewSaveError");
+    if (existing) {
+      existing.remove();
+    }
+    var banner = document.createElement("div");
+    banner.id = "reviewSaveError";
+    banner.className = "review-save-error";
+    banner.innerHTML = [
+      '<span class="rse-text">' + t.saveError + escapeHtml(errorMessage) + '</span>',
+      '<button type="button" class="rse-close" aria-label="close">&times;</button>',
+    ].join("");
+    banner.querySelector(".rse-close").addEventListener("click", function () {
+      banner.remove();
+    });
+    document.body.prepend(banner);
   }
 })();

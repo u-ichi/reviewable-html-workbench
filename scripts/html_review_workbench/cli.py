@@ -116,9 +116,31 @@ def build_model(args: argparse.Namespace) -> int:
 
 
 def render(args: argparse.Namespace) -> int:
-    index_path = render_bundle(Path(args.model), Path(args.output))
+    output_path = Path(args.output)
+    index_path = render_bundle(Path(args.model), output_path)
     print(index_path)
+    _check_render_gate(output_path)
     return 0
+
+
+def _check_render_gate(output_dir: Path) -> None:
+    """Print a stderr warning if the resolution gate is blocked."""
+    import sys
+
+    try:
+        result = run_check_gate(output_dir)
+    except Exception:
+        return
+    if result.gate == "blocked":
+        thread_ids = [t["thread_id"] for t in result.blocking_threads]
+        count = len(thread_ids)
+        ids_str = ", ".join(thread_ids)
+        print(
+            f"WARNING: Resolution gate is blocked by {count} unresolved "
+            f"clarification thread(s): {ids_str}. "
+            f"Do not proceed with design changes.",
+            file=sys.stderr,
+        )
 
 
 def check_model(args: argparse.Namespace) -> int:
@@ -290,7 +312,7 @@ def watch_comments(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "failed", "error": "no active preview session found"}, ensure_ascii=False))
             return 2
         url = f"http://{session['bind']}:{session['port']}"
-    return run_watch(url)
+    return run_watch(url, root=root)
 
 
 def notify_update(args: argparse.Namespace) -> int:

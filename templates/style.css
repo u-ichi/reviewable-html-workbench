@@ -1186,6 +1186,13 @@ textarea.cmt-input, input.cmt-input {
   font-size: 16px;
 }
 .review-update-banner .rub-close:hover { color: var(--ink); }
+.review-save-error {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+  background: #c0392b; color: #fff; padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600;
+}
+.rse-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 0 4px; }
 
 @keyframes new-reply-pulse {
   0%   { box-shadow: 0 0 0 0 rgba(9,105,218,.4); }

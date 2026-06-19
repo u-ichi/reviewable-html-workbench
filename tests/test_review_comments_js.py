@@ -29,6 +29,7 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "downloadPublishedDoc",
             "threadCardState",
             "normalizeThreadStatus",
+            "showSaveError",
         ]:
             self.assertIn(f"function {function_name}", script)
 
@@ -129,6 +130,18 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         for key in ["agentReplied", "docUpdated", "reloadBtn", "closeBtn"]:
             self.assertIn(f"{key}:", ja_block, f"Missing ja i18n key: {key}")
             self.assertIn(f"{key}:", en_block, f"Missing en i18n key: {key}")
+
+    def test_save_comments_surfaces_server_errors(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        save_block = script[script.index("async function saveComments") : script.index("function scheduleSelectionCapture")]
+        ja_block = script[script.index("ja: {") : script.index("},\n    en: {")]
+        en_block = script[script.index("en: {") : script.index("},\n  });")]
+
+        self.assertIn("function showSaveError", script)
+        self.assertIn("var body = await response.json();", save_block)
+        self.assertIn("showSaveError(errorMessage);", save_block)
+        self.assertIn("saveError:", ja_block)
+        self.assertIn("saveError:", en_block)
 
     def test_event_source_initialized_after_load(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
