@@ -136,6 +136,7 @@
             "type": "string",
             "enum": [
               "flow",
+              "sequence",
               "state",
               "architecture",
               "matrix",

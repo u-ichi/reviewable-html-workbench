@@ -625,6 +625,50 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .state-transitions .transition-label { color: var(--ink-2); font-style: italic; }
 .state-transitions .ink-faint { color: var(--ink-faint); }
 
+/* ---------- 12c. SEQUENCE DIAGRAM FALLBACK ------------------ */
+.seq-diagram { font-size: var(--fs-small); }
+.seq-participants { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.seq-pill { background: var(--brand-soft); border: 1px solid var(--brand); border-radius: 999px; padding: 4px 14px; font-weight: 600; font-size: var(--fs-caption); }
+.seq-messages { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
+.seq-messages th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
+.seq-messages td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
+.seq-messages td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
+.seq-messages td.seq-dashed { border-bottom-style: dashed; }
+.seq-label { color: var(--ink-2); }
+
+/* ---------- 12d. ARCHITECTURE DIAGRAM FALLBACK -------------- */
+.arch-diagram { font-size: var(--fs-small); }
+.arch-entities { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.arch-card { background: var(--paper); border: 2px solid var(--line-2); border-radius: var(--r-md); padding: 8px 16px; text-align: center; min-width: 90px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.arch-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; }
+.arch-name { font-weight: 600; }
+.arch-relations { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
+.arch-relations th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
+.arch-relations td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
+.arch-relations td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
+.arch-rel-label { color: var(--ink-2); font-style: italic; }
+
+/* ---------- 12e. TIMELINE DIAGRAM FALLBACK ------------------ */
+.tl-diagram { font-size: var(--fs-small); }
+.tl-timeline { border-left: 3px solid var(--line-2); padding-left: var(--sp-4); }
+.tl-section { font-weight: 700; color: var(--ink-2); margin: var(--sp-3) 0 var(--sp-1); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+.tl-item { display: flex; align-items: baseline; gap: var(--sp-2); padding: 4px 0; }
+.tl-dot { width: 8px; height: 8px; min-width: 8px; background: var(--brand); border-radius: 50%; margin-left: calc(-1 * var(--sp-4) - 5.5px); border: 2px solid var(--paper); }
+.tl-name { font-weight: 600; }
+.tl-detail { color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; }
+
+/* ---------- 12f. MATRIX / QUADRANT DIAGRAM FALLBACK --------- */
+.mx-diagram { font-size: var(--fs-small); }
+.mx-title { font-weight: 700; text-align: center; margin-bottom: var(--sp-3); }
+.mx-grid { display: flex; flex-direction: column; align-items: center; }
+.mx-quadrants { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 100%; max-width: 480px; aspect-ratio: 1; border: 1px solid var(--line-2); border-radius: var(--r-md); overflow: hidden; }
+.mx-q { background: var(--paper); padding: var(--sp-3); display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; }
+.mx-point { background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--r-xs); padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.mx-axis { font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); }
+.mx-axis-row { display: flex; justify-content: space-between; width: 100%; max-width: 480px; margin-top: 4px; }
+.mx-y-hi { margin-bottom: 4px; }
+.mx-y-lo { margin-top: 4px; }
+
 /* ---------- 13. GENERATED IMAGE --------------------------- */
 .figure { margin: var(--sp-5) 0; }
 .gen-image {

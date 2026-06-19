@@ -438,7 +438,13 @@ def _render_diagram(diagram: PlannedDiagram) -> str:
     source_path = escape(diagram.relative_path, quote=True)
     kind = escape(diagram.kind, quote=True)
     source = escape(diagram.source)
-    renderers = {"state": _render_diagram_state}
+    renderers = {
+        "state": _render_diagram_state,
+        "sequence": _render_diagram_sequence,
+        "architecture": _render_diagram_architecture,
+        "timeline": _render_diagram_timeline,
+        "matrix": _render_diagram_matrix,
+    }
     renderer = renderers.get(diagram.kind, _render_diagram_flow)
     flow_html = renderer(diagram)
     return (
@@ -600,6 +606,218 @@ def _diagram_preview_state(source: str) -> tuple[list[str], list[tuple[str, str,
     return states, transitions
 
 
+_SEQ_PARTICIPANT = re.compile(r"participant\s+(\S+)(?:\s+as\s+(.+))?", re.IGNORECASE)
+_SEQ_MESSAGE = re.compile(r"(\S+?)\s*(--?>>?)\s*(\S+)\s*:\s*(.+)")
+
+
+def _diagram_preview_sequence(source: str) -> tuple[list[str], list[tuple[str, str, str, str]]]:
+    participants: list[str] = []
+    seen: set[str] = set()
+    messages: list[tuple[str, str, str, str]] = []
+    aliases: dict[str, str] = {}
+    skip = {
+        "sequencediagram",
+        "%%",
+        "note",
+        "loop",
+        "end",
+        "alt",
+        "else",
+        "opt",
+        "par",
+        "and",
+        "rect",
+        "activate",
+        "deactivate",
+        "autonumber",
+    }
+
+    def _add_p(name: str) -> None:
+        if name and name not in seen:
+            participants.append(name)
+            seen.add(name)
+
+    for raw_line in source.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        first_word = line.split()[0].lower().rstrip(":")
+        if first_word in skip:
+            continue
+        pm = _SEQ_PARTICIPANT.match(line)
+        if pm:
+            pid = pm.group(1)
+            alias = (pm.group(2) or "").strip()
+            if alias:
+                aliases[pid] = alias
+            _add_p(pid)
+            continue
+        mm = _SEQ_MESSAGE.match(line)
+        if mm:
+            f, arrow, t, label = mm.group(1), mm.group(2), mm.group(3), mm.group(4).strip()
+            _add_p(f)
+            _add_p(t)
+            messages.append((aliases.get(f, f), aliases.get(t, t), arrow, label))
+    display_participants = [aliases.get(p, p) for p in participants]
+    return display_participants, messages
+
+
+_ER_RELATION = re.compile(r"(\S+)\s+(\S*\|?\S*--\S*\|?\S*)\s+(\S+)\s*:\s*(.+)")
+_CLASS_INHERIT = re.compile(r"(\S+)\s+(<\|--|--|\.\.>|--\*|--o|-->)\s+(\S+)")
+_C4_ELEMENT = re.compile(
+    r"(Person|System|Container|System_Ext|ContainerDb|SystemDb)\s*\(\s*(\w+)\s*,\s*\"([^\"]+)\"",
+    re.IGNORECASE,
+)
+_C4_REL = re.compile(r"Rel\s*\(\s*(\w+)\s*,\s*(\w+)\s*,\s*\"([^\"]+)\"", re.IGNORECASE)
+
+
+def _diagram_preview_architecture(source: str) -> tuple[list[tuple[str, str]], list[tuple[str, str, str]]]:
+    entities: list[tuple[str, str]] = []
+    relations: list[tuple[str, str, str]] = []
+    seen_ent: set[str] = set()
+    first_line = ""
+    for raw in source.splitlines():
+        stripped = raw.strip().lower()
+        if stripped and not stripped.startswith("%%"):
+            first_line = stripped
+            break
+
+    def _add_ent(name: str, kind: str) -> None:
+        if name and name not in seen_ent:
+            entities.append((name, kind))
+            seen_ent.add(name)
+
+    if first_line.startswith("erdiagram"):
+        for raw_line in source.splitlines():
+            line = raw_line.strip()
+            m = _ER_RELATION.match(line)
+            if m:
+                _add_ent(m.group(1), "Entity")
+                _add_ent(m.group(3), "Entity")
+                relations.append((m.group(1), m.group(3), m.group(4).strip().strip('"')))
+    elif first_line.startswith("classdiagram"):
+        for raw_line in source.splitlines():
+            line = raw_line.strip()
+            if line.lower().startswith("class "):
+                name = line.split()[1].rstrip("{").strip()
+                _add_ent(name, "Class")
+                continue
+            m = _CLASS_INHERIT.match(line)
+            if m:
+                _add_ent(m.group(1), "Class")
+                _add_ent(m.group(3), "Class")
+                relations.append((m.group(1), m.group(3), m.group(2)))
+    elif first_line.startswith("c4context") or first_line.startswith("c4"):
+        for raw_line in source.splitlines():
+            line = raw_line.strip()
+            em = _C4_ELEMENT.match(line)
+            if em:
+                _add_ent(em.group(3), em.group(1))
+                continue
+            rm = _C4_REL.match(line)
+            if rm:
+                relations.append((rm.group(1), rm.group(2), rm.group(3)))
+    else:
+        for raw_line in source.splitlines():
+            line = raw_line.strip()
+            if not line or line.lower().startswith("architecture") or line.startswith("%%"):
+                continue
+            m = _ER_RELATION.match(line)
+            if m:
+                _add_ent(m.group(1), "")
+                _add_ent(m.group(3), "")
+                relations.append((m.group(1), m.group(3), m.group(4).strip().strip('"')))
+    return entities, relations
+
+
+_GANTT_TASK = re.compile(r"(.+?)\s*:\s*(.+)")
+_JOURNEY_TASK = re.compile(r"(.+?)\s*:\s*(\d+)\s*:\s*(.+)")
+
+
+def _diagram_preview_timeline(source: str) -> tuple[list[tuple[str, list[tuple[str, str]]]], str]:
+    sections: list[tuple[str, list[tuple[str, str]]]] = []
+    current_items: list[tuple[str, str]] = []
+    current_section = ""
+    subtype = "timeline"
+    skip_keys = {
+        "dateformat",
+        "title",
+        "axisformat",
+        "todaymarker",
+        "excludes",
+        "inclusiveenddates",
+        "%%",
+    }
+
+    for raw_line in source.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        low = line.lower()
+        if low.startswith("gantt"):
+            subtype = "gantt"
+            continue
+        if low.startswith("timeline"):
+            subtype = "timeline"
+            continue
+        if low.startswith("journey"):
+            subtype = "journey"
+            continue
+        first_word = low.split()[0].rstrip(":")
+        if first_word in skip_keys:
+            continue
+        if low.startswith("section ") or low.startswith("section\t"):
+            if current_section or current_items:
+                sections.append((current_section, current_items))
+                current_items = []
+            current_section = line[len("section"):].strip()
+            continue
+        if subtype == "journey":
+            jm = _JOURNEY_TASK.match(line)
+            if jm:
+                current_items.append((jm.group(1).strip(), f"score: {jm.group(2)}, {jm.group(3).strip()}"))
+                continue
+        gm = _GANTT_TASK.match(line)
+        if gm:
+            current_items.append((gm.group(1).strip(), gm.group(2).strip()))
+        else:
+            current_items.append((line, ""))
+    if current_section or current_items:
+        sections.append((current_section, current_items))
+    return sections, subtype
+
+
+_QUAD_AXIS = re.compile(r"(x|y)-axis\s+(.+?)\s*-->\s*(.+)")
+_QUAD_POINT = re.compile(r"(.+?):\s*\[\s*([\d.]+)\s*,\s*([\d.]+)\s*\]")
+
+
+def _diagram_preview_matrix(source: str) -> tuple[str, str, str, str, str, list[tuple[str, float, float]]]:
+    title = ""
+    x_lo, x_hi, y_lo, y_hi = "", "", "", ""
+    points: list[tuple[str, float, float]] = []
+    for raw_line in source.splitlines():
+        line = raw_line.strip()
+        if not line or line.lower().startswith("quadrantchart") or line.startswith("%%"):
+            continue
+        if line.lower().startswith("title "):
+            title = line[len("title "):].strip()
+            continue
+        am = _QUAD_AXIS.match(line)
+        if am:
+            axis = am.group(1).lower()
+            if axis == "x":
+                x_lo, x_hi = am.group(2).strip(), am.group(3).strip()
+            else:
+                y_lo, y_hi = am.group(2).strip(), am.group(3).strip()
+            continue
+        pm = _QUAD_POINT.match(line)
+        if pm:
+            x = min(max(float(pm.group(2)), 0.0), 1.0)
+            y = min(max(float(pm.group(3)), 0.0), 1.0)
+            points.append((pm.group(1).strip(), x, y))
+    return title, x_lo, x_hi, y_lo, y_hi, points
+
+
 def _render_diagram_state(diagram: PlannedDiagram) -> str:
     states, transitions = _diagram_preview_state(diagram.source)
     if not states:
@@ -628,6 +846,108 @@ def _render_diagram_state(diagram: PlannedDiagram) -> str:
             )
         parts.append("</tbody></table>")
     return f'  <div class="state-diagram">{"".join(parts)}</div>'
+
+
+def _render_diagram_sequence(diagram: PlannedDiagram) -> str:
+    participants, messages = _diagram_preview_sequence(diagram.source)
+    if not participants:
+        return '<div class="seq-diagram"><div class="node"><div class="n-t">Preview unavailable</div></div></div>'
+    parts: list[str] = []
+    parts.append('<div class="seq-participants">')
+    for p in participants:
+        parts.append(f'<div class="seq-pill">{escape(p)}</div>')
+    parts.append("</div>")
+    if messages:
+        parts.append('<table class="seq-messages">')
+        parts.append("<thead><tr><th>From</th><th></th><th>To</th><th>Message</th></tr></thead>")
+        parts.append("<tbody>")
+        for frm, to, arrow, label in messages:
+            arrow_cls = "seq-dashed" if "-->" in arrow and "->" not in arrow.replace("--", "") else ""
+            parts.append(
+                f"<tr><td>{escape(frm)}</td>"
+                f'<td class="arrow {arrow_cls}">→</td>'
+                f"<td>{escape(to)}</td>"
+                f"<td class=\"seq-label\">{escape(label)}</td></tr>"
+            )
+        parts.append("</tbody></table>")
+    return f'  <div class="seq-diagram">{"".join(parts)}</div>'
+
+
+def _render_diagram_architecture(diagram: PlannedDiagram) -> str:
+    entities, relations = _diagram_preview_architecture(diagram.source)
+    if not entities:
+        return '<div class="arch-diagram"><div class="node"><div class="n-t">Preview unavailable</div></div></div>'
+    parts: list[str] = []
+    parts.append('<div class="arch-entities">')
+    for name, kind in entities:
+        kind_label = f'<span class="arch-kind">{escape(kind)}</span>' if kind else ""
+        parts.append(f'<div class="arch-card">{kind_label}<span class="arch-name">{escape(name)}</span></div>')
+    parts.append("</div>")
+    if relations:
+        parts.append('<table class="arch-relations">')
+        parts.append("<thead><tr><th>From</th><th></th><th>To</th><th>Relationship</th></tr></thead>")
+        parts.append("<tbody>")
+        for frm, to, label in relations:
+            label_html = escape(label) if label else '<span class="ink-faint">&mdash;</span>'
+            parts.append(
+                f"<tr><td>{escape(frm)}</td>"
+                f'<td class="arrow">→</td>'
+                f"<td>{escape(to)}</td>"
+                f"<td class=\"arch-rel-label\">{label_html}</td></tr>"
+            )
+        parts.append("</tbody></table>")
+    return f'  <div class="arch-diagram">{"".join(parts)}</div>'
+
+
+def _render_diagram_timeline(diagram: PlannedDiagram) -> str:
+    sections, subtype = _diagram_preview_timeline(diagram.source)
+    if not sections:
+        return '<div class="tl-diagram"><div class="node"><div class="n-t">Preview unavailable</div></div></div>'
+    parts: list[str] = []
+    parts.append(f'<div class="tl-timeline" data-subtype="{escape(subtype, quote=True)}">')
+    for section_title, items in sections:
+        if section_title:
+            parts.append(f'<div class="tl-section">{escape(section_title)}</div>')
+        for task_name, detail in items:
+            detail_html = f'<span class="tl-detail">{escape(detail)}</span>' if detail else ""
+            parts.append(
+                f'<div class="tl-item"><span class="tl-dot"></span><span class="tl-name">{escape(task_name)}</span>{detail_html}</div>'
+            )
+    parts.append("</div>")
+    return f'  <div class="tl-diagram">{"".join(parts)}</div>'
+
+
+def _render_diagram_matrix(diagram: PlannedDiagram) -> str:
+    title, x_lo, x_hi, y_lo, y_hi, points = _diagram_preview_matrix(diagram.source)
+    parts: list[str] = []
+    if title:
+        parts.append(f'<div class="mx-title">{escape(title)}</div>')
+    parts.append('<div class="mx-grid">')
+    parts.append(f'<div class="mx-axis mx-y-hi">{escape(y_hi)}</div>')
+    parts.append('<div class="mx-quadrants">')
+    quadrant_labels = ["Q2", "Q1", "Q3", "Q4"]
+    for ql in quadrant_labels:
+        q_points = []
+        for name, x, y in points:
+            in_right = x >= 0.5
+            in_top = y >= 0.5
+            if ql == "Q1" and in_right and in_top:
+                q_points.append(name)
+            elif ql == "Q2" and not in_right and in_top:
+                q_points.append(name)
+            elif ql == "Q3" and not in_right and not in_top:
+                q_points.append(name)
+            elif ql == "Q4" and in_right and not in_top:
+                q_points.append(name)
+        items_html = "".join(f'<span class="mx-point">{escape(n)}</span>' for n in q_points)
+        parts.append(f'<div class="mx-q">{items_html}</div>')
+    parts.append("</div>")
+    parts.append(f'<div class="mx-axis mx-y-lo">{escape(y_lo)}</div>')
+    parts.append(
+        f'<div class="mx-axis-row"><span class="mx-axis mx-x-lo">{escape(x_lo)}</span><span class="mx-axis mx-x-hi">{escape(x_hi)}</span></div>'
+    )
+    parts.append("</div>")
+    return f'  <div class="mx-diagram">{"".join(parts)}</div>'
 
 
 def _review_block_diagram_metadata(diagram: PlannedDiagram | None) -> dict[str, str]:

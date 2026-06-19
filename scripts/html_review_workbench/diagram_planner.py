@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-DIAGRAM_KINDS = frozenset({"flow", "state", "architecture", "matrix", "timeline", "concept"})
+DIAGRAM_KINDS = frozenset({"flow", "sequence", "state", "architecture", "matrix", "timeline", "concept"})
 
 
 @dataclass(frozen=True)
@@ -88,7 +88,9 @@ def _classify_diagram(block: dict[str, Any], source: str) -> str:
         return "architecture"
     if any(keyword in text for keyword in ["statediagram"]):
         return "state"
-    if any(keyword in text for keyword in ["flowchart", "graph ", "sequencediagram"]):
+    if any(keyword in text for keyword in ["sequencediagram"]):
+        return "sequence"
+    if any(keyword in text for keyword in ["flowchart", "graph "]):
         return "flow"
     return "concept"
 

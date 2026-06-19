@@ -236,6 +236,7 @@ class RendererBundleTest(unittest.TestCase):
     def test_plan_diagrams_classifies_supported_kinds(self) -> None:
         blocks = [
             {"id": "flow", "type": "diagram", "content": "flowchart LR\nA-->B"},
+            {"id": "seq", "type": "diagram", "content": "sequenceDiagram\n  A->>B: Hello"},
             {"id": "arch", "type": "diagram", "content": "C4Context\nPerson(user, User)"},
             {"id": "matrix", "type": "diagram", "content": "quadrantChart\nx-axis Low --> High"},
             {"id": "timeline", "type": "diagram", "content": "gantt\ndateFormat YYYY-MM-DD"},
@@ -246,6 +247,7 @@ class RendererBundleTest(unittest.TestCase):
         plans = plan_diagrams(blocks)
 
         self.assertEqual(plans["flow"].kind, "flow")
+        self.assertEqual(plans["seq"].kind, "sequence")
         self.assertEqual(plans["arch"].kind, "architecture")
         self.assertEqual(plans["matrix"].kind, "matrix")
         self.assertEqual(plans["timeline"].kind, "timeline")
@@ -273,6 +275,188 @@ class RendererBundleTest(unittest.TestCase):
                 ("Done", "[*]", ""),
             ],
         )
+
+    def test_render_bundle_sequence_diagram_fallback(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "seq-doc",
+            "title": "Seq Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "auth-flow",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "Auth Flow",
+                    "content": "sequenceDiagram\n  participant C as Client\n  participant S as Server\n  C->>S: Login\n  S-->>C: Token",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            index_path = render_bundle(model_path, output_dir)
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('data-diagram-kind="sequence"', html)
+            self.assertIn("seq-diagram", html)
+            self.assertIn("seq-participants", html)
+            self.assertIn("seq-messages", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_render_bundle_architecture_diagram_fallback(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "arch-doc",
+            "title": "Arch Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "er-model",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "ER Model",
+                    "content": "erDiagram\n  USER ||--o{ ORDER : places\n  ORDER ||--|{ LINE_ITEM : contains",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            index_path = render_bundle(model_path, output_dir)
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('data-diagram-kind="architecture"', html)
+            self.assertIn("arch-diagram", html)
+            self.assertIn("arch-entities", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_render_bundle_timeline_diagram_fallback(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "tl-doc",
+            "title": "Timeline Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "project-plan",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "Project Plan",
+                    "content": "gantt\n  dateFormat YYYY-MM-DD\n  section Phase1\n  Design : 2026-01-01, 30d\n  section Phase2\n  Develop : 2026-02-01, 60d",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            index_path = render_bundle(model_path, output_dir)
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('data-diagram-kind="timeline"', html)
+            self.assertIn("tl-diagram", html)
+            self.assertIn("tl-timeline", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_render_bundle_matrix_diagram_fallback(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "mx-doc",
+            "title": "Matrix Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "priority-matrix",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "Priority Matrix",
+                    "content": "quadrantChart\n  title Priority\n  x-axis Low --> High\n  y-axis Low --> High\n  Alpha: [0.8, 0.9]\n  Beta: [0.2, 0.3]",
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            index_path = render_bundle(model_path, output_dir)
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('data-diagram-kind="matrix"', html)
+            self.assertIn("mx-diagram", html)
+            self.assertIn("mx-quadrants", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_diagram_preview_sequence_parses_messages(self) -> None:
+        from scripts.html_review_workbench.render import _diagram_preview_sequence
+
+        source = (
+            "sequenceDiagram\n"
+            "  participant C as Client\n"
+            "  participant S as Server\n"
+            "  C->>S: Login request\n"
+            "  S-->>C: Auth token\n"
+        )
+        participants, messages = _diagram_preview_sequence(source)
+        self.assertEqual(participants, ["Client", "Server"])
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0], ("Client", "Server", "->>", "Login request"))
+        self.assertEqual(messages[1], ("Server", "Client", "-->>", "Auth token"))
+
+    def test_diagram_preview_architecture_parses_er(self) -> None:
+        from scripts.html_review_workbench.render import _diagram_preview_architecture
+
+        source = (
+            "erDiagram\n"
+            "  USER ||--o{ ORDER : places\n"
+            "  ORDER ||--|{ LINE_ITEM : contains\n"
+        )
+        entities, relations = _diagram_preview_architecture(source)
+        self.assertEqual(len(entities), 3)
+        entity_names = [e[0] for e in entities]
+        self.assertIn("USER", entity_names)
+        self.assertIn("ORDER", entity_names)
+        self.assertIn("LINE_ITEM", entity_names)
+        self.assertEqual(len(relations), 2)
+
+    def test_diagram_preview_timeline_parses_gantt(self) -> None:
+        from scripts.html_review_workbench.render import _diagram_preview_timeline
+
+        source = (
+            "gantt\n"
+            "  dateFormat YYYY-MM-DD\n"
+            "  section Phase1\n"
+            "  Design : 2026-01-01, 30d\n"
+            "  section Phase2\n"
+            "  Develop : 2026-02-01, 60d\n"
+        )
+        sections, subtype = _diagram_preview_timeline(source)
+        self.assertEqual(subtype, "gantt")
+        self.assertEqual(len(sections), 2)
+        self.assertEqual(sections[0][0], "Phase1")
+        self.assertEqual(sections[1][0], "Phase2")
+        self.assertEqual(sections[0][1][0][0], "Design")
+
+    def test_diagram_preview_matrix_parses_quadrant(self) -> None:
+        from scripts.html_review_workbench.render import _diagram_preview_matrix
+
+        source = (
+            "quadrantChart\n"
+            "  title Priority\n"
+            "  x-axis Low --> High\n"
+            "  y-axis Low --> High\n"
+            "  Alpha: [0.8, 0.9]\n"
+            "  Beta: [0.2, 0.3]\n"
+        )
+        title, x_lo, x_hi, y_lo, y_hi, points = _diagram_preview_matrix(source)
+        self.assertEqual(title, "Priority")
+        self.assertEqual(x_lo, "Low")
+        self.assertEqual(x_hi, "High")
+        self.assertEqual(len(points), 2)
+        self.assertEqual(points[0][0], "Alpha")
+        self.assertAlmostEqual(points[0][1], 0.8)
 
 
 def _minimal_png_bytes() -> bytes:
