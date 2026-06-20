@@ -128,6 +128,42 @@ class PreviewServerTest(unittest.TestCase):
                 session.process.terminate()
                 session.process.wait(timeout=5)
 
+    def test_wait_for_ready_signal_reads_from_non_socket_pipe(self) -> None:
+        # Regression: the ready-signal wait must not select() on the child
+        # stdout pipe. select() on a pipe is POSIX-only and raises
+        # OSError WinError 10038 on Windows. os.pipe() yields non-socket FDs,
+        # reproducing that path on every platform.
+        from scripts.html_review_workbench.preview_server import _wait_for_ready_signal
+
+        read_fd, write_fd = os.pipe()
+        reader = os.fdopen(read_fd, "rb", buffering=0)
+        with os.fdopen(write_fd, "wb", buffering=0) as writer:
+            writer.write(b'{"port": 51234}\n')
+
+        class _FakeProcess:
+            def __init__(self, stdout: object) -> None:
+                self.stdout = stdout
+
+        port = _wait_for_ready_signal(_FakeProcess(reader), timeout=5.0)
+        self.assertEqual(port, 51234)
+
+    def test_wait_for_ready_signal_times_out_without_blocking(self) -> None:
+        # A hung child must raise instead of blocking the parent forever.
+        from scripts.html_review_workbench.preview_server import _wait_for_ready_signal
+
+        read_fd, write_fd = os.pipe()
+        reader = os.fdopen(read_fd, "rb", buffering=0)
+
+        class _FakeProcess:
+            def __init__(self, stdout: object) -> None:
+                self.stdout = stdout
+
+        try:
+            with self.assertRaises(PreviewConfigurationError):
+                _wait_for_ready_signal(_FakeProcess(reader), timeout=0.2)
+        finally:
+            os.close(write_fd)
+
     def test_preview_server_exits_when_owner_pid_exits(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import argparse
 import os
-import selectors
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -83,16 +82,34 @@ class PreviewSession:
 def _wait_for_ready_signal(
     process: subprocess.Popen[bytes], timeout: float = 5.0
 ) -> int:
-    """サーバーの ready シグナルを読み、実ポートを返す。"""
-    sel = selectors.DefaultSelector()
+    """サーバーの ready シグナルを読み、実ポートを返す。
+
+    子プロセスの stdout から ready 行（ポート情報の JSON）を timeout 付きで読む。
+    パイプに対する ``select()`` は POSIX 専用で Windows では ``OSError``
+    (WinError 10038) になるため、クロスプラットフォームなブロッキング
+    ``readline()`` をワーカースレッドで実行し、``join(timeout)`` で待機する。
+    """
+    result: dict[str, object] = {}
+
+    def _read_ready_line() -> None:
+        try:
+            result["line"] = process.stdout.readline()
+        except Exception as exc:  # pragma: no cover - defensive
+            result["error"] = exc
+
+    reader = threading.Thread(target=_read_ready_line, daemon=True)
+    reader.start()
+    reader.join(timeout)
     try:
-        sel.register(process.stdout, selectors.EVENT_READ)
-        events = sel.select(timeout=timeout)
-        if not events:
+        if reader.is_alive():
             raise PreviewConfigurationError(
                 "preview server did not become ready within timeout"
             )
-        line = process.stdout.readline()
+        if "error" in result:
+            raise PreviewConfigurationError(
+                "preview server failed before becoming ready"
+            ) from result["error"]  # type: ignore[misc]
+        line = result.get("line") or b""
         if not line:
             raise PreviewConfigurationError(
                 "preview server exited before becoming ready"
@@ -100,8 +117,11 @@ def _wait_for_ready_signal(
         signal = json.loads(line)
         return int(signal["port"])
     finally:
-        sel.close()
-        if process.stdout:
+        # Only close stdout once the reader thread has finished. Closing a
+        # BufferedReader while another thread is blocked inside readline()
+        # deadlocks on the buffer lock. On timeout the caller terminates the
+        # process, which releases the pipe and lets the daemon thread exit.
+        if not reader.is_alive() and process.stdout:
             process.stdout.close()
 
 
