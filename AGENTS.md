@@ -60,8 +60,14 @@ python3 -m scripts.html_review_workbench.cli --help
 - コメントの確認質問はチャットだけで返さず、HTMLのコメントスレッドへ agent reply として書き戻す。
 - Preview Runtime は Tailscale IPv4 を優先し、fallback は `127.0.0.1`。`0.0.0.0` bindは禁止。
 - 外部アップロード型の図式レンダラーは承認なしに使わない。
-- git commit 時は必ず `.claude-plugin/plugin.json` と `.codex-plugin/plugin.json` の
-  `version` フィールドを semver に従って更新する。バージョン更新なしの commit は禁止。
+- git commit 時は必ず以下の **4 ファイル全て** の `version` フィールドを同じ値に揃えて
+  semver に従って更新する。バージョン更新なしの commit は禁止。
+  1. `.claude-plugin/plugin.json`
+  2. `.codex-plugin/plugin.json`
+  3. `.claude-plugin/marketplace.json`（`metadata.version` と `plugins[0].version` の 2 箇所）
+  4. `pyproject.toml`
+
+  4 ファイルの version 一致は `test_project_layout.py` のテストで検証される。
 
   | 変更種別 | bump | 例 |
   |----------|------|----|

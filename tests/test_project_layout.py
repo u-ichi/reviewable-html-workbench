@@ -5,6 +5,8 @@ import os
 import unittest
 from pathlib import Path
 
+import tomllib
+
 from scripts.html_review_workbench import cli
 
 
@@ -19,6 +21,20 @@ class ProjectLayoutTest(unittest.TestCase):
             payload = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(payload["name"], "reviewable-html-workbench")
             self.assertEqual(payload["skills"], "./skills/")
+
+    def test_all_version_files_are_in_sync(self) -> None:
+        claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        marketplace = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        with open(ROOT / "pyproject.toml", "rb") as f:
+            pyproject = tomllib.load(f)
+
+        version = claude["version"]
+        self.assertTrue(version, "version must not be empty")
+        self.assertEqual(codex["version"], version, ".codex-plugin/plugin.json")
+        self.assertEqual(marketplace["metadata"]["version"], version, "marketplace metadata.version")
+        self.assertEqual(marketplace["plugins"][0]["version"], version, "marketplace plugins[0].version")
+        self.assertEqual(pyproject["project"]["version"], version, "pyproject.toml")
 
     def test_codex_marketplace_entry_points_to_plugin_root(self) -> None:
         path = ROOT / ".agents" / "plugins" / "marketplace.json"
