@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -72,6 +73,43 @@ class ProjectLayoutTest(unittest.TestCase):
             self.assertIn("description:", text)
             self.assertIn("Triggers:", text)
             self.assertIn("使用しない場面:", text)
+
+    def test_plan_preview_hooks_define_plan_mode_pretooluse_matchers(self) -> None:
+        path = ROOT / "hooks" / "hooks.json"
+        self.assertTrue(path.exists())
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        pre_tool_use = payload["hooks"]["PreToolUse"]
+
+        by_matcher = {entry["matcher"]: entry for entry in pre_tool_use}
+        self.assertIn("ExitPlanMode", by_matcher)
+        self.assertIn("EnterPlanMode", by_matcher)
+
+        exit_commands = [hook["command"] for hook in by_matcher["ExitPlanMode"]["hooks"]]
+        enter_commands = [hook["command"] for hook in by_matcher["EnterPlanMode"]["hooks"]]
+        self.assertTrue(any("gate.sh" in command for command in exit_commands))
+        self.assertTrue(any("cleanup.sh" in command for command in enter_commands))
+
+    def test_plan_preview_hook_scripts_are_executable(self) -> None:
+        hooks_payload = json.loads((ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        commands = [
+            hook["command"]
+            for entry in hooks_payload["hooks"]["PreToolUse"]
+            for hook in entry["hooks"]
+        ]
+        expected_scripts = {
+            ROOT / "hooks" / "plan-preview-gate.sh",
+            ROOT / "hooks" / "plan-preview-cleanup.sh",
+        }
+
+        referenced_scripts = {
+            ROOT / command.split("${CLAUDE_PLUGIN_ROOT}/", 1)[1].split('"', 1)[0]
+            for command in commands
+            if "${CLAUDE_PLUGIN_ROOT}/" in command
+        }
+        self.assertEqual(referenced_scripts, expected_scripts)
+        for path in expected_scripts:
+            self.assertTrue(path.exists(), str(path))
+            self.assertTrue(os.access(path, os.X_OK), str(path))
 
     def test_review_preview_kill_helper_has_narrow_permission_allow(self) -> None:
         settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))

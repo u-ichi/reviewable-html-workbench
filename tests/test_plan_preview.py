@@ -11,8 +11,10 @@ from pathlib import Path
 
 from scripts.html_review_workbench.plan_preview import (
     MARKER_FILE,
+    PLAN_PREVIEW_SENTINEL_DIR_NAME,
     ROOT_PREFIX,
     PlanPreviewError,
+    _remove_plan_preview_sentinel,
     build_plan_preview_model,
     create_plan_preview,
     read_payload,
@@ -94,6 +96,71 @@ class PlanPreviewTest(unittest.TestCase):
             self.assertEqual(seen["idle_timeout"], 60)
         finally:
             if result.root.exists():
+                stop_plan_preview(result.root)
+
+    def test_create_plan_preview_writes_claude_session_sentinel(self) -> None:
+        old_session_id = os.environ.get("CLAUDE_SESSION_ID")
+        session_id = f"test-plan-preview-{os.getpid()}"
+        os.environ["CLAUDE_SESSION_ID"] = session_id
+        _remove_plan_preview_sentinel()
+        result = None
+
+        def fake_start_preview(root: Path, mode: str, idle_timeout: float) -> SimpleNamespace:
+            return SimpleNamespace(
+                url="http://127.0.0.1:54321/index.html",
+                pid=os.getpid(),
+                process=None,
+            )
+
+        try:
+            result = create_plan_preview(
+                _payload(),
+                ttl=60,
+                mode="local",
+                preview_starter=fake_start_preview,
+                cleanup_starter=lambda root, pid, ttl: None,
+            )
+            sentinel = Path(tempfile.gettempdir()) / PLAN_PREVIEW_SENTINEL_DIR_NAME / session_id
+            payload = json.loads(sentinel.read_text(encoding="utf-8"))
+            self.assertEqual(payload["preview_id"], result.id)
+            self.assertIsInstance(payload["created_at"], str)
+            self.assertTrue(payload["created_at"])
+        finally:
+            _remove_plan_preview_sentinel()
+            if old_session_id is None:
+                os.environ.pop("CLAUDE_SESSION_ID", None)
+            else:
+                os.environ["CLAUDE_SESSION_ID"] = old_session_id
+            if result is not None and result.root.exists():
+                stop_plan_preview(result.root)
+
+    def test_create_plan_preview_does_not_write_sentinel_without_claude_session_id(self) -> None:
+        old_session_id = os.environ.pop("CLAUDE_SESSION_ID", None)
+        sentinel_dir = Path(tempfile.gettempdir()) / PLAN_PREVIEW_SENTINEL_DIR_NAME
+        before = set(sentinel_dir.iterdir()) if sentinel_dir.exists() else set()
+        result = None
+
+        def fake_start_preview(root: Path, mode: str, idle_timeout: float) -> SimpleNamespace:
+            return SimpleNamespace(
+                url="http://127.0.0.1:54321/index.html",
+                pid=os.getpid(),
+                process=None,
+            )
+
+        try:
+            result = create_plan_preview(
+                _payload(),
+                ttl=60,
+                mode="local",
+                preview_starter=fake_start_preview,
+                cleanup_starter=lambda root, pid, ttl: None,
+            )
+            after = set(sentinel_dir.iterdir()) if sentinel_dir.exists() else set()
+            self.assertEqual(after, before)
+        finally:
+            if old_session_id is not None:
+                os.environ["CLAUDE_SESSION_ID"] = old_session_id
+            if result is not None and result.root.exists():
                 stop_plan_preview(result.root)
 
     def test_create_plan_preview_validates_bundle_before_starting_preview(self) -> None:

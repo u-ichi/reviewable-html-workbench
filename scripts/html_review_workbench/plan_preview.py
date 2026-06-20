@@ -25,6 +25,7 @@ from scripts.html_review_workbench.validate_bundle import validate_bundle
 MAX_PAYLOAD_BYTES = 512 * 1024
 MARKER_FILE = ".rhw-plan-preview"
 ROOT_PREFIX = "rhw-plan-preview-"
+PLAN_PREVIEW_SENTINEL_DIR_NAME = "claude-plan-preview"
 DEFAULT_TTL_SECONDS = 1800.0
 _CLEANUP_WATCHERS: list[subprocess.Popen[bytes]] = []
 
@@ -109,6 +110,7 @@ def create_plan_preview(
     session = preview_starter(root, mode, idle_timeout=ttl)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
     cleanup_process = cleanup_starter(root, session.pid, ttl)
+    _write_plan_preview_sentinel(preview_id)
     return PlanPreviewResult(
         id=preview_id,
         url=session.url,
@@ -412,6 +414,33 @@ def _start_cleanup_watcher(root: Path, pid: int, ttl: float) -> subprocess.Popen
     )
     _CLEANUP_WATCHERS.append(process)
     return process
+
+
+def _plan_preview_sentinel_path() -> Path | None:
+    session_id = os.environ.get("CLAUDE_SESSION_ID", "")
+    if not session_id or "/" in session_id or session_id in {".", ".."}:
+        return None
+    sentinel_dir = Path(tempfile.gettempdir()) / PLAN_PREVIEW_SENTINEL_DIR_NAME
+    return sentinel_dir / session_id
+
+
+def _write_plan_preview_sentinel(preview_id: str) -> None:
+    sentinel = _plan_preview_sentinel_path()
+    if sentinel is None:
+        return
+    sentinel_dir = sentinel.parent
+    sentinel_dir.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text(
+        json.dumps({"preview_id": preview_id, "created_at": _now_iso()}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _remove_plan_preview_sentinel() -> None:
+    sentinel = _plan_preview_sentinel_path()
+    if sentinel is None:
+        return
+    sentinel.unlink(missing_ok=True)
 
 
 def _pid_is_alive(pid: int) -> bool:

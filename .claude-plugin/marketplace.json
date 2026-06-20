@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Reviewable HTML Workbench — generate reviewable HTML documents with preview and review comment support.",
-    "version": "1.11.0"
+    "version": "1.11.3"
   },
   "plugins": [
     {
       "name": "reviewable-html-workbench",
       "description": "Generate reviewable HTML documents, serve previews, collect comments, and feed review outcomes back into agent workflows.",
-      "version": "1.11.0",
+      "version": "1.11.3",
       "author": {
         "name": "u1"
       },

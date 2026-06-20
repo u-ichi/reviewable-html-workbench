@@ -23,7 +23,7 @@ Create a temporary visual preview for a Plan Mode proposal. The user should not 
 ## Strict procedure profile
 
 - Strictness: strict-procedure。Plan Mode の正式な実装基準は `<proposed_plan>` 本文であり、previewは判断補助として扱う。
-- Hard gates: 外部サービス送信、shared state変更、永続ファイル出力、hook追加は行わない。
+- Hard gates: 外部サービス送信、shared state変更、永続ファイル出力、skill実行時にhookを動的に追加しない（plugin同梱の静的hook定義は対象外）。
 - Forcing function: `plan-preview` CLI、TTL付き一時ディレクトリ、`Plan preview: <url>` 行、失敗時の明示。
 - Completion receipt: `<proposed_plan>` 内に preview URL または `Plan preview: unavailable (<reason>)` を含める。
 
