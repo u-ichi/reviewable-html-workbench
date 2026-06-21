@@ -168,7 +168,11 @@ def start_preview(
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    port = _wait_for_ready_signal(process)
+    try:
+        port = _wait_for_ready_signal(process)
+    except Exception:
+        _terminate_preview_process(process)
+        raise
     url = f"http://{bind}:{port}/index.html"
     manifest_path = root / "annotations" / f"preview-session-{session_id}.json"
     session = PreviewSession(
@@ -191,6 +195,17 @@ def start_preview(
     )
     write_session_manifest(manifest_path, session)
     return session
+
+
+def _terminate_preview_process(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def current_owner_session(environ: dict[str, str] | None = None) -> str | None:

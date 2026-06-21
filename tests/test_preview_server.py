@@ -10,6 +10,7 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.html_review_workbench.preview_server import (
     PreviewConfigurationError,
@@ -163,6 +164,44 @@ class PreviewServerTest(unittest.TestCase):
                 _wait_for_ready_signal(_FakeProcess(reader), timeout=0.2)
         finally:
             os.close(write_fd)
+            reader.close()
+
+    def test_start_preview_terminates_process_when_ready_signal_fails(self) -> None:
+        class _FakeProcess:
+            pid = 51234
+            stdout = None
+            terminated = False
+            killed = False
+            waited = False
+
+            def poll(self) -> int | None:
+                return None if not self.terminated else -15
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def wait(self, timeout: float | None = None) -> int:
+                self.waited = True
+                return -15
+
+            def kill(self) -> None:
+                self.killed = True
+
+        fake_process = _FakeProcess()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            with patch("scripts.html_review_workbench.preview_server.subprocess.Popen", return_value=fake_process):
+                with patch(
+                    "scripts.html_review_workbench.preview_server._wait_for_ready_signal",
+                    side_effect=PreviewConfigurationError("ready timeout"),
+                ):
+                    with self.assertRaisesRegex(PreviewConfigurationError, "ready timeout"):
+                        start_preview(root, "local")
+
+        self.assertTrue(fake_process.terminated)
+        self.assertTrue(fake_process.waited)
+        self.assertFalse(fake_process.killed)
 
     def test_preview_server_exits_when_owner_pid_exits(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
