@@ -254,7 +254,7 @@ def _payload() -> dict[str, object]:
         ],
         "test_plan": [
             "unit test",
-            "CLI smoke",
+            "CLI疎通確認",
         ],
         "assumptions": [
             "初期版ではhookを追加しない",
