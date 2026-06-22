@@ -187,15 +187,14 @@ python3 -m scripts.html_review_workbench.cli validate \
 
 python3 -m scripts.html_review_workbench.cli preview \
   --root <output-dir> \
-  --mode auto \
-  --owner-pid $PPID
+  --mode auto
 ```
 
-注意: `$PPID` は preview コマンドを直接実行する Bash の親プロセス ID を指す。ラッパースクリプト (bash run-render.sh 等) 内で `$PPID` を使うと、一時的な Bash プロセスの親を監視してしまい、スクリプト完了後に preview server が自動停止する。preview コマンドは常に agent が直接 Bash tool call で実行し、ラッパースクリプトに含めない。
+Codex / Claude では preview コマンドを一回限りの shell から起動することがあるため、標準手順では `--owner-pid` を渡さない。preview server は 24時間アクセスが無い場合に idle timeout で自動停止する。長寿命の所有プロセスが明確に分かる場合だけ `--owner-pid <pid>` を使ってよい。一回限りの shell の `$$` や `$PPID` は短命プロセスを指すため使わない。
 
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、`visual-html-renderer` と同じく `python3 -m scripts.html_review_workbench.preview_host_resolve` で取得したIPv4を `HTML_REVIEW_WORKBENCH_TAILSCALE_IP` に渡してから `preview --mode auto` を起動する。
 
-`preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。`$PPID` で agent セッションのプロセスを監視し、セッション終了時にサーバーも自動停止する。加えて idle timeout でも孤児を防止する。
+`preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。標準では `--owner-pid` を渡さず、24時間アクセスが無い場合に idle timeout で自動停止させる。長寿命の所有プロセスが明確な場合だけ `--owner-pid <pid>` を使う。
 
 レビュー取り込み時は、最新のpreview sessionまたはユーザー指定の成果物rootから `annotations/comments.json` を読み込む。
 

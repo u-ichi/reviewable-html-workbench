@@ -28,6 +28,7 @@ from scripts.html_review_workbench.preview_host_resolve import detect_tailscale_
 ROOT = Path(__file__).resolve().parents[2]
 PreviewMode = Literal["auto", "tailscale", "local"]
 ResolvedMode = Literal["tailscale", "local"]
+DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS = 24 * 60 * 60
 
 
 class PreviewConfigurationError(ValueError):
@@ -130,7 +131,7 @@ def start_preview(
     mode: PreviewMode = "auto",
     owner_session: str | None = None,
     owner_pid: int | None = None,
-    idle_timeout: float = 3600.0,
+    idle_timeout: float = DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
     owner_grace: float = 300.0,
 ) -> PreviewSession:
     root = root.resolve()
@@ -374,7 +375,7 @@ def serve(
     bind: str,
     port: int,
     owner_pid: int | None = None,
-    idle_timeout: float = 3600.0,
+    idle_timeout: float = DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
     owner_grace: float = 300.0,
 ) -> None:
     bind = _validate_bind(bind)
@@ -391,10 +392,17 @@ def serve(
             json.dumps({"ready": True, "port": actual_port}).encode() + b"\n"
         )
         sys.stdout.buffer.flush()
-        if owner_pid and owner_pid > 1:
-            _start_owner_watchdog(server, owner_pid, handler_class, grace_seconds=owner_grace)
         if idle_timeout > 0:
+            handler_class.touch_activity()
             _start_idle_watchdog(server, handler_class, idle_timeout)
+        if owner_pid and owner_pid > 1:
+            _start_owner_watchdog(
+                server,
+                owner_pid,
+                handler_class,
+                grace_seconds=owner_grace,
+                idle_timeout=idle_timeout,
+            )
         _start_comments_file_watcher(root, event_bus)
         server.serve_forever()
 
@@ -415,11 +423,15 @@ def _start_owner_watchdog(
     owner_pid: int,
     handler_class: type[ReviewPreviewHandler],
     grace_seconds: float = 300.0,
+    idle_timeout: float = DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
     interval_seconds: float = 2.0,
 ) -> None:
     def watch() -> None:
         while True:
             if not _pid_is_alive(owner_pid):
+                if idle_timeout > 0 and grace_seconds > 0:
+                    time.sleep(grace_seconds)
+                    return
                 _run_grace_period(server, handler_class, grace_seconds, interval_seconds)
                 return
             time.sleep(interval_seconds)
@@ -536,7 +548,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--owner-session", default="unknown")
     parser.add_argument("--owner-pid", type=int)
-    parser.add_argument("--idle-timeout", type=float, default=3600.0)
+    parser.add_argument("--idle-timeout", type=float, default=DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS)
     parser.add_argument("--owner-grace", type=float, default=300.0)
     parser.add_argument("root", nargs="?")
     return parser

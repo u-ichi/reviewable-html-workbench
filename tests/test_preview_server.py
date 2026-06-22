@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.html_review_workbench.preview_server import (
+    DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
     PreviewConfigurationError,
     resolve_bind,
     start_preview,
@@ -128,6 +129,13 @@ class PreviewServerTest(unittest.TestCase):
                 self.assertIsNotNone(session.process)
                 session.process.terminate()
                 session.process.wait(timeout=5)
+
+    def test_preview_default_idle_timeout_is_24_hours(self) -> None:
+        from scripts.html_review_workbench.cli import build_parser
+
+        args = build_parser().parse_args(["preview", "--root", "/tmp/out", "--mode", "local"])
+        self.assertEqual(DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS, 24 * 60 * 60)
+        self.assertEqual(args.idle_timeout, DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS)
 
     def test_wait_for_ready_signal_reads_from_non_socket_pipe(self) -> None:
         # Regression: the ready-signal wait must not select() on the child
@@ -266,6 +274,28 @@ class PreviewServerTest(unittest.TestCase):
                     session.process.terminate()
                     session.process.wait(timeout=5)
 
+    def test_owner_pid_death_uses_idle_timeout_after_grace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+            owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+            session = start_preview(root, "local", owner_pid=owner.pid, idle_timeout=8, owner_grace=1)
+            try:
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                owner.terminate()
+                owner.wait(timeout=5)
+                time.sleep(4)
+                with urllib.request.urlopen(session.url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+            finally:
+                if owner.poll() is None:
+                    owner.terminate()
+                    owner.wait(timeout=5)
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
+
     def test_preview_server_reads_and_writes_comments_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -378,6 +408,22 @@ class PreviewServerTest(unittest.TestCase):
                 with urllib.request.urlopen(session.url, timeout=5) as response:
                     self.assertEqual(response.status, 200)
                 time.sleep(5)
+                self.assertIsNotNone(session.process)
+                session.process.wait(timeout=5)
+                self.assertIsNotNone(session.process.poll())
+            finally:
+                if session.process is not None and session.process.poll() is None:
+                    session.process.terminate()
+                    session.process.wait(timeout=5)
+
+    def test_preview_server_without_owner_pid_exits_after_idle_timeout_before_first_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "index.html").write_text("<h1>Preview</h1>", encoding="utf-8")
+
+            session = start_preview(root, "local", idle_timeout=1)
+            try:
+                self.assertIsNone(session.owner_pid)
                 self.assertIsNotNone(session.process)
                 session.process.wait(timeout=5)
                 self.assertIsNotNone(session.process.poll())

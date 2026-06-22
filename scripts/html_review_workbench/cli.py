@@ -23,7 +23,11 @@ from scripts.html_review_workbench.plan_preview import (
     stop_plan_preview,
 )
 from scripts.html_review_workbench.render import render_bundle
-from scripts.html_review_workbench.preview_server import PreviewConfigurationError, start_preview
+from scripts.html_review_workbench.preview_server import (
+    DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
+    PreviewConfigurationError,
+    start_preview,
+)
 from scripts.html_review_workbench.resolution_gate import check_gate as run_check_gate
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
@@ -382,7 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
     preview_parser.add_argument("--mode", choices=["auto", "tailscale", "local", "off"], default="auto")
     preview_parser.add_argument("--owner-session")
     preview_parser.add_argument("--owner-pid", type=int)
-    preview_parser.add_argument("--idle-timeout", type=float, default=3600.0)
+    preview_parser.add_argument("--idle-timeout", type=float, default=DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS)
     preview_parser.add_argument("--owner-grace", type=float, default=300.0)
     preview_parser.set_defaults(func=preview)
 

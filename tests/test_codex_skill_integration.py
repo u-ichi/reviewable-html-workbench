@@ -157,6 +157,9 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("`plan-preview` を使う", visual)
         self.assertIn("Do not use this skill for Plan Mode proposal previews", visual)
         self.assertNotIn("--owner-pid $$", visual)
+        self.assertNotIn("--owner-pid $PPID", visual)
+        self.assertIn("標準では `--owner-pid` を渡さず", visual)
+        self.assertIn("24時間アクセスが無い場合", visual)
 
     def test_reviewable_design_doc_builds_model_and_reports_preview_url(self) -> None:
         reviewable = (ROOT / "skills/reviewable-design-doc/SKILL.md").read_text(encoding="utf-8")
@@ -168,6 +171,9 @@ class CodexSkillIntegrationTest(unittest.TestCase):
         self.assertIn("source-capture draft", reviewable)
         self.assertIn("返却JSONの `url`", reviewable)
         self.assertNotIn("--owner-pid $$", reviewable)
+        self.assertNotIn("--owner-pid $PPID", reviewable)
+        self.assertIn("標準では `--owner-pid` を渡さず", reviewable)
+        self.assertIn("24時間アクセスが無い場合", reviewable)
 
     def test_plan_preview_skill_guides_plan_mode_without_user_cli(self) -> None:
         plan_preview = (ROOT / "skills/plan-preview/SKILL.md").read_text(encoding="utf-8")
