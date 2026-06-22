@@ -19,7 +19,6 @@ from scripts.html_review_workbench.comment_store import (
 
 DEFAULT_STATE_PATH = "annotations/review-cycle-state.json"
 DEFAULT_AGENT_AUTHOR = "codex"
-DEFAULT_CLARIFICATION_BODY = "Please clarify the expected change so I can apply it safely."
 
 INGESTION_CLASSIFICATIONS = (
     "actionable",
@@ -30,8 +29,42 @@ INGESTION_CLASSIFICATIONS = (
 COMMENT_STATUS_VALUES = ("needs_agent_review", "needs_user_reply", "resolved")
 
 _BLOCKED_KEYWORDS = ("blocked", "cannot", "can't", "unable", "missing source", "no access")
-_CLARIFICATION_KEYWORDS = ("clarify", "which", "whether", "should", "what do you mean", "ambiguous")
-_ACTION_KEYWORDS = ("replace", "rename", "fix", "typo", "add", "remove", "change", "update")
+_CLARIFICATION_KEYWORDS = (
+    "clarify",
+    "which",
+    "whether",
+    "should",
+    "what do you mean",
+    "ambiguous",
+    "どちら",
+    "どれ",
+    "未定",
+)
+_ACTION_KEYWORDS = (
+    "replace",
+    "rename",
+    "fix",
+    "typo",
+    "add",
+    "remove",
+    "change",
+    "update",
+    "変更",
+    "置き換え",
+    "置換",
+    "修正",
+    "追加",
+    "削除",
+    "消して",
+    "書いて",
+    "まとめて",
+    "表に",
+    "具体的",
+    "掲載禁止",
+    "一切書かない",
+    "関係無い",
+    "関係ない",
+)
 _REPLACEMENT_PATTERNS = (
     re.compile(r"replace\s+['\"](?P<old>.+?)['\"]\s+with\s+['\"](?P<new>.+?)['\"]", re.IGNORECASE),
     re.compile(r"replace\s+selected\s+text\s+with\s+['\"](?P<new>.+?)['\"]", re.IGNORECASE),
@@ -68,20 +101,7 @@ def ingest_review(
     replies_added = 0
     for thread in payload["comments"]:
         classified = classify_thread(thread)
-        if classified["classification"] == "needs_clarification" and not _has_agent_clarification(thread):
-            thread["replies"].append(
-                make_reply(
-                    author=agent_author,
-                    role="agent",
-                    kind="clarification_request",
-                    body=DEFAULT_CLARIFICATION_BODY,
-                )
-            )
-            thread["status"] = "needs_user_reply"
-            replies_added += 1
-            classified["reply_added"] = True
-        else:
-            classified["reply_added"] = False
+        classified["reply_added"] = False
         classified["status_after"] = thread["status"]
         classifications.append(classified)
 
@@ -141,7 +161,12 @@ def ingest_review(
 def classify_thread(thread: dict[str, Any]) -> dict[str, Any]:
     status = str(thread.get("status", ""))
     comment = str(thread.get("comment", ""))
-    normalized = comment.lower()
+    review_text = " ".join(
+        str(thread.get(key, ""))
+        for key in ("selected_text", "prefix", "suffix", "comment")
+        if thread.get(key)
+    )
+    normalized = review_text.lower()
     classification = "needs_clarification"
     reason = "default_to_clarification"
     replacement = extract_replacement(thread)
@@ -158,7 +183,7 @@ def classify_thread(thread: dict[str, Any]) -> dict[str, Any]:
     elif replacement is not None or _contains_any(normalized, _ACTION_KEYWORDS):
         classification = "actionable"
         reason = "action_keyword_or_replacement"
-    elif "?" in comment or _contains_any(normalized, _CLARIFICATION_KEYWORDS):
+    elif _contains_any(normalized, _CLARIFICATION_KEYWORDS):
         classification = "needs_clarification"
         reason = "clarification_keyword"
 

@@ -63,7 +63,7 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "optional_options": ("--pid",),
     },
     "ingest-review": {
-        "purpose": "Read review comments, classify them, write agent replies, and save review-cycle state.",
+        "purpose": "Read review comments, classify them, and save review-cycle state.",
         "required_options": ("--root",),
         "optional_options": ("--comments", "--state", "--model", "--apply-model"),
     },

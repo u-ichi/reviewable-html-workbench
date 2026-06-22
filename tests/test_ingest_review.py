@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class IngestReviewTest(unittest.TestCase):
-    def test_ingest_review_classifies_threads_adds_reply_and_writes_state(self) -> None:
+    def test_ingest_review_classifies_threads_without_writing_clarification_replies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_comments(
@@ -36,20 +36,87 @@ class IngestReviewTest(unittest.TestCase):
             self.assertEqual(result.payload["summary"]["needs_clarification"], 1)
             self.assertEqual(result.payload["summary"]["blocked"], 1)
             self.assertEqual(result.payload["summary"]["already_addressed"], 1)
-            self.assertEqual(result.payload["summary"]["replies_added"], 1)
+            self.assertEqual(result.payload["summary"]["replies_added"], 0)
             self.assertIn("gate", result.payload)
             self.assertIn("gate", result.payload["gate"])
 
             comments = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
             clarify = _find_thread(comments, "cmt-clarify")
-            self.assertEqual(clarify["status"], "needs_user_reply")
-            self.assertEqual(clarify["replies"][0]["role"], "agent")
-            self.assertEqual(clarify["replies"][0]["kind"], "clarification_request")
+            self.assertEqual(clarify["status"], "needs_agent_review")
+            self.assertEqual(clarify["replies"], [])
 
             state = json.loads((root / "annotations/review-cycle-state.json").read_text(encoding="utf-8"))
             self.assertEqual(state["actionable_comment_ids"], ["cmt-action"])
             self.assertEqual(state["blocked_comment_ids"], ["cmt-blocked"])
             self.assertEqual(state["needs_clarification_comment_ids"], ["cmt-clarify"])
+
+    def test_japanese_review_comments_are_actionable_without_default_reply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_comments(
+                root,
+                [
+                    _thread(
+                        "cmt-roles",
+                        "architecture",
+                        "Mac Studio / mac mini",
+                        "Mac Studioと書いてるところは母艦､mac miniと書いてるところはComputer Use実行マシンに全体的に変更",
+                    ),
+                    _thread(
+                        "cmt-specific",
+                        "architecture",
+                        "remote API",
+                        "ここでいってうrremote APIとは具体的に何?",
+                    ),
+                    _thread(
+                        "cmt-table",
+                        "speed",
+                        "高速化手法",
+                        "それぞれの手法でどういう効果がどの程度あったかを実績数値を踏まえて表にまとめて",
+                    ),
+                    _thread(
+                        "cmt-prohibit",
+                        "troubleshooting",
+                        "ChatGPT利用",
+                        "ChagGPT利用云々は記事には一切書かない形で",
+                    ),
+                    _thread("cmt-also-prohibit", "operation", "投入履歴", "これも掲載禁止"),
+                    _thread("cmt-unrelated", "troubleshooting", "repo に混ざる", "一般論としては関係無い話"),
+                    _thread(
+                        "cmt-protocol",
+                        "architecture-flow",
+                        "通信プロトコル",
+                        "通信プロトコルの流れをもう少し具体的に書いて｡何の通信プロトコルの上に何のデータを流してるのかが具体的に欲しい",
+                    ),
+                ],
+            )
+
+            result = ingest_review(root)
+
+            self.assertEqual(result.payload["summary"]["total"], 7)
+            self.assertEqual(result.payload["summary"]["actionable"], 7)
+            self.assertEqual(result.payload["summary"]["needs_clarification"], 0)
+            self.assertEqual(result.payload["summary"]["replies_added"], 0)
+
+            comments = json.loads((root / "annotations/comments.json").read_text(encoding="utf-8"))
+            for thread in comments["comments"]:
+                self.assertEqual(thread["status"], "needs_agent_review")
+                self.assertEqual(thread["replies"], [])
+
+            state = json.loads((root / "annotations/review-cycle-state.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                state["actionable_comment_ids"],
+                [
+                    "cmt-roles",
+                    "cmt-specific",
+                    "cmt-table",
+                    "cmt-prohibit",
+                    "cmt-also-prohibit",
+                    "cmt-unrelated",
+                    "cmt-protocol",
+                ],
+            )
+            self.assertEqual(state["needs_clarification_comment_ids"], [])
 
     def test_ingestion_classification_is_separate_from_comment_status(self) -> None:
         self.assertEqual(set(COMMENT_STATUS_VALUES), {"needs_agent_review", "needs_user_reply", "resolved"})

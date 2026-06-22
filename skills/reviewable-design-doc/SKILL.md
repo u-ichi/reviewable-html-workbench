@@ -74,10 +74,10 @@ IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で 
 
 ### 手順
 
-1. `ingest-review` CLI でコメントを分類する。
-2. 分類結果の `needs_clarification` コメントについて、`comment` と `selected_text` を読み、設計資料の該当箇所の文脈を踏まえてコメントの意図を理解する。
-3. 各コメントに対する実質的な回答を `add-reply` CLI で HTML コメントスレッドに書き戻す。
-4. `actionable` なコメントは設計へ反映し、必要に応じて再 render する。
+1. `ingest-review` CLI でコメントを分類し、`annotations/review-cycle-state.json` に状態を保存する。`ingest-review` はコメントスレッドへ返信を書かない。
+2. 分類結果に関係なく、各コメントの `comment` と `selected_text` を読み、設計資料の該当箇所の文脈を踏まえてコメントの意図を理解する。
+3. 回答・受領・確認依頼が必要なコメントには、実質的な回答を `add-reply` CLI で HTML コメントスレッドに書き戻す。
+4. `actionable` なコメントは、解決待ちゲートが開いてから設計へ反映し、必要に応じて再 render する。
 5. ユーザーにブラウザでの確認を依頼する。
 
 ### なぜチャット回答ではなく add-reply か
@@ -88,7 +88,7 @@ IMPORTANT: レビューコメントへの回答は、必ず `add-reply` CLI で 
 
 ## Handling Review Comments
 
-Start this workflow when the user says comments were added or asks to `ingest review comments`, `process review comments`, `reply to review comments`, or `apply resolved comments`. Always run `ingest-review`, inspect each comment's `comment` and `selected_text`, write substantive clarification replies with `add-reply`, and apply actionable feedback only when the review gates allow it. Do not answer only in chat; the durable answer belongs in the HTML comment thread.
+Start this workflow when the user says comments were added or asks to `ingest review comments`, `process review comments`, `reply to review comments`, or `apply resolved comments`. Always run `ingest-review` to classify comments and write review-cycle state only, inspect each comment's `comment` and `selected_text`, write substantive answers with `add-reply` when a thread needs a response, and apply actionable feedback only when the review gates allow it. Do not answer only in chat; the durable answer belongs in the HTML comment thread.
 
 ## コメント自動回答と解決待ちゲート
 
@@ -109,9 +109,9 @@ agent は Monitor ツールでこのプロセスの stdout を監視する。各
 
 `watch-comments` から `comment_updated` イベントを受信したら:
 
-1. `ingest-review --root <dir>` でコメントを分類する。
-2. `needs_clarification` コメントについて、`comment` と `selected_text` を読み、設計資料の文脈を踏まえて実質的な回答を作成する。
-3. `add-reply --root <dir> --thread-id <id> --body "<reply>"` で HTML コメントスレッドに書き戻す。
+1. `ingest-review --root <dir>` でコメントを分類し、状態だけを保存する。`ingest-review` の実行だけで返信が追加されることはない。
+2. `comment` と `selected_text` を読み、設計資料の文脈を踏まえて実質的な回答を作成する。
+3. 回答・受領・確認依頼が必要なコメントにだけ `add-reply --root <dir> --thread-id <id> --body "<reply>"` で HTML コメントスレッドに書き戻す。
 4. 回答本文をコンソール（会話）にも出力する。ユーザーはブラウザとコンソールの両方で回答を確認できる。
 5. `actionable` コメントにはまだ設計変更を適用しない。回答で受領を伝え、スレッド解決後に反映する旨を書く。
 6. 自動回答が完了したら、設計変更には進まず停止する。`ingest-review` と `watch-comments` の出力に含まれる `gate` フィールドが `blocked` の場合、`document-model.json` を含むいかなる設計ファイルも変更してはならない。ゲートが `open` になるまで待機する。
@@ -204,7 +204,7 @@ python3 -m scripts.html_review_workbench.cli ingest-review \
   --root <output-dir>
 ```
 
-確認が必要なコメントへagent replyを書き戻す場合は、`ingest-review` の分類結果から対象thread idを確認し、同じ成果物rootへ `add-reply` を実行する。
+回答・受領・確認依頼が必要なコメントへagent replyを書き戻す場合は、`ingest-review` の分類結果から対象thread idを確認し、同じ成果物rootへ `add-reply` を実行する。
 
 ```bash
 python3 -m scripts.html_review_workbench.cli add-reply \
@@ -254,7 +254,7 @@ Use the same shared CLI as `visual-html-renderer`. Resolve the renderer repo roo
 - `check-model` が `status: ok` 相当の成功終了を返している。
 - preview有効時は、レビュー用URLをユーザーへ提示している。
 - レビュー取り込み後、`annotations/review-cycle-state.json` が生成されている。
-- `needs_clarification` のコメントには、`add-reply` によりHTMLコメントスレッド上のagent replyが追加されている。
+- 回答・受領・確認依頼が必要なコメントには、`add-reply` によりHTMLコメントスレッド上のagent replyが追加されている。
 - コメント反映でユーザー確認が必要な場合は、チャットだけでなくHTMLコメントへ返信済みであることを確認している。
 
 ## 実シナリオ検証
@@ -266,7 +266,7 @@ Use the same shared CLI as `visual-html-renderer`. Resolve the renderer repo roo
 1. ユーザーが HTML 上にコメントを入れたことを確認する（ユーザーからの報告を待つ）。
 2. `ingest-review` で `comments.json` を取り込み、分類結果を読む。
 3. 各コメントの `comment` と `selected_text` を読み、設計資料の該当箇所の文脈を踏まえて、コメントの意図を理解する。
-4. `needs_clarification` のコメントに対して、コメント内容に対する実質的な返答を考え、`add-reply` で HTML コメントスレッドに書き戻す。
+4. 回答・受領・確認依頼が必要なコメントに対して、コメント内容に対する実質的な返答を考え、`add-reply` で HTML コメントスレッドに書き戻す。
 5. ユーザーに返信した旨を伝え、ブラウザで表示と内容の両方を確認してもらう。
 
 検証の完了条件: ユーザーがブラウザ上で agent の返信を読み、内容と表示の両方が意図通りであることを確認した時点。CLI が正しい JSON を返したことではない。
