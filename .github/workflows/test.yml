@@ -34,10 +34,19 @@ jobs:
           pyproject_version="$(grep -E '^version = ' pyproject.toml | sed -E 's/^version = "([^"]+)"/\1/')"
           claude_plugin_version="$(python3 -c 'import json; print(json.load(open(".claude-plugin/plugin.json", encoding="utf-8"))["version"])')"
           codex_plugin_version="$(python3 -c 'import json; print(json.load(open(".codex-plugin/plugin.json", encoding="utf-8"))["version"])')"
-          if [ "$pyproject_version" != "$claude_plugin_version" ] || [ "$pyproject_version" != "$codex_plugin_version" ]; then
-            echo "Version mismatch:"
-            echo "pyproject.toml: $pyproject_version"
-            echo ".claude-plugin/plugin.json: $claude_plugin_version"
-            echo ".codex-plugin/plugin.json: $codex_plugin_version"
-            exit 1
-          fi
+          marketplace_meta_version="$(python3 -c 'import json; print(json.load(open(".claude-plugin/marketplace.json", encoding="utf-8"))["metadata"]["version"])')"
+          marketplace_plugin_version="$(python3 -c 'import json; print(json.load(open(".claude-plugin/marketplace.json", encoding="utf-8"))["plugins"][0]["version"])')"
+          mismatch=0
+          for name_ver in \
+            "pyproject.toml:$pyproject_version" \
+            ".claude-plugin/plugin.json:$claude_plugin_version" \
+            ".codex-plugin/plugin.json:$codex_plugin_version" \
+            "marketplace.json metadata.version:$marketplace_meta_version" \
+            "marketplace.json plugins[0].version:$marketplace_plugin_version"; do
+            ver="${name_ver#*:}"
+            if [ "$ver" != "$pyproject_version" ]; then
+              echo "Version mismatch: ${name_ver%%:*} = $ver (expected $pyproject_version)"
+              mismatch=1
+            fi
+          done
+          if [ "$mismatch" -eq 1 ]; then exit 1; fi
