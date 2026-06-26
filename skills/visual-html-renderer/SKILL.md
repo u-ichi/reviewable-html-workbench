@@ -208,6 +208,10 @@ python3 -m scripts.html_review_workbench.cli validate \
 python3 -m scripts.html_review_workbench.cli preview \
   --root <output-dir> \
   --mode auto
+
+python3 -m scripts.html_review_workbench.cli publish \
+  --root <rendered-bundle-dir> \
+  --output <publish-output-dir>
 ```
 
 Codex / Claude では preview コマンドを一回限りの shell から起動することがあるため、標準手順では `--owner-pid` を渡さない。preview server は 24時間アクセスが無い場合に idle timeout で自動停止する。

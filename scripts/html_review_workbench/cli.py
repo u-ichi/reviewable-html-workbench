@@ -22,6 +22,7 @@ from scripts.html_review_workbench.plan_preview import (
     read_payload as read_plan_preview_payload,
     stop_plan_preview,
 )
+from scripts.html_review_workbench.publish import PublishError, publish_bundle
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.preview_server import (
     DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS,
@@ -95,6 +96,11 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
         "required_options": ("--root",),
         "optional_options": ("--url", "--message"),
     },
+    "publish": {
+        "purpose": "Create a clean standalone HTML from a rendered bundle with review UI stripped.",
+        "required_options": ("--root",),
+        "optional_options": ("--output",),
+    },
 }
 
 
@@ -124,6 +130,21 @@ def render(args: argparse.Namespace) -> int:
     index_path = render_bundle(Path(args.model), output_path)
     print(index_path)
     _check_render_gate(output_path)
+    return 0
+
+
+def publish(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    if args.output:
+        output = Path(args.output)
+    else:
+        output = root.parent / f"{root.name}-published"
+    try:
+        result = publish_bundle(root, output)
+    except (OSError, PublishError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(json.dumps(result, ensure_ascii=False))
     return 0
 
 
@@ -470,6 +491,15 @@ def build_parser() -> argparse.ArgumentParser:
     notify_update_parser.add_argument("--url")
     notify_update_parser.add_argument("--message", default="")
     notify_update_parser.set_defaults(func=notify_update)
+
+    publish_parser = subparsers.add_parser(
+        "publish",
+        help=str(COMMAND_CONTRACT["publish"]["purpose"]),
+        description=str(COMMAND_CONTRACT["publish"]["purpose"]),
+    )
+    publish_parser.add_argument("--root", required=True)
+    publish_parser.add_argument("--output")
+    publish_parser.set_defaults(func=publish)
 
     return parser
 
