@@ -58,6 +58,48 @@ class ModelQualityTest(unittest.TestCase):
 
         self.assertTrue(result.ok, result.errors)
 
+    def test_check_model_accepts_mermaid_v11_diagram_prefixes(self) -> None:
+        prefixes = [
+            "flowchart",
+            "graph",
+            "sequenceDiagram",
+            "stateDiagram",
+            "classDiagram",
+            "erDiagram",
+            "gantt",
+            "journey",
+            "timeline",
+            "mindmap",
+            "quadrantChart",
+            "C4Context",
+            "pie",
+            "gitGraph",
+            "requirementDiagram",
+            "sankey",
+            "xychart",
+            "architecture",
+            "block",
+            "packet",
+            "kanban",
+            "radar",
+            "treemap",
+            "zenuml",
+        ]
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix):
+                result = check_model_quality(
+                    _write_model(
+                        {
+                            "id": f"diagram-{prefix.lower()}",
+                            "type": "diagram",
+                            "heading_level": 2,
+                            "content": f"{prefix}\n  A --> B",
+                        }
+                    )
+                )
+                self.assertTrue(result.ok, result.errors)
+                self.assertEqual(result.warnings, [])
+
 
 def _write_model(block: dict[str, object]) -> Path:
     tmp_dir = tempfile.TemporaryDirectory()

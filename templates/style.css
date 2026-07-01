@@ -458,8 +458,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   background: var(--paper-2);
 }
 
-.block-content pre,
-.diagram-source {
+.block-content pre {
   overflow-x: auto;
   margin: 0;
   padding: 14px 16px;
@@ -468,8 +467,7 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
   border: 1px solid var(--code-line);
   border-radius: var(--r-md);
 }
-.block-content pre code,
-.diagram-source code {
+.block-content pre code {
   color: #f8fafc;
   font-family: var(--font-mono);
   font-size: 12.5px;
@@ -596,82 +594,9 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .log-line.is-warn { background: rgba(230,192,116,.07); }
 .log-line.is-err  { background: rgba(224,143,168,.09); }
 
-/* ---------- 12. DIAGRAM FALLBACK -------------------------- */
-.diagram-fallback {
-  border: 1px dashed var(--line-3); border-radius: var(--r-md); background: var(--paper-2);
-  padding: var(--sp-5); position: relative;
-}
-.diagram-fallback .df-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-caption); color: var(--ink-3); font-family: var(--font-mono); margin-bottom: var(--sp-4); }
-.diagram-fallback .df-badge { background: var(--reply-bg); color: var(--reply); border: 1px solid var(--reply-line); border-radius: var(--r-xs); padding: 1px 6px; font-weight: 600; letter-spacing: .04em; }
-/* ascii/box render of the diagram */
-.flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; font-size: var(--fs-small); }
-.node { background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px 14px; text-align: center; min-width: 96px; box-shadow: var(--sh-1); }
-.node .n-t { font-weight: 600; }
-.node .n-s { color: var(--ink-3); font-size: 11px; font-family: var(--font-mono); }
-.node.accent { border-color: var(--brand); background: var(--brand-soft); }
-.arrow { align-self: center; color: var(--ink-faint); font-family: var(--font-mono); padding: 0 10px; font-size: 16px; }
-.df-cap { margin-top: var(--sp-4); font-size: var(--fs-caption); color: var(--ink-3); }
-.df-raw { margin-top: 12px; font-size: 11px; color: var(--ink-faint); font-family: var(--font-mono); }
-
-/* ---------- 12b. STATE DIAGRAM FALLBACK -------------------- */
-.state-diagram { font-size: var(--fs-small); }
-.state-nodes { display: flex; align-items: stretch; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
-.state-nodes .node.state { background: var(--paper); border: 2px solid var(--line-2); border-radius: var(--r-md); padding: 8px 16px; text-align: center; min-width: 80px; }
-.state-nodes .node.state-pseudo { background: var(--ink); color: var(--paper); border-color: var(--ink); border-radius: 50%; width: 28px; height: 28px; min-width: 28px; padding: 0; display: grid; place-items: center; font-size: 14px; }
-.state-transitions { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
-.state-transitions th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
-.state-transitions td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
-.state-transitions td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
-.state-transitions .transition-label { color: var(--ink-2); font-style: italic; }
-.state-transitions .ink-faint { color: var(--ink-faint); }
-
-/* ---------- 12c. SEQUENCE DIAGRAM FALLBACK ------------------ */
-.seq-diagram { font-size: var(--fs-small); }
-.seq-participants { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
-.seq-pill { background: var(--brand-soft); border: 1px solid var(--brand); border-radius: 999px; padding: 4px 14px; font-weight: 600; font-size: var(--fs-caption); }
-.seq-messages { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
-.seq-messages th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
-.seq-messages td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
-.seq-messages td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
-.seq-messages td.seq-dashed { border-bottom-style: dashed; }
-.seq-label { color: var(--ink-2); }
-
-/* ---------- 12d. ARCHITECTURE DIAGRAM FALLBACK -------------- */
-.arch-diagram { font-size: var(--fs-small); }
-.arch-entities { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
-.arch-card { background: var(--paper); border: 2px solid var(--line-2); border-radius: var(--r-md); padding: 8px 16px; text-align: center; min-width: 90px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.arch-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; }
-.arch-name { font-weight: 600; }
-.arch-relations { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); }
-.arch-relations th { background: var(--paper-2); color: var(--ink-2); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: var(--row-pad); border-bottom: 2px solid var(--line-2); }
-.arch-relations td { padding: var(--row-pad); border-bottom: 1px solid var(--line-1); vertical-align: top; }
-.arch-relations td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
-.arch-rel-label { color: var(--ink-2); font-style: italic; }
-
-/* ---------- 12e. MERMAID DIAGRAM RENDERING ------------------- */
+/* ---------- 12. MERMAID DIAGRAM RENDERING ------------------ */
 .mermaid { display: block; width: 100%; margin: var(--sp-4) 0; padding: var(--sp-3); border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--paper-2); overflow-x: auto; text-align: center; }
 .mermaid svg { max-width: 100%; height: auto; }
-
-/* ---------- 12f. TIMELINE DIAGRAM FALLBACK ------------------ */
-.tl-diagram { font-size: var(--fs-small); }
-.tl-timeline { border-left: 3px solid var(--line-2); padding-left: var(--sp-4); }
-.tl-section { font-weight: 700; color: var(--ink-2); margin: var(--sp-3) 0 var(--sp-1); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
-.tl-item { display: flex; align-items: baseline; gap: var(--sp-2); padding: 4px 0; }
-.tl-dot { width: 8px; height: 8px; min-width: 8px; background: var(--brand); border-radius: 50%; margin-left: calc(-1 * var(--sp-4) - 5.5px); border: 2px solid var(--paper); }
-.tl-name { font-weight: 600; }
-.tl-detail { color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; }
-
-/* ---------- 12g. MATRIX / QUADRANT DIAGRAM FALLBACK --------- */
-.mx-diagram { font-size: var(--fs-small); }
-.mx-title { font-weight: 700; text-align: center; margin-bottom: var(--sp-3); }
-.mx-grid { display: flex; flex-direction: column; align-items: center; }
-.mx-quadrants { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 100%; max-width: 480px; aspect-ratio: 1; border: 1px solid var(--line-2); border-radius: var(--r-md); overflow: hidden; }
-.mx-q { background: var(--paper); padding: var(--sp-3); display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; }
-.mx-point { background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--r-xs); padding: 2px 8px; font-size: 11px; font-weight: 600; }
-.mx-axis { font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); }
-.mx-axis-row { display: flex; justify-content: space-between; width: 100%; max-width: 480px; margin-top: 4px; }
-.mx-y-hi { margin-bottom: 4px; }
-.mx-y-lo { margin-top: 4px; }
 
 /* ---------- 13. GENERATED IMAGE --------------------------- */
 .figure { margin: var(--sp-5) 0; }
@@ -705,13 +630,9 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .cx[data-state="reply"]    { background: var(--reply-bg);    border-bottom: 2px solid var(--reply); }
 .cx[data-state="resolved"] { background: transparent;        border-bottom: 1px dashed var(--resolved-line); color: inherit; }
 .code .cx[data-state="open"],
-.code .cx[data-state="reply"],
-.diagram-source .cx[data-state="open"],
-.diagram-source .cx[data-state="reply"] { color: #1d2127; }
+.code .cx[data-state="reply"] { color: #1d2127; }
 [data-theme="dark"] .code .cx[data-state="open"],
-[data-theme="dark"] .code .cx[data-state="reply"],
-[data-theme="dark"] .diagram-source .cx[data-state="open"],
-[data-theme="dark"] .diagram-source .cx[data-state="reply"] { color: var(--code-ink); }
+[data-theme="dark"] .code .cx[data-state="reply"] { color: var(--code-ink); }
 .cx:hover { filter: brightness(.97); }
 [data-theme="dark"] .cx:hover { filter: brightness(1.25); }
 .cx.is-active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px currentColor; }
@@ -741,7 +662,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .is-focus .paper { padding: var(--sp-7) clamp(28px, 5vw, 76px) var(--sp-8); }
 .is-focus .prose p, .is-focus .prose ul, .is-focus .prose ol, .is-focus .doc-deck { max-width: none; }
 /* big blocks use the full width gained by hiding the rails */
-.is-focus .table-wrap, .is-focus .code, .is-focus .figure, .is-focus .diagram-fallback, .is-focus .summary, .is-focus .meta-grid { max-width: none; }
+.is-focus .table-wrap, .is-focus .code, .is-focus .figure, .is-focus .mermaid, .is-focus .summary, .is-focus .meta-grid { max-width: none; }
 .is-focus .cx { background: transparent; border-bottom: 0; cursor: default; }
 .is-focus .cx .cx-num { display: none; }
 #focusToggle[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); }
@@ -766,7 +687,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 
 /* 大きなブロックも幅制限解除 */
 .is-published .table-wrap, .is-published .code, .is-published .figure,
-.is-published .diagram-fallback, .is-published .summary,
+.is-published .mermaid, .is-published .summary,
 .is-published .meta-grid { max-width: none; }
 
 /* レビュー要素の非表示 */

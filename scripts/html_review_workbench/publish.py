@@ -159,7 +159,7 @@ def _embed_images(html: str, root: Path) -> str:
 
 
 def _inline_mermaid_script(source_html: str, article: str, root: Path) -> str:
-    """ER 図 bundle の Mermaid asset を standalone HTML に inline 化する。"""
+    """Mermaid 図 bundle の Mermaid asset を standalone HTML に inline 化する。"""
     needs_mermaid = "assets/mermaid.min.js" in source_html or 'class="mermaid"' in article
     if not needs_mermaid:
         return ""

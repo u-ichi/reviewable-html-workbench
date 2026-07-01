@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from html import escape
 from pathlib import Path
 
 from scripts.html_review_workbench.diagram_planner import plan_diagrams
@@ -92,7 +93,8 @@ class RendererBundleTest(unittest.TestCase):
             self.assertTrue(result.ok, result.errors)
             self.assertEqual(result.review_blocks, 2)
 
-    def test_render_bundle_saves_diagram_source_and_fallback(self) -> None:
+    def test_render_bundle_saves_diagram_source_and_emits_mermaid_pre(self) -> None:
+        source = "flowchart TD\n  A[Input] --> B[Output]"
         model = {
             "schema_version": "1.0",
             "document_id": "diagram-doc",
@@ -104,7 +106,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "System Flow",
-                    "content": "flowchart TD\n  A[Input] --> B[Output]",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -122,14 +124,19 @@ class RendererBundleTest(unittest.TestCase):
 
             self.assertTrue(diagram_path.exists())
             self.assertEqual(diagram_path.read_text(encoding="utf-8").strip(), model["blocks"][0]["content"])
-            self.assertIn('data-diagram-kind="flow"', html)
-            self.assertIn("diagram-fallback", html)
-            self.assertIn("assets/diagrams/system-flow.mmd", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("DIAGRAM FALLBACK", html)
+            self.assertNotIn('class="diagram-source"', html)
+            self.assertTrue((output_dir / "assets" / "mermaid.min.js").is_file())
+            self.assertIn("assets/mermaid.min.js", manifest["outputs"]["assets"])
             self.assertEqual(manifest["outputs"]["diagrams"], ["assets/diagrams/system-flow.mmd"])
             self.assertEqual(manifest["review_blocks"][1]["diagram_kind"], "flow")
             self.assertTrue(validate_bundle(output_dir).ok)
 
-    def test_render_bundle_state_diagram_fallback(self) -> None:
+    def test_render_bundle_state_diagram_emits_mermaid_pre(self) -> None:
+        source = "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Processing : start\n  Processing --> Done : finish\n  Done --> [*]"
         model = {
             "schema_version": "1.0",
             "document_id": "state-doc",
@@ -141,7 +148,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "Lifecycle",
-                    "content": "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Processing : start\n  Processing --> Done : finish\n  Done --> [*]",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -154,10 +161,10 @@ class RendererBundleTest(unittest.TestCase):
             index_path = render_bundle(model_path, output_dir)
 
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('data-diagram-kind="state"', html)
-            self.assertIn("state-diagram", html)
-            self.assertIn("state-transitions", html)
-            self.assertIn("state-nodes", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("state-diagram", html)
             self.assertTrue(validate_bundle(output_dir).ok)
 
     def test_render_bundle_uses_updated_callout_markup(self) -> None:
@@ -256,29 +263,8 @@ class RendererBundleTest(unittest.TestCase):
         self.assertEqual(plans["concept"].kind, "concept")
         self.assertEqual(plans["state"].kind, "state")
 
-    def test_diagram_preview_state_parses_transitions(self) -> None:
-        from scripts.html_review_workbench.render import _diagram_preview_state
-
-        source = (
-            "stateDiagram-v2\n"
-            "  [*] --> Idle\n"
-            "  Idle --> Processing : start\n"
-            "  Processing --> Done : finish\n"
-            "  Done --> [*]\n"
-        )
-        states, transitions = _diagram_preview_state(source)
-        self.assertEqual(states, ["[*]", "Idle", "Processing", "Done"])
-        self.assertEqual(
-            transitions,
-            [
-                ("[*]", "Idle", ""),
-                ("Idle", "Processing", "start"),
-                ("Processing", "Done", "finish"),
-                ("Done", "[*]", ""),
-            ],
-        )
-
-    def test_render_bundle_sequence_diagram_fallback(self) -> None:
+    def test_render_bundle_sequence_diagram_emits_mermaid_pre(self) -> None:
+        source = "sequenceDiagram\n  participant C as Client\n  participant S as Server\n  C->>S: Login\n  S-->>C: Token"
         model = {
             "schema_version": "1.0",
             "document_id": "seq-doc",
@@ -290,7 +276,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "Auth Flow",
-                    "content": "sequenceDiagram\n  participant C as Client\n  participant S as Server\n  C->>S: Login\n  S-->>C: Token",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -301,13 +287,14 @@ class RendererBundleTest(unittest.TestCase):
             model_path.write_text(json.dumps(model), encoding="utf-8")
             index_path = render_bundle(model_path, output_dir)
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('data-diagram-kind="sequence"', html)
-            self.assertIn("seq-diagram", html)
-            self.assertIn("seq-participants", html)
-            self.assertIn("seq-messages", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("seq-diagram", html)
             self.assertTrue(validate_bundle(output_dir).ok)
 
-    def test_render_bundle_architecture_diagram_fallback(self) -> None:
+    def test_render_bundle_architecture_diagram_emits_mermaid_pre(self) -> None:
+        source = "classDiagram\n  class User\n  class Order\n  User --> Order"
         model = {
             "schema_version": "1.0",
             "document_id": "arch-doc",
@@ -319,7 +306,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "Class Model",
-                    "content": "classDiagram\n  class User\n  class Order\n  User --> Order",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -330,9 +317,10 @@ class RendererBundleTest(unittest.TestCase):
             model_path.write_text(json.dumps(model), encoding="utf-8")
             index_path = render_bundle(model_path, output_dir)
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('data-diagram-kind="architecture"', html)
-            self.assertIn("arch-diagram", html)
-            self.assertIn("arch-entities", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("arch-diagram", html)
             self.assertTrue(validate_bundle(output_dir).ok)
 
     def test_plan_diagrams_classifies_erdiagram_as_er(self) -> None:
@@ -379,7 +367,7 @@ class RendererBundleTest(unittest.TestCase):
             self.assertTrue((output_dir / "assets" / "mermaid.min.js").is_file())
             self.assertIn("assets/mermaid.min.js", manifest["outputs"]["assets"])
 
-    def test_render_bundle_skips_mermaid_asset_when_no_er_diagram(self) -> None:
+    def test_render_bundle_skips_mermaid_asset_when_no_diagram(self) -> None:
         model = {
             "schema_version": "1.0",
             "document_id": "plain-doc",
@@ -424,7 +412,8 @@ class RendererBundleTest(unittest.TestCase):
             self.assertNotIn("DIAGRAM FALLBACK", html)
             self.assertNotIn('class="diagram-source"', html)
 
-    def test_render_bundle_timeline_diagram_fallback(self) -> None:
+    def test_render_bundle_timeline_diagram_emits_mermaid_pre(self) -> None:
+        source = "gantt\n  dateFormat YYYY-MM-DD\n  section Phase1\n  Design : 2026-01-01, 30d\n  section Phase2\n  Develop : 2026-02-01, 60d"
         model = {
             "schema_version": "1.0",
             "document_id": "tl-doc",
@@ -436,7 +425,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "Project Plan",
-                    "content": "gantt\n  dateFormat YYYY-MM-DD\n  section Phase1\n  Design : 2026-01-01, 30d\n  section Phase2\n  Develop : 2026-02-01, 60d",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -447,12 +436,14 @@ class RendererBundleTest(unittest.TestCase):
             model_path.write_text(json.dumps(model), encoding="utf-8")
             index_path = render_bundle(model_path, output_dir)
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('data-diagram-kind="timeline"', html)
-            self.assertIn("tl-diagram", html)
-            self.assertIn("tl-timeline", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("tl-diagram", html)
             self.assertTrue(validate_bundle(output_dir).ok)
 
-    def test_render_bundle_matrix_diagram_fallback(self) -> None:
+    def test_render_bundle_matrix_diagram_emits_mermaid_pre(self) -> None:
+        source = "quadrantChart\n  title Priority\n  x-axis Low --> High\n  y-axis Low --> High\n  Alpha: [0.8, 0.9]\n  Beta: [0.2, 0.3]"
         model = {
             "schema_version": "1.0",
             "document_id": "mx-doc",
@@ -464,7 +455,7 @@ class RendererBundleTest(unittest.TestCase):
                     "type": "diagram",
                     "heading_level": 2,
                     "title": "Priority Matrix",
-                    "content": "quadrantChart\n  title Priority\n  x-axis Low --> High\n  y-axis Low --> High\n  Alpha: [0.8, 0.9]\n  Beta: [0.2, 0.3]",
+                    "content": source,
                     "review_required": True,
                 }
             ],
@@ -475,63 +466,40 @@ class RendererBundleTest(unittest.TestCase):
             model_path.write_text(json.dumps(model), encoding="utf-8")
             index_path = render_bundle(model_path, output_dir)
             html = index_path.read_text(encoding="utf-8")
-            self.assertIn('data-diagram-kind="matrix"', html)
-            self.assertIn("mx-diagram", html)
-            self.assertIn("mx-quadrants", html)
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertNotIn("mx-diagram", html)
             self.assertTrue(validate_bundle(output_dir).ok)
 
-    def test_diagram_preview_sequence_parses_messages(self) -> None:
-        from scripts.html_review_workbench.render import _diagram_preview_sequence
-
-        source = (
-            "sequenceDiagram\n"
-            "  participant C as Client\n"
-            "  participant S as Server\n"
-            "  C->>S: Login request\n"
-            "  S-->>C: Auth token\n"
-        )
-        participants, messages = _diagram_preview_sequence(source)
-        self.assertEqual(participants, ["Client", "Server"])
-        self.assertEqual(len(messages), 2)
-        self.assertEqual(messages[0], ("Client", "Server", "->>", "Login request"))
-        self.assertEqual(messages[1], ("Server", "Client", "-->>", "Auth token"))
-
-    def test_diagram_preview_timeline_parses_gantt(self) -> None:
-        from scripts.html_review_workbench.render import _diagram_preview_timeline
-
-        source = (
-            "gantt\n"
-            "  dateFormat YYYY-MM-DD\n"
-            "  section Phase1\n"
-            "  Design : 2026-01-01, 30d\n"
-            "  section Phase2\n"
-            "  Develop : 2026-02-01, 60d\n"
-        )
-        sections, subtype = _diagram_preview_timeline(source)
-        self.assertEqual(subtype, "gantt")
-        self.assertEqual(len(sections), 2)
-        self.assertEqual(sections[0][0], "Phase1")
-        self.assertEqual(sections[1][0], "Phase2")
-        self.assertEqual(sections[0][1][0][0], "Design")
-
-    def test_diagram_preview_matrix_parses_quadrant(self) -> None:
-        from scripts.html_review_workbench.render import _diagram_preview_matrix
-
-        source = (
-            "quadrantChart\n"
-            "  title Priority\n"
-            "  x-axis Low --> High\n"
-            "  y-axis Low --> High\n"
-            "  Alpha: [0.8, 0.9]\n"
-            "  Beta: [0.2, 0.3]\n"
-        )
-        title, x_lo, x_hi, y_lo, y_hi, points = _diagram_preview_matrix(source)
-        self.assertEqual(title, "Priority")
-        self.assertEqual(x_lo, "Low")
-        self.assertEqual(x_hi, "High")
-        self.assertEqual(len(points), 2)
-        self.assertEqual(points[0][0], "Alpha")
-        self.assertAlmostEqual(points[0][1], 0.8)
+    def test_render_bundle_concept_diagram_emits_mermaid_pre(self) -> None:
+        source = "mindmap\n  root((Workbench))\n    Render\n    Review"
+        model = {
+            "schema_version": "1.0",
+            "document_id": "concept-doc",
+            "title": "Concept Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "concept-map",
+                    "type": "diagram",
+                    "heading_level": 2,
+                    "title": "Concept Map",
+                    "content": source,
+                    "review_required": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+            index_path = render_bundle(model_path, output_dir)
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertIn(escape(source), html)
+            self.assertNotIn("diagram-fallback", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
 
 
 def _minimal_png_bytes() -> bytes:

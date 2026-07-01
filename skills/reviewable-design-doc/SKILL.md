@@ -58,9 +58,83 @@ Follow the language of the latest user request for progress updates, final respo
 - 大区分のブロック（背景・要求、アーキテクチャ、代替案比較、意思決定、未決事項など）には `heading_level: 2` を設定し、その配下の詳細ブロックには `heading_level: 3` を使う。各章の冒頭にはその章で扱う内容を示す導入段落を置く。
 - 比較・代替案・評価軸は `html` block内の `<table>`、手順は `<ol>`、並列項目は `<ul>`、操作例・ログ・コマンドは `<pre><code>`、処理・依存・構成はdiagramブロック、決定・前提・注意はplain textのcallout、レビューしてほしい論点は専用のレビュー観点blockにする。
 - `section`, `text`, `table` block typeは現行rendererに専用描画がないため、最終モデルでは使わない。
-- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。ER図 (`erDiagram`) は同梱 mermaid.js でブラウザ描画し、standalone publishでは mermaid.js をHTMLへinline化する。sourceに無い関係や判断を画像側で追加しない。
+- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。生成画像が未添付の場合、全diagram kindを同梱 mermaid.js でブラウザ描画し、standalone publishでは mermaid.js をHTMLへinline化する。Mermaid v11系の記法に準拠してsourceを書く。sourceに無い関係や判断を画像側で追加しない。
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
+
+## Mermaid 対応 kind と最小サンプル
+
+diagramブロックのMermaid sourceは、mermaid.js v11系が対応する記法から選ぶ。同梱済み `mermaid.min.js` がHTML上でSVGに置換する。
+
+主要 kind:
+
+| kind | 用途 |
+|---|---|
+| `flowchart` / `graph` | 処理・依存関係のフロー |
+| `sequenceDiagram` | 相互作用・時系列メッセージ |
+| `stateDiagram-v2` | 状態遷移 |
+| `classDiagram` | クラス構造・継承・関連 |
+| `erDiagram` | エンティティ関係 |
+| `gantt` | 期間・スケジュール |
+| `journey` | ユーザー体験の順序 |
+| `timeline` | 時系列イベント |
+| `mindmap` | 概念マップ・分類 |
+| `pie` | 割合 |
+| `gitGraph` | ブランチ・マージ |
+| `requirementDiagram` | 要件・トレーサビリティ |
+| `quadrantChart` | 2軸マトリクス |
+| `sankey` | フロー量 |
+| `xychart-beta` | 2次元数値プロット |
+| `architecture-beta` | システム構成 |
+| `block-beta` | ブロック配置 |
+| `packet-beta` | パケット構造 |
+| `kanban` | カンバンボード |
+| `radar` | レーダーチャート |
+| `treemap` | 階層構造の面積表現 |
+| `zenuml` | ZenUML記法 |
+
+最小サンプル:
+
+`erDiagram`
+
+    erDiagram
+        CUSTOMER ||--o{ ORDER : places
+        CUSTOMER {
+            string id PK
+            string name
+        }
+        ORDER {
+            string id PK
+            string customer_id FK
+        }
+
+`sequenceDiagram`
+
+    sequenceDiagram
+        participant User
+        participant API
+        User->>API: request
+        API-->>User: response
+
+`stateDiagram-v2`
+
+    stateDiagram-v2
+        [*] --> Idle
+        Idle --> Running: start
+        Running --> Idle: stop
+
+`flowchart LR`
+
+    flowchart LR
+        A[Input] --> B{Decide}
+        B -->|yes| C[Do it]
+        B -->|no| D[Skip]
+
+sourceの記法が不確かな場合は mermaid.js 公式docs (https://mermaid.js.org/) を参照する。schemaの `diagram_kind` は表示ラベル用のグループ名で、Mermaidの内部kind名と一致させる必要はない。
+
+## Mermaid Kinds and Minimal Samples
+
+Use Mermaid source supported by mermaid.js v11. The bundled `mermaid.min.js` renders diagram blocks into SVG in the browser. Common kinds include `flowchart` / `graph`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `journey`, `timeline`, `mindmap`, `pie`, `gitGraph`, `requirementDiagram`, `quadrantChart`, `sankey`, `xychart-beta`, `architecture-beta`, `block-beta`, `packet-beta`, `kanban`, `radar`, `treemap`, and `zenuml`. If syntax is uncertain, check the Mermaid docs. The schema `diagram_kind` is a display grouping label and does not need to match Mermaid's internal kind name.
 
 ## Design Document Model Rules
 
