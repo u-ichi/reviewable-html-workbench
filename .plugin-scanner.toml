@@ -1,0 +1,3 @@
+[scanner]
+# Vendored minified browser assets are generated upstream and can trigger scanner false positives.
+ignore_paths = ["templates/assets/*.min.js"]
