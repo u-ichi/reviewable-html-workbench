@@ -648,7 +648,11 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .arch-relations td.arrow { color: var(--ink-faint); font-family: var(--font-mono); text-align: center; width: 2em; }
 .arch-rel-label { color: var(--ink-2); font-style: italic; }
 
-/* ---------- 12e. TIMELINE DIAGRAM FALLBACK ------------------ */
+/* ---------- 12e. MERMAID DIAGRAM RENDERING ------------------- */
+.mermaid { display: block; width: 100%; margin: var(--sp-4) 0; padding: var(--sp-3); border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--paper-2); overflow-x: auto; text-align: center; }
+.mermaid svg { max-width: 100%; height: auto; }
+
+/* ---------- 12f. TIMELINE DIAGRAM FALLBACK ------------------ */
 .tl-diagram { font-size: var(--fs-small); }
 .tl-timeline { border-left: 3px solid var(--line-2); padding-left: var(--sp-4); }
 .tl-section { font-weight: 700; color: var(--ink-2); margin: var(--sp-3) 0 var(--sp-1); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
@@ -657,7 +661,7 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .tl-name { font-weight: 600; }
 .tl-detail { color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; }
 
-/* ---------- 12f. MATRIX / QUADRANT DIAGRAM FALLBACK --------- */
+/* ---------- 12g. MATRIX / QUADRANT DIAGRAM FALLBACK --------- */
 .mx-diagram { font-size: var(--fs-small); }
 .mx-title { font-weight: 700; text-align: center; margin-bottom: var(--sp-3); }
 .mx-grid { display: flex; flex-direction: column; align-items: center; }

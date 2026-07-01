@@ -1,6 +1,6 @@
 [project]
 name = "reviewable-html-workbench"
-version = "1.12.0"
+version = "1.14.0"
 description = "Shared scripts for reviewable HTML generation and feedback ingestion."
 requires-python = ">=3.11"
 

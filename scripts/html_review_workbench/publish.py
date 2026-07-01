@@ -78,6 +78,7 @@ def publish_bundle(root: Path, output: Path) -> dict[str, Any]:
     article = _strip_review_attrs(article)
     article = _strip_review_elements(article)
     article = _embed_images(article, root)
+    mermaid_script = _inline_mermaid_script(source_html, article, root)
 
     title = _extract_text(article, r'<h1 class="doc-title">(.*?)</h1>') or "document"
     description = _extract_description(article)
@@ -90,6 +91,7 @@ def publish_bundle(root: Path, output: Path) -> dict[str, Any]:
         css=css,
         article=article,
         is_focus=is_focus,
+        mermaid_script=mermaid_script,
     )
 
     output.mkdir(parents=True, exist_ok=True)
@@ -156,6 +158,21 @@ def _embed_images(html: str, root: Path) -> str:
     return re.sub(r'src="([^"]*)"', _replace, html)
 
 
+def _inline_mermaid_script(source_html: str, article: str, root: Path) -> str:
+    """ER 図 bundle の Mermaid asset を standalone HTML に inline 化する。"""
+    needs_mermaid = "assets/mermaid.min.js" in source_html or 'class="mermaid"' in article
+    if not needs_mermaid:
+        return ""
+    mermaid_path = root / "assets" / "mermaid.min.js"
+    if not mermaid_path.is_file():
+        raise PublishError(f"assets/mermaid.min.js not found in {root}")
+    script = mermaid_path.read_text(encoding="utf-8")
+    return (
+        f"<script>\n{script}\n</script>\n"
+        "<script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+    )
+
+
 def _extract_text(html: str, pattern: str) -> str:
     """regex でマッチしたタグの text content を返す。"""
     m = re.search(pattern, html, re.DOTALL)
@@ -185,6 +202,7 @@ def _assemble(
     css: str,
     article: str,
     is_focus: bool,
+    mermaid_script: str = "",
 ) -> str:
     """公開用 standalone HTML を組み立てる。"""
     esc_title = escape(title)
@@ -206,7 +224,9 @@ def _assemble(
         f"/* published export overrides */\n"
         f"{_PUBLISH_OVERRIDES}"
         f"{_DARK_OVERRIDES}\n"
-        f"</style>\n</head>\n"
+        f"</style>\n"
+        f"{mermaid_script}"
+        f"</head>\n"
         f'<body class="is-published">\n'
         f'<main class="canvas{focus_class}">\n'
         f'<div class="doc-shell">\n<div class="doc-grid">\n'

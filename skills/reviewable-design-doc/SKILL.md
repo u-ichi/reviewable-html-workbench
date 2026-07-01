@@ -58,7 +58,7 @@ Follow the language of the latest user request for progress updates, final respo
 - 大区分のブロック（背景・要求、アーキテクチャ、代替案比較、意思決定、未決事項など）には `heading_level: 2` を設定し、その配下の詳細ブロックには `heading_level: 3` を使う。各章の冒頭にはその章で扱う内容を示す導入段落を置く。
 - 比較・代替案・評価軸は `html` block内の `<table>`、手順は `<ol>`、並列項目は `<ul>`、操作例・ログ・コマンドは `<pre><code>`、処理・依存・構成はdiagramブロック、決定・前提・注意はplain textのcallout、レビューしてほしい論点は専用のレビュー観点blockにする。
 - `section`, `text`, `table` block typeは現行rendererに専用描画がないため、最終モデルでは使わない。
-- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。sourceに無い関係や判断を画像側で追加しない。
+- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。ER図 (`erDiagram`) は同梱 mermaid.js でブラウザ描画し、standalone publishでは mermaid.js をHTMLへinline化する。sourceに無い関係や判断を画像側で追加しない。
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
 

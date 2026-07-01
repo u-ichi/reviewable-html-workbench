@@ -238,6 +238,7 @@ class RendererBundleTest(unittest.TestCase):
             {"id": "flow", "type": "diagram", "content": "flowchart LR\nA-->B"},
             {"id": "seq", "type": "diagram", "content": "sequenceDiagram\n  A->>B: Hello"},
             {"id": "arch", "type": "diagram", "content": "C4Context\nPerson(user, User)"},
+            {"id": "er", "type": "diagram", "content": "erDiagram\n  USER ||--o{ ORDER : places"},
             {"id": "matrix", "type": "diagram", "content": "quadrantChart\nx-axis Low --> High"},
             {"id": "timeline", "type": "diagram", "content": "gantt\ndateFormat YYYY-MM-DD"},
             {"id": "concept", "type": "diagram", "content": "mindmap\n  root"},
@@ -249,6 +250,7 @@ class RendererBundleTest(unittest.TestCase):
         self.assertEqual(plans["flow"].kind, "flow")
         self.assertEqual(plans["seq"].kind, "sequence")
         self.assertEqual(plans["arch"].kind, "architecture")
+        self.assertEqual(plans["er"].kind, "er")
         self.assertEqual(plans["matrix"].kind, "matrix")
         self.assertEqual(plans["timeline"].kind, "timeline")
         self.assertEqual(plans["concept"].kind, "concept")
@@ -316,8 +318,8 @@ class RendererBundleTest(unittest.TestCase):
                     "id": "er-model",
                     "type": "diagram",
                     "heading_level": 2,
-                    "title": "ER Model",
-                    "content": "erDiagram\n  USER ||--o{ ORDER : places\n  ORDER ||--|{ LINE_ITEM : contains",
+                    "title": "Class Model",
+                    "content": "classDiagram\n  class User\n  class Order\n  User --> Order",
                     "review_required": True,
                 }
             ],
@@ -332,6 +334,95 @@ class RendererBundleTest(unittest.TestCase):
             self.assertIn("arch-diagram", html)
             self.assertIn("arch-entities", html)
             self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_plan_diagrams_classifies_erdiagram_as_er(self) -> None:
+        plans = plan_diagrams(
+            [
+                {
+                    "id": "er-model",
+                    "type": "diagram",
+                    "content": "erDiagram\n  CUSTOMER ||--o{ ORDER : places",
+                }
+            ]
+        )
+
+        self.assertEqual(plans["er-model"].kind, "er")
+
+    def test_render_bundle_er_emits_mermaid_pre(self) -> None:
+        model = _er_model()
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('<pre class="mermaid">erDiagram', html)
+            self.assertIn("CUSTOMER ||--o{ ORDER : places", html)
+            self.assertIn("string customer_id FK", html)
+            self.assertTrue(validate_bundle(output_dir).ok)
+
+    def test_render_bundle_includes_mermaid_asset(self) -> None:
+        model = _er_model()
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
+            self.assertIn('src="assets/mermaid.min.js?', html)
+            self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", html)
+            self.assertTrue((output_dir / "assets" / "mermaid.min.js").is_file())
+            self.assertIn("assets/mermaid.min.js", manifest["outputs"]["assets"])
+
+    def test_render_bundle_skips_mermaid_asset_when_no_er_diagram(self) -> None:
+        model = {
+            "schema_version": "1.0",
+            "document_id": "plain-doc",
+            "title": "Plain Doc",
+            "generated_at": "2026-05-17T00:00:00+09:00",
+            "blocks": [
+                {
+                    "id": "plain",
+                    "type": "html",
+                    "heading_level": 2,
+                    "title": "Plain",
+                    "content": "<p>No ER diagram</p>",
+                    "review_required": False,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
+            self.assertNotIn("mermaid.min.js", html)
+            self.assertFalse((output_dir / "assets" / "mermaid.min.js").exists())
+            self.assertNotIn("assets/mermaid.min.js", manifest["outputs"]["assets"])
+
+    def test_render_bundle_er_skips_diagram_fallback_wrapper(self) -> None:
+        model = _er_model()
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "bundle"
+            model_path = Path(tmp) / "model.json"
+            model_path.write_text(json.dumps(model), encoding="utf-8")
+
+            index_path = render_bundle(model_path, output_dir)
+
+            html = index_path.read_text(encoding="utf-8")
+            self.assertIn('<pre class="mermaid">', html)
+            self.assertNotIn('data-diagram-kind="er"', html)
+            self.assertNotIn("DIAGRAM FALLBACK", html)
+            self.assertNotIn('class="diagram-source"', html)
 
     def test_render_bundle_timeline_diagram_fallback(self) -> None:
         model = {
@@ -405,22 +496,6 @@ class RendererBundleTest(unittest.TestCase):
         self.assertEqual(messages[0], ("Client", "Server", "->>", "Login request"))
         self.assertEqual(messages[1], ("Server", "Client", "-->>", "Auth token"))
 
-    def test_diagram_preview_architecture_parses_er(self) -> None:
-        from scripts.html_review_workbench.render import _diagram_preview_architecture
-
-        source = (
-            "erDiagram\n"
-            "  USER ||--o{ ORDER : places\n"
-            "  ORDER ||--|{ LINE_ITEM : contains\n"
-        )
-        entities, relations = _diagram_preview_architecture(source)
-        self.assertEqual(len(entities), 3)
-        entity_names = [e[0] for e in entities]
-        self.assertIn("USER", entity_names)
-        self.assertIn("ORDER", entity_names)
-        self.assertIn("LINE_ITEM", entity_names)
-        self.assertEqual(len(relations), 2)
-
     def test_diagram_preview_timeline_parses_gantt(self) -> None:
         from scripts.html_review_workbench.render import _diagram_preview_timeline
 
@@ -469,6 +544,41 @@ def _minimal_png_bytes() -> bytes:
         b"\xdc\xccY\xe7"
         b"\x00\x00\x00\x00IEND\xaeB`\x82"
     )
+
+
+def _er_model() -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "document_id": "er-doc",
+        "title": "ER Doc",
+        "generated_at": "2026-05-17T00:00:00+09:00",
+        "blocks": [
+            {
+                "id": "customer-order",
+                "type": "diagram",
+                "heading_level": 2,
+                "title": "Customer Order ER",
+                "content": (
+                    "erDiagram\n"
+                    "  CUSTOMER ||--o{ ORDER : places\n"
+                    "  ORDER }o..o| INVOICE : bills\n"
+                    "  CUSTOMER {\n"
+                    "    string id PK\n"
+                    "    string name\n"
+                    "  }\n"
+                    "  ORDER {\n"
+                    "    string id PK\n"
+                    "    string customer_id FK\n"
+                    "  }\n"
+                    "  INVOICE {\n"
+                    "    string id PK\n"
+                    "    string order_id FK\n"
+                    "  }\n"
+                ),
+                "review_required": True,
+            }
+        ],
+    }
 
 
 if __name__ == "__main__":

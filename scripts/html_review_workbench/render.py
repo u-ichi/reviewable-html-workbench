@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE_PATH = ROOT / "templates" / "report.html.j2"
 STYLE_PATH = ROOT / "templates" / "style.css"
 COMMENTS_JS_PATH = ROOT / "templates" / "review-comments.js"
+MERMAID_JS_PATH = ROOT / "templates" / "assets" / "mermaid.min.js"
 
 
 def render_bundle(model_path: Path, output_dir: Path) -> Path:
@@ -31,6 +32,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     rendered_at = datetime.now(timezone.utc).isoformat()
 
     diagrams = plan_diagrams(model["blocks"])
+    has_er_diagram = any(diagram.kind == "er" for diagram in diagrams.values())
     diagram_outputs = write_diagram_sources(output_dir, diagrams)
     image_outputs = _prepare_image_assets(model["blocks"], model_path.parent, output_dir)
     body_html, review_blocks = _render_blocks(model["blocks"], diagrams, image_outputs)
@@ -57,6 +59,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
             "summary": _render_optional_summary(model.get("summary"), doc_lang),
             "generated_at": escape(model["generated_at"]),
             "asset_version": escape(rendered_at, quote=True),
+            "mermaid_head": _render_mermaid_head(rendered_at) if has_er_diagram else "",
             "body": body_html,
             "toc": _render_toc(model["blocks"]),
         }
@@ -66,6 +69,12 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     index_path.write_text(html, encoding="utf-8")
     shutil.copyfile(STYLE_PATH, assets_dir / "style.css")
     shutil.copyfile(COMMENTS_JS_PATH, assets_dir / "review-comments.js")
+    asset_outputs = ["assets/style.css", "assets/review-comments.js"]
+    if has_er_diagram:
+        if not MERMAID_JS_PATH.is_file():
+            raise ValueError(f"Mermaid asset not found: {MERMAID_JS_PATH}")
+        shutil.copyfile(MERMAID_JS_PATH, assets_dir / "mermaid.min.js")
+        asset_outputs.append("assets/mermaid.min.js")
 
     manifest = {
         "schema_version": "1.0",
@@ -81,7 +90,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
         },
         "outputs": {
             "index": "index.html",
-            "assets": ["assets/style.css", "assets/review-comments.js"],
+            "assets": asset_outputs,
             "diagrams": diagram_outputs,
             "images": list(image_outputs.values()),
         },
@@ -100,6 +109,14 @@ def _render_template(values: dict[str, str]) -> str:
     for key, value in values.items():
         template = template.replace("{{ " + key + " }}", value)
     return template
+
+
+def _render_mermaid_head(asset_version: str) -> str:
+    version = escape(asset_version, quote=True)
+    return (
+        f'  <script src="assets/mermaid.min.js?v={version}"></script>\n'
+        "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>"
+    )
 
 
 def _render_optional_summary(summary: object, lang: str = "ja") -> str:
@@ -435,6 +452,9 @@ def _format_log_line(line: str, level_class: str) -> str:
 
 
 def _render_diagram(diagram: PlannedDiagram) -> str:
+    if diagram.kind == "er":
+        return _render_diagram_er(diagram)
+
     source_path = escape(diagram.relative_path, quote=True)
     kind = escape(diagram.kind, quote=True)
     source = escape(diagram.source)
@@ -442,6 +462,7 @@ def _render_diagram(diagram: PlannedDiagram) -> str:
         "state": _render_diagram_state,
         "sequence": _render_diagram_sequence,
         "architecture": _render_diagram_architecture,
+        "er": _render_diagram_er,
         "timeline": _render_diagram_timeline,
         "matrix": _render_diagram_matrix,
     }
@@ -687,15 +708,7 @@ def _diagram_preview_architecture(source: str) -> tuple[list[tuple[str, str]], l
             entities.append((name, kind))
             seen_ent.add(name)
 
-    if first_line.startswith("erdiagram"):
-        for raw_line in source.splitlines():
-            line = raw_line.strip()
-            m = _ER_RELATION.match(line)
-            if m:
-                _add_ent(m.group(1), "Entity")
-                _add_ent(m.group(3), "Entity")
-                relations.append((m.group(1), m.group(3), m.group(4).strip().strip('"')))
-    elif first_line.startswith("classdiagram"):
+    if first_line.startswith("classdiagram"):
         for raw_line in source.splitlines():
             line = raw_line.strip()
             if line.lower().startswith("class "):
@@ -728,6 +741,10 @@ def _diagram_preview_architecture(source: str) -> tuple[list[tuple[str, str]], l
                 _add_ent(m.group(3), "")
                 relations.append((m.group(1), m.group(3), m.group(4).strip().strip('"')))
     return entities, relations
+
+
+def _render_diagram_er(diagram: PlannedDiagram) -> str:
+    return f'  <pre class="mermaid">{escape(diagram.source)}</pre>'
 
 
 _GANTT_TASK = re.compile(r"(.+?)\s*:\s*(.+)")

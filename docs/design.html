@@ -588,6 +588,12 @@
               <td>複雑すぎる場合は本文側へ分解し、1図1論点にする。</td>
             </tr>
             <tr>
+              <td>エンティティ、属性、主キー・外部キー、カーディナリティ</td>
+              <td><code>Mermaid erDiagram</code> + 同梱 mermaid.js</td>
+              <td>sourceで属性表と関係を保持し、画像未添付時はブラウザ上でMermaidがER図として描画する。</td>
+              <td>CDNは使わず、standalone publishでは mermaid.js をHTMLへinline化する。sourceに無い属性や関係を追加しない。</td>
+            </tr>
+            <tr>
               <td>業務フロー、編集前提の図</td>
               <td><code>.drawio</code> + exported SVG</td>
               <td>人間がdraw.ioで編集できる。</td>
@@ -605,7 +611,7 @@
           図示は「本文の構造を見える化する」用途に限定する。入力に存在しない因果関係、判断、優先順位を図で追加してはいけない。
         </div>
         <div class="callout">
-          Renderer MVPでは <code>type: "diagram"</code> ブロックを <code>flow</code>, <code>architecture</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類し、Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。HTML上では生成画像を主表示にし、画像が未添付の場合だけsource保存先と <code>&lt;pre&gt;</code> fallbackを表示する。
+          Renderer MVPでは <code>type: "diagram"</code> ブロックを <code>flow</code>, <code>architecture</code>, <code>er</code>, <code>matrix</code>, <code>timeline</code>, <code>concept</code> に分類し、Mermaid sourceを <code>assets/diagrams/*.mmd</code> に保存する。HTML上では生成画像を主表示にし、画像が未添付の場合だけsource保存先と <code>&lt;pre&gt;</code> fallbackを表示する。<code>erDiagram</code> は同梱 mermaid.js によるブラウザ描画を行い、公開用 standalone HTML では script をinline化する。
         </div>
       </section>
 

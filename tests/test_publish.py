@@ -170,6 +170,32 @@ class TestPublishBundle(unittest.TestCase):
         content = (self.output_dir / "index.html").read_text(encoding="utf-8")
         self.assertIn('class="is-published"', content)
 
+    def test_publish_inlines_mermaid_script(self) -> None:
+        mermaid_asset = self.bundle_dir / "assets" / "mermaid.min.js"
+        mermaid_asset.write_text("/*! Mermaid test */\nwindow.mermaid = { initialize() {} };\n", encoding="utf-8")
+        index_path = self.bundle_dir / "index.html"
+        html = index_path.read_text(encoding="utf-8")
+        html = html.replace(
+            '  <link rel="stylesheet" href="assets/style.css?v=test">\n',
+            '  <link rel="stylesheet" href="assets/style.css?v=test">\n'
+            '  <script src="assets/mermaid.min.js?v=test"></script>\n'
+            "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n",
+        )
+        html = html.replace(
+            "                  <p>Hello world</p>\n",
+            '                  <pre class="mermaid">erDiagram\n'
+            "  CUSTOMER ||--o{ ORDER : places</pre>\n",
+        )
+        index_path.write_text(html, encoding="utf-8")
+
+        publish_bundle(self.bundle_dir, self.output_dir)
+
+        content = (self.output_dir / "index.html").read_text(encoding="utf-8")
+        self.assertIn("/*! Mermaid test */", content)
+        self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", content)
+        self.assertIn('<pre class="mermaid">erDiagram', content)
+        self.assertNotIn('<script src="assets/mermaid.min.js', content)
+
 
 if __name__ == "__main__":
     unittest.main()
