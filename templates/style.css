@@ -598,7 +598,52 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 .mermaid { display: block; width: 100%; margin: var(--sp-4) 0; padding: var(--sp-3); border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--paper-2); overflow-x: auto; text-align: center; }
 .mermaid svg { max-width: 100%; height: auto; }
 
-/* ---------- 13. GENERATED IMAGE --------------------------- */
+/* ---------- 13. DIAGRAM ZOOM ------------------------------- */
+.diagram-wrap { position: relative; margin: 0; }
+.diagram-zoom-btn {
+  position: absolute; top: var(--sp-2); right: var(--sp-2); z-index: 2;
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-2); background: color-mix(in srgb, var(--paper) 92%, transparent);
+  color: var(--ink-2); box-shadow: var(--sh-1); cursor: pointer;
+  opacity: 0; transition: opacity .12s ease, color .12s ease, border-color .12s ease;
+}
+.diagram-wrap:hover .diagram-zoom-btn,
+.diagram-zoom-btn:focus-visible { opacity: 1; }
+.diagram-zoom-btn:hover { color: var(--ink); border-color: var(--line-3); }
+@media (hover: none) { .diagram-zoom-btn { opacity: 1; } }
+
+body.zoom-open { overflow: hidden; }
+.diagram-zoom-overlay {
+  position: fixed; inset: 0; z-index: 9999; display: none;
+  align-items: stretch; justify-content: stretch;
+  background: rgba(0, 0, 0, .85); color: #f4f1e8;
+}
+.diagram-zoom-overlay.is-open { display: flex; }
+.diagram-zoom-overlay .zoom-viewport {
+  position: relative; flex: 1 1 auto; overflow: hidden;
+}
+.diagram-zoom-overlay .zoom-container {
+  position: absolute; top: 0; left: 0; transform-origin: 0 0;
+  will-change: transform; cursor: grab; user-select: none; touch-action: none;
+}
+.diagram-zoom-overlay .zoom-container.is-dragging { cursor: grabbing; }
+.diagram-zoom-overlay .zoom-container svg {
+  max-width: none !important; width: auto !important; height: auto !important;
+}
+.diagram-zoom-overlay .zoom-toolbar {
+  position: absolute; right: var(--sp-3); bottom: var(--sp-3);
+  display: inline-flex; gap: var(--sp-2); align-items: center;
+  padding: 6px; border: 1px solid rgba(255,255,255,.18); border-radius: var(--r-md);
+  background: rgba(28,31,36,.92); box-shadow: var(--sh-3);
+}
+.diagram-zoom-overlay .zoom-toolbar button {
+  min-width: 36px; height: 34px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+  background: rgba(255,255,255,.12); color: inherit; font: inherit; cursor: pointer;
+}
+.diagram-zoom-overlay .zoom-toolbar button:hover,
+.diagram-zoom-overlay .zoom-toolbar button:focus-visible { background: rgba(255,255,255,.22); outline: none; }
+
+/* ---------- 14. GENERATED IMAGE --------------------------- */
 .figure { margin: var(--sp-5) 0; }
 .gen-image {
   position: relative; border: 1px solid var(--line-2); border-radius: var(--r-md);
@@ -620,7 +665,7 @@ table.cmp td.pick { background: color-mix(in srgb, var(--resolved) 7%, var(--pap
 figcaption { margin-top: 8px; font-size: var(--fs-caption); color: var(--ink-3); display: flex; gap: 8px; }
 figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(--ink-2); }
 
-/* ---------- 14. REVIEW HIGHLIGHTS ------------------------- */
+/* ---------- 15. REVIEW HIGHLIGHTS ------------------------- */
 .cx {
   border-radius: var(--r-xs); padding: 0 1px; cursor: pointer;
   transition: background .12s; position: relative;
@@ -655,7 +700,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .only-open .cx[data-state="reply"], .only-open .cx[data-state="resolved"] { background: transparent; border-bottom: 0; }
 .hide-resolved .cx[data-state="resolved"] { background: transparent; border-bottom: 0; cursor: default; }
 
-/* ---------- 14b. FOCUS / WIDE READING MODE --------------- */
+/* ---------- 15b. FOCUS / WIDE READING MODE --------------- */
 .is-focus .doc-grid { grid-template-columns: minmax(0, 1fr); }
 .is-focus .toc, .is-focus .cmt-rail { display: none; }
 .is-focus .doc-shell { max-width: 1480px; }
@@ -667,7 +712,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .is-focus .cx .cx-num { display: none; }
 #focusToggle[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); }
 
-/* ---------- 14c. PUBLISHED / PUBLIC MODE ----------------- */
+/* ---------- 15c. PUBLISHED / PUBLIC MODE ----------------- */
 
 /* 公開プレビューモード: トップバー・目次・コメントレール非表示、1カラム化 */
 .is-published .topbar { display: none; }

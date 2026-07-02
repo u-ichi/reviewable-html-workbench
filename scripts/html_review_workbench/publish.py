@@ -14,6 +14,9 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[2]
+DIAGRAM_ZOOM_JS_PATH = ROOT / "templates" / "assets" / "diagram-zoom.js"
+
 _DARK_OVERRIDES = (
     "@media(prefers-color-scheme:dark){:root{"
     "--bg-app:#131519;--bg-rail:#171a1f;--paper:#1c1f24;--paper-2:#20242a;"
@@ -159,17 +162,24 @@ def _embed_images(html: str, root: Path) -> str:
 
 
 def _inline_mermaid_script(source_html: str, article: str, root: Path) -> str:
-    """Mermaid 図 bundle の Mermaid asset を standalone HTML に inline 化する。"""
+    """Mermaid 図 bundle の Mermaid / zoom asset を standalone HTML に inline 化する。"""
     needs_mermaid = "assets/mermaid.min.js" in source_html or 'class="mermaid"' in article
     if not needs_mermaid:
         return ""
     mermaid_path = root / "assets" / "mermaid.min.js"
+    zoom_path = root / "assets" / "diagram-zoom.js"
     if not mermaid_path.is_file():
         raise PublishError(f"assets/mermaid.min.js not found in {root}")
+    if not zoom_path.is_file():
+        zoom_path = DIAGRAM_ZOOM_JS_PATH
+    if not zoom_path.is_file():
+        raise PublishError(f"assets/diagram-zoom.js not found in {root}")
     script = mermaid_path.read_text(encoding="utf-8")
+    zoom_script = zoom_path.read_text(encoding="utf-8")
     return (
         f"<script>\n{script}\n</script>\n"
         "<script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+        f"<script>\n{zoom_script}\n</script>\n"
     )
 
 

@@ -172,14 +172,17 @@ class TestPublishBundle(unittest.TestCase):
 
     def test_publish_inlines_mermaid_script(self) -> None:
         mermaid_asset = self.bundle_dir / "assets" / "mermaid.min.js"
+        zoom_asset = self.bundle_dir / "assets" / "diagram-zoom.js"
         mermaid_asset.write_text("/*! Mermaid test */\nwindow.mermaid = { initialize() {} };\n", encoding="utf-8")
+        zoom_asset.write_text("/*! Diagram zoom test */\nwindow.initDiagramZoom = function() {};\n", encoding="utf-8")
         index_path = self.bundle_dir / "index.html"
         html = index_path.read_text(encoding="utf-8")
         html = html.replace(
             '  <link rel="stylesheet" href="assets/style.css?v=test">\n',
             '  <link rel="stylesheet" href="assets/style.css?v=test">\n'
             '  <script src="assets/mermaid.min.js?v=test"></script>\n'
-            "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n",
+            "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+            '  <script src="assets/diagram-zoom.js?v=test" defer></script>\n',
         )
         html = html.replace(
             "                  <p>Hello world</p>\n",
@@ -192,9 +195,20 @@ class TestPublishBundle(unittest.TestCase):
 
         content = (self.output_dir / "index.html").read_text(encoding="utf-8")
         self.assertIn("/*! Mermaid test */", content)
+        self.assertIn("/*! Diagram zoom test */", content)
         self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", content)
         self.assertIn('<pre class="mermaid">erDiagram', content)
         self.assertNotIn('<script src="assets/mermaid.min.js', content)
+        self.assertNotIn('<script src="assets/diagram-zoom.js', content)
+
+    def test_publish_does_not_inline_diagram_zoom_without_mermaid(self) -> None:
+        zoom_asset = self.bundle_dir / "assets" / "diagram-zoom.js"
+        zoom_asset.write_text("/*! Diagram zoom test */\nwindow.initDiagramZoom = function() {};\n", encoding="utf-8")
+
+        publish_bundle(self.bundle_dir, self.output_dir)
+
+        content = (self.output_dir / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("/*! Diagram zoom test */", content)
 
 
 if __name__ == "__main__":

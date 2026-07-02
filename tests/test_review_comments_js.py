@@ -26,6 +26,8 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "initPublishToggle",
             "setPublished",
             "buildPublishedDoc",
+            "collectMermaidScripts",
+            "fetchAssetText",
             "downloadPublishedDoc",
             "threadCardState",
             "normalizeThreadStatus",
@@ -91,7 +93,18 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('clone.querySelectorAll(".review-comment-badge")', script)
         self.assertIn('"<body class=\\"is-published\\">\\n"', script)
         self.assertIn("const css = await collectCSS();", script)
+        self.assertIn("const mermaidScripts = await collectMermaidScripts(clone);", script)
         self.assertIn("toast(t.publishToast);", script)
+
+    def test_build_published_doc_inlines_diagram_zoom_script(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        publish_block = script[script.index("async function buildPublishedDoc") : script.index("async function collectCSS")]
+
+        self.assertIn('clone.querySelector(".mermaid")', publish_block)
+        self.assertIn('fetchAssetText("assets/mermaid.min.js")', publish_block)
+        self.assertIn('fetchAssetText("assets/diagram-zoom.js")', publish_block)
+        self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", publish_block)
+        self.assertIn("mermaidScripts +", publish_block)
 
     def test_published_i18n_keys_exist(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")

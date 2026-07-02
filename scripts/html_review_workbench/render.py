@@ -20,6 +20,7 @@ TEMPLATE_PATH = ROOT / "templates" / "report.html.j2"
 STYLE_PATH = ROOT / "templates" / "style.css"
 COMMENTS_JS_PATH = ROOT / "templates" / "review-comments.js"
 MERMAID_JS_PATH = ROOT / "templates" / "assets" / "mermaid.min.js"
+DIAGRAM_ZOOM_JS_PATH = ROOT / "templates" / "assets" / "diagram-zoom.js"
 
 
 def render_bundle(model_path: Path, output_dir: Path) -> Path:
@@ -32,10 +33,10 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     rendered_at = datetime.now(timezone.utc).isoformat()
 
     diagrams = plan_diagrams(model["blocks"])
-    has_diagram = bool(diagrams)
     diagram_outputs = write_diagram_sources(output_dir, diagrams)
     image_outputs = _prepare_image_assets(model["blocks"], model_path.parent, output_dir)
     body_html, review_blocks = _render_blocks(model["blocks"], diagrams, image_outputs)
+    has_rendered_mermaid = 'class="mermaid"' in body_html
     review_blocks.insert(
         0,
         {
@@ -59,7 +60,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
             "summary": _render_optional_summary(model.get("summary"), doc_lang),
             "generated_at": escape(model["generated_at"]),
             "asset_version": escape(rendered_at, quote=True),
-            "mermaid_head": _render_mermaid_head(rendered_at) if has_diagram else "",
+            "mermaid_head": _render_mermaid_head(rendered_at) if has_rendered_mermaid else "",
             "body": body_html,
             "toc": _render_toc(model["blocks"]),
         }
@@ -70,11 +71,15 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     shutil.copyfile(STYLE_PATH, assets_dir / "style.css")
     shutil.copyfile(COMMENTS_JS_PATH, assets_dir / "review-comments.js")
     asset_outputs = ["assets/style.css", "assets/review-comments.js"]
-    if has_diagram:
+    if has_rendered_mermaid:
         if not MERMAID_JS_PATH.is_file():
             raise ValueError(f"Mermaid asset not found: {MERMAID_JS_PATH}")
+        if not DIAGRAM_ZOOM_JS_PATH.is_file():
+            raise ValueError(f"Diagram zoom asset not found: {DIAGRAM_ZOOM_JS_PATH}")
         shutil.copyfile(MERMAID_JS_PATH, assets_dir / "mermaid.min.js")
+        shutil.copyfile(DIAGRAM_ZOOM_JS_PATH, assets_dir / "diagram-zoom.js")
         asset_outputs.append("assets/mermaid.min.js")
+        asset_outputs.append("assets/diagram-zoom.js")
 
     manifest = {
         "schema_version": "1.0",
@@ -115,7 +120,8 @@ def _render_mermaid_head(asset_version: str) -> str:
     version = escape(asset_version, quote=True)
     return (
         f'  <script src="assets/mermaid.min.js?v={version}"></script>\n'
-        "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>"
+        "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+        f'  <script src="assets/diagram-zoom.js?v={version}" defer></script>'
     )
 
 
@@ -452,7 +458,12 @@ def _format_log_line(line: str, level_class: str) -> str:
 
 
 def _render_diagram(diagram: PlannedDiagram) -> str:
-    return f'  <pre class="mermaid">{escape(diagram.source)}</pre>'
+    return (
+        '  <figure class="diagram-wrap">'
+        '<button type="button" class="diagram-zoom-btn" aria-label="拡大">⤢</button>'
+        f'<pre class="mermaid">{escape(diagram.source)}</pre>'
+        '</figure>'
+    )
 
 
 def _prepare_image_assets(blocks: list[dict[str, Any]], model_dir: Path, output_dir: Path) -> dict[str, str]:

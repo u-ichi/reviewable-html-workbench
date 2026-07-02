@@ -1102,6 +1102,7 @@
     }
 
     const css = await collectCSS();
+    const mermaidScripts = await collectMermaidScripts(clone);
     var darkOverrides =
       "@media(prefers-color-scheme:dark){:root{" +
       "--bg-app:#131519;--bg-rail:#171a1f;--paper:#1c1f24;--paper-2:#20242a;" +
@@ -1133,11 +1134,44 @@
       "html,body{background:var(--bg-app);}\n" +
       ".canvas{overflow:visible;height:auto;min-height:100vh;}\n" +
       darkOverrides + "\n" +
-      "</style>\n</head>\n" +
+      "</style>\n" +
+      mermaidScripts +
+      "</head>\n" +
       "<body class=\"is-published\">\n" +
       "<main class=\"canvas" + (isFocus ? " is-focus" : "") + "\">\n" +
       clone.outerHTML + "\n</main>\n</body>\n</html>\n";
     return { html, title };
+  }
+
+  async function collectMermaidScripts(clone) {
+    const needsMermaid = Boolean(
+      clone.querySelector(".mermaid") ||
+      document.querySelector('script[src*="assets/mermaid.min.js"]')
+    );
+    if (!needsMermaid) {
+      return "";
+    }
+    const mermaid = await fetchAssetText("assets/mermaid.min.js");
+    const zoom = await fetchAssetText("assets/diagram-zoom.js");
+    let scripts = "";
+    if (mermaid) {
+      scripts += "<script>\n" + mermaid + "\n</script>\n";
+      scripts += "<script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n";
+    }
+    if (zoom) {
+      scripts += "<script>\n" + zoom + "\n</script>\n";
+    }
+    return scripts;
+  }
+
+  async function fetchAssetText(path) {
+    try {
+      const response = await fetch(new URL(path, window.location.href).toString(), { cache: "no-store" });
+      if (response.ok) {
+        return await response.text();
+      }
+    } catch (_error) { /* skip */ }
+    return "";
   }
 
   async function collectCSS() {

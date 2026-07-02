@@ -58,7 +58,8 @@ Follow the language of the latest user request for progress updates, final respo
 - 大区分のブロック（背景・要求、アーキテクチャ、代替案比較、意思決定、未決事項など）には `heading_level: 2` を設定し、その配下の詳細ブロックには `heading_level: 3` を使う。各章の冒頭にはその章で扱う内容を示す導入段落を置く。
 - 比較・代替案・評価軸は `html` block内の `<table>`、手順は `<ol>`、並列項目は `<ul>`、操作例・ログ・コマンドは `<pre><code>`、処理・依存・構成はdiagramブロック、決定・前提・注意はplain textのcallout、レビューしてほしい論点は専用のレビュー観点blockにする。
 - `section`, `text`, `table` block typeは現行rendererに専用描画がないため、最終モデルでは使わない。
-- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。生成画像が未添付の場合、全diagram kindを同梱 mermaid.js でブラウザ描画し、standalone publishでは mermaid.js をHTMLへinline化する。Mermaid v11系の記法に準拠してsourceを書く。sourceに無い関係や判断を画像側で追加しない。
+- diagramブロックはMermaid sourceを構造保存用に残し、生成画像を主表示にする。生成画像が未添付の場合、全diagram kindを同梱 mermaid.js でブラウザ描画し、standalone publishでは mermaid.js と図の拡大用scriptをHTMLへinline化する。Mermaid v11系の記法に準拠してsourceを書く。sourceに無い関係や判断を画像側で追加しない。
+- Mermaidで描画される図は、図右上の拡大ボタンから全画面表示に切り替え、pan / zoom で詳細を確認できる。
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
 
@@ -134,7 +135,7 @@ sourceの記法が不確かな場合は mermaid.js 公式docs (https://mermaid.j
 
 ## Mermaid Kinds and Minimal Samples
 
-Use Mermaid source supported by mermaid.js v11. The bundled `mermaid.min.js` renders diagram blocks into SVG in the browser. Common kinds include `flowchart` / `graph`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `journey`, `timeline`, `mindmap`, `pie`, `gitGraph`, `requirementDiagram`, `quadrantChart`, `sankey`, `xychart-beta`, `architecture-beta`, `block-beta`, `packet-beta`, `kanban`, `radar`, `treemap`, and `zenuml`. If syntax is uncertain, check the Mermaid docs. The schema `diagram_kind` is a display grouping label and does not need to match Mermaid's internal kind name.
+Use Mermaid source supported by mermaid.js v11. The bundled `mermaid.min.js` renders diagram blocks into SVG in the browser, and rendered Mermaid diagrams can be opened from the zoom button for full-screen pan / zoom inspection. Common kinds include `flowchart` / `graph`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `journey`, `timeline`, `mindmap`, `pie`, `gitGraph`, `requirementDiagram`, `quadrantChart`, `sankey`, `xychart-beta`, `architecture-beta`, `block-beta`, `packet-beta`, `kanban`, `radar`, `treemap`, and `zenuml`. If syntax is uncertain, check the Mermaid docs. The schema `diagram_kind` is a display grouping label and does not need to match Mermaid's internal kind name.
 
 ## Design Document Model Rules
 
