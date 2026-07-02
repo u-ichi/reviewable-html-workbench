@@ -25,6 +25,7 @@ class RendererBundleTest(unittest.TestCase):
             css = (output_dir / "assets/style.css").read_text(encoding="utf-8")
             self.assertIn('data-review-block="overview"', html)
             self.assertIn("assets/style.css", html)
+            self.assertIn("assets/publish-export.js", html)
             self.assertIn("assets/review-comments.js", html)
             self.assertIn('<section class="review-block" id="overview"', html)
             self.assertNotIn("review-block-section", html)
@@ -46,6 +47,8 @@ class RendererBundleTest(unittest.TestCase):
             self.assertEqual(manifest["document"]["id"], "minimal-design-doc")
             self.assertEqual(manifest["outputs"]["index"], "index.html")
             self.assertIn("assets/review-comments.js", manifest["outputs"]["assets"])
+            self.assertIn("assets/publish-overrides.css", manifest["outputs"]["assets"])
+            self.assertIn("assets/publish-export.js", manifest["outputs"]["assets"])
             self.assertEqual(manifest["review_blocks"][0]["id"], "document-header")
             self.assertEqual(manifest["review_blocks"][1]["id"], "overview")
             self.assertRegex(manifest["input"]["sha256"], r"^[0-9a-f]{64}$")
@@ -68,6 +71,8 @@ class RendererBundleTest(unittest.TestCase):
 
             for marker in [".is-published", ".pub-exit", ".pub-toast"]:
                 self.assertIn(marker, css)
+            self.assertTrue((output_dir / "assets" / "publish-overrides.css").is_file())
+            self.assertTrue((output_dir / "assets" / "publish-export.js").is_file())
 
     def test_render_toc_uses_block_titles(self) -> None:
         toc = _render_toc(
@@ -125,6 +130,7 @@ class RendererBundleTest(unittest.TestCase):
             self.assertTrue(diagram_path.exists())
             self.assertEqual(diagram_path.read_text(encoding="utf-8").strip(), model["blocks"][0]["content"])
             self.assertIn('<pre class="mermaid">', html)
+            self.assertIn('data-role="reviewable-mermaid-init"', html)
             self.assertIn(escape(source), html)
             self.assertNotIn("diagram-fallback", html)
             self.assertNotIn("DIAGRAM FALLBACK", html)

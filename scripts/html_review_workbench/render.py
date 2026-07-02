@@ -11,7 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench import __version__
-from scripts.html_review_workbench.common import MERMAID_INIT_JS, REPO_ROOT, now_iso, unique_path, write_json
+from scripts.html_review_workbench.common import (
+    MERMAID_INIT_JS,
+    PUBLISH_EXPORT_JS_PATH,
+    PUBLISH_OVERRIDES_CSS_PATH,
+    REPO_ROOT,
+    now_iso,
+    unique_path,
+    write_json,
+)
 from scripts.html_review_workbench.diagram_planner import PlannedDiagram, plan_diagrams, write_diagram_sources
 
 
@@ -69,8 +77,15 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     index_path = output_dir / "index.html"
     index_path.write_text(html, encoding="utf-8")
     shutil.copyfile(STYLE_PATH, assets_dir / "style.css")
+    shutil.copyfile(PUBLISH_OVERRIDES_CSS_PATH, assets_dir / "publish-overrides.css")
+    shutil.copyfile(PUBLISH_EXPORT_JS_PATH, assets_dir / "publish-export.js")
     shutil.copyfile(COMMENTS_JS_PATH, assets_dir / "review-comments.js")
-    asset_outputs = ["assets/style.css", "assets/review-comments.js"]
+    asset_outputs = [
+        "assets/style.css",
+        "assets/publish-overrides.css",
+        "assets/publish-export.js",
+        "assets/review-comments.js",
+    ]
     if has_rendered_mermaid:
         if not MERMAID_JS_PATH.is_file():
             raise ValueError(f"Mermaid asset not found: {MERMAID_JS_PATH}")
@@ -117,7 +132,7 @@ def _render_mermaid_head(asset_version: str) -> str:
     version = escape(asset_version, quote=True)
     return (
         f'  <script src="assets/mermaid.min.js?v={version}"></script>\n'
-        f"  <script>{MERMAID_INIT_JS}</script>\n"
+        f'  <script data-role="reviewable-mermaid-init">{MERMAID_INIT_JS}</script>\n'
         f'  <script src="assets/diagram-zoom.js?v={version}" defer></script>'
     )
 

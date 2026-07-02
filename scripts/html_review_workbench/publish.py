@@ -14,32 +14,10 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from scripts.html_review_workbench.common import MERMAID_INIT_JS, REPO_ROOT
+from scripts.html_review_workbench.common import MERMAID_INIT_JS, PUBLISH_OVERRIDES_CSS_PATH, REPO_ROOT
 
 ROOT = REPO_ROOT
 DIAGRAM_ZOOM_JS_PATH = ROOT / "templates" / "assets" / "diagram-zoom.js"
-
-_DARK_OVERRIDES = (
-    "@media(prefers-color-scheme:dark){:root{"
-    "--bg-app:#131519;--bg-rail:#171a1f;--paper:#1c1f24;--paper-2:#20242a;"
-    "--ink:#e7e3da;--ink-2:#a6a299;--ink-3:#7d7a72;--ink-faint:#5b5851;"
-    "--line-1:#2c2f35;--line-2:#393d44;--line-3:#4a4e56;"
-    "--brand:#6ea4dc;--brand-soft:#1f2d3c;"
-    "--open:#6ea4dc;--open-bg:#1c2c3b;--open-line:#355472;"
-    "--reply:#d6a85a;--reply-bg:#352c18;--reply-line:#604c25;"
-    "--resolved:#6dba88;--resolved-bg:#1c2e23;--resolved-line:#345240;"
-    "--code-bg:#15181d;--code-bg-2:#1b1f25;--code-line:#262b32;"
-    "--sh-1:0 1px 2px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.04);"
-    "--sh-2:0 2px 8px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.05);"
-    "--sh-3:0 10px 30px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);"
-    "--focus-ring:0 0 0 3px color-mix(in srgb,var(--brand) 40%,transparent);"
-    "}}"
-)
-
-_PUBLISH_OVERRIDES = (
-    "html,body{background:var(--bg-app);}\n"
-    ".canvas{overflow:visible;height:auto;min-height:100vh;}\n"
-)
 
 
 class PublishError(Exception):
@@ -72,6 +50,7 @@ def publish_bundle(root: Path, output: Path) -> dict[str, Any]:
 
     source_html = index_path.read_text(encoding="utf-8")
     css = style_path.read_text(encoding="utf-8")
+    publish_overrides = _load_publish_overrides(root)
 
     lang = _extract_attr(source_html, r'<html[^>]*\blang="([^"]*)"') or "ja"
     density = _extract_attr(source_html, r'data-density="([^"]*)"') or "compact"
@@ -94,6 +73,7 @@ def publish_bundle(root: Path, output: Path) -> dict[str, Any]:
         title=title,
         description=description,
         css=css,
+        publish_overrides=publish_overrides,
         article=article,
         is_focus=is_focus,
         mermaid_script=mermaid_script,
@@ -180,9 +160,19 @@ def _inline_mermaid_script(source_html: str, article: str, root: Path) -> str:
     zoom_script = zoom_path.read_text(encoding="utf-8")
     return (
         f"<script>\n{script}\n</script>\n"
-        f"<script>{MERMAID_INIT_JS}</script>\n"
+        f'<script data-role="reviewable-mermaid-init">{MERMAID_INIT_JS}</script>\n'
         f"<script>\n{zoom_script}\n</script>\n"
     )
+
+
+def _load_publish_overrides(root: Path) -> str:
+    """公開用 CSS override を bundle asset から読み、旧 bundle では template asset に fallback する。"""
+    path = root / "assets" / "publish-overrides.css"
+    if not path.is_file():
+        path = PUBLISH_OVERRIDES_CSS_PATH
+    if not path.is_file():
+        raise PublishError(f"assets/publish-overrides.css not found in {root}")
+    return path.read_text(encoding="utf-8")
 
 
 def _extract_text(html: str, pattern: str) -> str:
@@ -212,6 +202,7 @@ def _assemble(
     title: str,
     description: str,
     css: str,
+    publish_overrides: str,
     article: str,
     is_focus: bool,
     mermaid_script: str = "",
@@ -234,8 +225,7 @@ def _assemble(
         f'<meta name="twitter:description" content="{esc_desc}">\n'
         f"<style>\n{css}\n"
         f"/* published export overrides */\n"
-        f"{_PUBLISH_OVERRIDES}"
-        f"{_DARK_OVERRIDES}\n"
+        f"{publish_overrides}"
         f"</style>\n"
         f"{mermaid_script}"
         f"</head>\n"

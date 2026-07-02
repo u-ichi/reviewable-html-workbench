@@ -165,6 +165,24 @@ class TestPublishBundle(unittest.TestCase):
         content = (self.output_dir / "index.html").read_text(encoding="utf-8")
         self.assertIn("prefers-color-scheme:dark", content)
 
+    def test_publish_uses_bundle_publish_overrides_when_present(self) -> None:
+        overrides_path = self.bundle_dir / "assets" / "publish-overrides.css"
+        overrides_path.write_text(".canvas{min-height:42px;}\n", encoding="utf-8")
+
+        publish_bundle(self.bundle_dir, self.output_dir)
+
+        content = (self.output_dir / "index.html").read_text(encoding="utf-8")
+        self.assertIn(".canvas{min-height:42px;}", content)
+
+    def test_publish_falls_back_to_template_publish_overrides_for_legacy_bundle(self) -> None:
+        self.assertFalse((self.bundle_dir / "assets" / "publish-overrides.css").exists())
+
+        publish_bundle(self.bundle_dir, self.output_dir)
+
+        content = (self.output_dir / "index.html").read_text(encoding="utf-8")
+        self.assertIn("html,body{background:var(--bg-app);}", content)
+        self.assertIn("prefers-color-scheme:dark", content)
+
     def test_published_body_class(self) -> None:
         publish_bundle(self.bundle_dir, self.output_dir)
         content = (self.output_dir / "index.html").read_text(encoding="utf-8")
@@ -181,7 +199,7 @@ class TestPublishBundle(unittest.TestCase):
             '  <link rel="stylesheet" href="assets/style.css?v=test">\n',
             '  <link rel="stylesheet" href="assets/style.css?v=test">\n'
             '  <script src="assets/mermaid.min.js?v=test"></script>\n'
-            "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+            "  <script data-role=\"reviewable-mermaid-init\">mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
             '  <script src="assets/diagram-zoom.js?v=test" defer></script>\n',
         )
         html = html.replace(
@@ -196,7 +214,7 @@ class TestPublishBundle(unittest.TestCase):
         content = (self.output_dir / "index.html").read_text(encoding="utf-8")
         self.assertIn("/*! Mermaid test */", content)
         self.assertIn("/*! Diagram zoom test */", content)
-        self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", content)
+        self.assertIn('<script data-role="reviewable-mermaid-init">mermaid.initialize({startOnLoad: true, theme: \'dark\', securityLevel: \'strict\'})</script>', content)
         self.assertIn('<pre class="mermaid">erDiagram', content)
         self.assertNotIn('<script src="assets/mermaid.min.js', content)
         self.assertNotIn('<script src="assets/diagram-zoom.js', content)

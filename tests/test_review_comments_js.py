@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ReviewCommentsJavaScriptTest(unittest.TestCase):
     def test_review_comments_js_keeps_hardening_boundaries_visible(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        publish_script = (ROOT / "templates/assets/publish-export.js").read_text(encoding="utf-8")
 
         for function_name in [
             "loadComments",
@@ -25,15 +26,19 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "activate",
             "initPublishToggle",
             "setPublished",
-            "buildPublishedDoc",
-            "collectMermaidScripts",
-            "fetchAssetText",
-            "downloadPublishedDoc",
             "threadCardState",
             "normalizeThreadStatus",
             "showSaveError",
         ]:
             self.assertIn(f"function {function_name}", script)
+
+        for function_name in [
+            "buildPublishedDoc",
+            "collectMermaidScripts",
+            "fetchAssetText",
+            "downloadPublishedDoc",
+        ]:
+            self.assertIn(f"function {function_name}", publish_script)
 
     def test_line_selection_uses_deferred_capture_and_range_endpoint_fallback(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
@@ -83,28 +88,32 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
 
     def test_publish_preview_exports_clean_html_without_review_runtime(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        publish_script = (ROOT / "templates/assets/publish-export.js").read_text(encoding="utf-8")
 
         self.assertIn("initPublishToggle();", script)
         self.assertIn('document.body.classList.contains("is-published")', script)
-        self.assertIn('document.querySelector("#canvas .doc-shell")', script)
-        self.assertIn('clone.querySelectorAll(".toc, .cmt-rail, .doc-status, .byline, .cx-num")', script)
-        self.assertIn('clone.querySelectorAll(".cx")', script)
-        self.assertIn('clone.querySelectorAll(".review-comment-highlight")', script)
-        self.assertIn('clone.querySelectorAll(".review-comment-badge")', script)
-        self.assertIn('"<body class=\\"is-published\\">\\n"', script)
-        self.assertIn("const css = await collectCSS();", script)
-        self.assertIn("const mermaidScripts = await collectMermaidScripts(clone);", script)
-        self.assertIn("toast(t.publishToast);", script)
+        self.assertIn("window.reviewableWorkbenchPublish.downloadPublishedDoc({ toastMessage: t.publishToast });", script)
+        self.assertIn('document.querySelector("#canvas .doc-shell")', publish_script)
+        self.assertIn('clone.querySelectorAll(".toc, .cmt-rail, .doc-status, .byline, .cx-num")', publish_script)
+        self.assertIn('clone.querySelectorAll(".cx")', publish_script)
+        self.assertIn('clone.querySelectorAll(".review-comment-highlight")', publish_script)
+        self.assertIn('clone.querySelectorAll(".review-comment-badge")', publish_script)
+        self.assertIn('"<body class=\\"is-published\\">\\n"', publish_script)
+        self.assertIn("const css = await collectCSS();", publish_script)
+        self.assertIn('const publishOverrides = await fetchAssetText("assets/publish-overrides.css") || DEFAULT_PUBLISH_OVERRIDES;', publish_script)
+        self.assertIn("const mermaidScripts = await collectMermaidScripts(clone);", publish_script)
+        self.assertIn('toast((options && options.toastMessage) || "Published HTML exported");', publish_script)
 
     def test_build_published_doc_inlines_diagram_zoom_script(self) -> None:
-        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
-        publish_block = script[script.index("async function buildPublishedDoc") : script.index("async function collectCSS")]
+        script = (ROOT / "templates/assets/publish-export.js").read_text(encoding="utf-8")
+        publish_block = script[script.index("async function collectMermaidScripts") : script.index("async function buildPublishedDoc")]
 
         self.assertIn('clone.querySelector(".mermaid")', publish_block)
         self.assertIn('fetchAssetText("assets/mermaid.min.js")', publish_block)
         self.assertIn('fetchAssetText("assets/diagram-zoom.js")', publish_block)
-        self.assertIn("mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})", publish_block)
-        self.assertIn("mermaidScripts +", publish_block)
+        self.assertIn('document.querySelector(\'script[data-role="reviewable-mermaid-init"]\')', script)
+        self.assertIn("MERMAID_INIT_JS", script)
+        self.assertIn("mermaidScripts +", script)
 
     def test_published_i18n_keys_exist(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
