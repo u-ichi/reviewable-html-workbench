@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +13,11 @@ from scripts.html_review_workbench.comment_store import (
     CommentStoreError,
     make_reply,
     validate_comments_payload,
+)
+from scripts.html_review_workbench.common import (
+    now_iso,
+    resolve_bundle_json_path as _resolve_bundle_json_path,
+    write_json,
 )
 
 
@@ -131,15 +135,14 @@ def ingest_review(
         model_updates=model_update_result,
     )
     resolved_state_path = resolve_bundle_json_path(root, state_path)
-    resolved_state_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(resolved_state_path, state, ensure_parent=True)
 
-    try:
-        from scripts.html_review_workbench.resolution_gate import check_gate as _check_gate
+    from scripts.html_review_workbench.resolution_gate import try_check_gate
 
-        gate_result = _check_gate(root, comments_path=comments_path, state_path=state_path)
+    gate_result = try_check_gate(root, comments_path=comments_path, state_path=state_path)
+    if gate_result is not None:
         gate_payload = gate_result.to_payload()
-    except Exception:
+    else:
         gate_payload = {"gate": "unknown"}
 
     return ReviewIngestionResult(
@@ -160,7 +163,6 @@ def ingest_review(
 
 def classify_thread(thread: dict[str, Any]) -> dict[str, Any]:
     status = str(thread.get("status", ""))
-    comment = str(thread.get("comment", ""))
     review_text = " ".join(
         str(thread.get(key, ""))
         for key in ("selected_text", "prefix", "suffix", "comment")
@@ -215,7 +217,7 @@ def build_review_cycle_state(
         "schema_version": "1.0",
         "document_id": document_id,
         "comments_path": comments_path,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now_iso(),
         "summary": {
             "total": len(classifications),
             **counts,
@@ -272,7 +274,7 @@ def apply_limited_model_updates(model_path: Path, classifications: list[dict[str
         applied_comment_ids.append(item["comment_id"])
 
     if applied:
-        model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(model_path, model)
     return {"applied": applied, "applied_comment_ids": applied_comment_ids, "skipped": skipped}
 
 
@@ -337,20 +339,7 @@ def extract_replacement(thread: dict[str, Any]) -> dict[str, str] | None:
 
 
 def resolve_bundle_json_path(root: Path, relative_path: str) -> Path:
-    if not relative_path:
-        raise ReviewIngestionError("state path is required")
-    candidate = Path(relative_path)
-    if candidate.is_absolute():
-        raise ReviewIngestionError("state path must be relative")
-    if any(part == ".." for part in candidate.parts):
-        raise ReviewIngestionError("state path must not contain parent traversal")
-    resolved_root = root.resolve()
-    resolved_path = (resolved_root / candidate).resolve()
-    if not resolved_path.is_relative_to(resolved_root):
-        raise ReviewIngestionError("state path must stay inside the bundle root")
-    if resolved_path.suffix != ".json":
-        raise ReviewIngestionError("state path must be a JSON file")
-    return resolved_path
+    return _resolve_bundle_json_path(root, relative_path, label="state", error=ReviewIngestionError)
 
 
 def _find_model_block(blocks: list[Any], block_id: str) -> dict[str, Any] | None:

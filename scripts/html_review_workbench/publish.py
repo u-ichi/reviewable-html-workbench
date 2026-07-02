@@ -14,7 +14,9 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
+from scripts.html_review_workbench.common import MERMAID_INIT_JS, REPO_ROOT
+
+ROOT = REPO_ROOT
 DIAGRAM_ZOOM_JS_PATH = ROOT / "templates" / "assets" / "diagram-zoom.js"
 
 _DARK_OVERRIDES = (
@@ -178,7 +180,7 @@ def _inline_mermaid_script(source_html: str, article: str, root: Path) -> str:
     zoom_script = zoom_path.read_text(encoding="utf-8")
     return (
         f"<script>\n{script}\n</script>\n"
-        "<script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+        f"<script>{MERMAID_INIT_JS}</script>\n"
         f"<script>\n{zoom_script}\n</script>\n"
     )
 

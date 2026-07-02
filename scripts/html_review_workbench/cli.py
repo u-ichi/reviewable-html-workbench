@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
 
 from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError
 from scripts.html_review_workbench.image_assets import ImageAssetError, attach_image_to_model
@@ -30,6 +29,7 @@ from scripts.html_review_workbench.preview_server import (
     start_preview,
 )
 from scripts.html_review_workbench.resolution_gate import check_gate as run_check_gate
+from scripts.html_review_workbench.resolution_gate import try_check_gate
 from scripts.html_review_workbench.validate_bundle import validate_bundle
 
 
@@ -104,9 +104,24 @@ COMMAND_CONTRACT: dict[str, dict[str, str | tuple[str, ...]]] = {
 }
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+def _fail(exc: Exception, **extra: object) -> int:
+    payload = {"status": "failed", "error": str(exc)}
+    payload.update(extra)
+    print(json.dumps(payload, ensure_ascii=False))
+    return 2
+
+
+def active_session_base_url(root: Path) -> str | None:
+    from scripts.html_review_workbench.preview_server import find_active_session
+
+    session = find_active_session(root.resolve())
+    if session is None:
+        return None
+    bind = session.get("bind")
+    port = session.get("port")
+    if not isinstance(bind, str) or not isinstance(port, int):
+        return None
+    return f"http://{bind}:{port}"
 
 
 def build_model(args: argparse.Namespace) -> int:
@@ -119,8 +134,7 @@ def build_model(args: argparse.Namespace) -> int:
             document_id=args.document_id,
         )
     except (OSError, ModelBuildError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     print(result.path)
     return 0
 
@@ -142,8 +156,7 @@ def publish(args: argparse.Namespace) -> int:
     try:
         result = publish_bundle(root, output)
     except (OSError, PublishError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     print(json.dumps(result, ensure_ascii=False))
     return 0
 
@@ -152,9 +165,8 @@ def _check_render_gate(output_dir: Path) -> None:
     """Print a stderr warning if the resolution gate is blocked."""
     import sys
 
-    try:
-        result = run_check_gate(output_dir)
-    except Exception:
+    result = try_check_gate(output_dir)
+    if result is None:
         return
     if result.gate == "blocked":
         thread_ids = [t["thread_id"] for t in result.blocking_threads]
@@ -183,8 +195,7 @@ def attach_image(args: argparse.Namespace) -> int:
             output_path=Path(args.output) if args.output else None,
         )
     except (OSError, ImageAssetError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     print(
         json.dumps(
             {
@@ -213,8 +224,7 @@ def preview(args: argparse.Namespace) -> int:
             owner_grace=args.owner_grace,
         )
     except PreviewConfigurationError as exc:
-        print(json.dumps({"status": "failed", "error": str(exc), "root": args.root, "mode": args.mode}, ensure_ascii=False))
-        return 2
+        return _fail(exc, root=args.root, mode=args.mode)
     print(json.dumps(session.to_payload(), ensure_ascii=False))
     return 0
 
@@ -224,8 +234,7 @@ def plan_preview(args: argparse.Namespace) -> int:
         payload = read_plan_preview_payload(args.payload)
         result = create_plan_preview(payload, ttl=args.ttl, mode=args.mode)
     except (OSError, PreviewConfigurationError, PlanPreviewError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     print(json.dumps(result.to_payload(), ensure_ascii=False))
     return 0
 
@@ -234,8 +243,7 @@ def plan_preview_stop(args: argparse.Namespace) -> int:
     try:
         result = stop_plan_preview(Path(args.root), pid=args.pid)
     except (OSError, PlanPreviewError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc), "root": args.root}, ensure_ascii=False))
-        return 2
+        return _fail(exc, root=args.root)
     print(json.dumps(result, ensure_ascii=False))
     return 0
 
@@ -250,8 +258,7 @@ def ingest_review(args: argparse.Namespace) -> int:
             apply_model=args.apply_model,
         )
     except (CommentStoreError, ReviewIngestionError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     print(json.dumps(result.payload, ensure_ascii=False))
     return 0
 
@@ -277,8 +284,7 @@ def add_reply(args: argparse.Namespace) -> int:
             body=args.body,
         )
     except CommentStoreError as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
-        return 2
+        return _fail(exc)
     _publish_comment_updated(root, args.thread_id)
     print(
         json.dumps(
@@ -296,19 +302,14 @@ def add_reply(args: argparse.Namespace) -> int:
 
 def _publish_comment_updated(root: Path, thread_id: str) -> None:
     """Notify an active preview session that comments changed."""
-    from scripts.html_review_workbench.preview_server import find_active_session
     from scripts.html_review_workbench.watch_comments import post_event
 
-    session = find_active_session(root.resolve())
-    if session is None:
-        return
-    bind = session.get("bind")
-    port = session.get("port")
-    if not isinstance(bind, str) or not isinstance(port, int):
+    url = active_session_base_url(root)
+    if url is None:
         return
     try:
         post_event(
-            f"http://{bind}:{port}",
+            url,
             "comment_updated",
             {"source": "agent", "thread_id": thread_id},
         )
@@ -328,29 +329,25 @@ def check_gates(args: argparse.Namespace) -> int:
 
 def watch_comments(args: argparse.Namespace) -> int:
     from scripts.html_review_workbench.watch_comments import run_watch
-    from scripts.html_review_workbench.preview_server import find_active_session
     root = Path(args.root).resolve()
     url = args.url
     if not url:
-        session = find_active_session(root)
-        if session is None:
+        url = active_session_base_url(root)
+        if url is None:
             print(json.dumps({"status": "failed", "error": "no active preview session found"}, ensure_ascii=False))
             return 2
-        url = f"http://{session['bind']}:{session['port']}"
     return run_watch(url, root=root)
 
 
 def notify_update(args: argparse.Namespace) -> int:
     from scripts.html_review_workbench.watch_comments import send_notify
-    from scripts.html_review_workbench.preview_server import find_active_session
     root = Path(args.root).resolve()
     url = args.url
     if not url:
-        session = find_active_session(root)
-        if session is None:
+        url = active_session_base_url(root)
+        if url is None:
             print(json.dumps({"status": "failed", "error": "no active preview session found"}, ensure_ascii=False))
             return 2
-        url = f"http://{session['bind']}:{session['port']}"
     return send_notify(url, message=args.message)
 
 

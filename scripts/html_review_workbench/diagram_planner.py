@@ -32,7 +32,7 @@ def plan_diagrams(blocks: list[dict[str, Any]]) -> dict[str, PlannedDiagram]:
         if not _is_diagram_candidate(block):
             continue
         block_id = str(block["id"])
-        source = _diagram_source(block)
+        source = diagram_source(block)
         if not source:
             continue
         relative_path = f"assets/diagrams/{_safe_filename(block_id)}.mmd"
@@ -62,7 +62,7 @@ def _is_diagram_candidate(block: dict[str, Any]) -> bool:
     return block.get("type") == "diagram" or isinstance(block.get("diagram_source"), str) or isinstance(block.get("diagram"), dict)
 
 
-def _diagram_source(block: dict[str, Any]) -> str:
+def diagram_source(block: dict[str, Any]) -> str:
     diagram = block.get("diagram")
     if isinstance(diagram, dict) and isinstance(diagram.get("source"), str):
         return diagram["source"]
@@ -80,6 +80,7 @@ def _classify_diagram(block: dict[str, Any], source: str) -> str:
         for part in [str(block.get("title", "")), str(block.get("content", "")), source]
         if part
     )
+    # This partial-match classifier is intentionally separate from model_quality._looks_like_mermaid.
     if any(keyword in text for keyword in ["gantt", "timeline", "journey"]):
         return "timeline"
     if any(keyword in text for keyword in ["quadrantchart", "matrix", "table"]):

@@ -6,9 +6,10 @@ import json
 import re
 import shutil
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from scripts.html_review_workbench.common import now_iso, unique_path, write_json
 
 
 class ImageAssetError(ValueError):
@@ -44,14 +45,13 @@ def attach_image_to_model(
     image = block.setdefault("image", {})
     image["source_path"] = relative_source
     image["generation_status"] = "generated"
-    image["generated_at"] = datetime.now(timezone.utc).isoformat()
+    image["generated_at"] = now_iso()
     if "alt" not in image:
         image["alt"] = block.get("title") or block_id
     if "prompt" not in image:
         image["prompt"] = block.get("content") or block_id
 
-    target_model_path.parent.mkdir(parents=True, exist_ok=True)
-    target_model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(target_model_path, model, ensure_parent=True)
     return ImageAttachmentResult(
         model_path=target_model_path,
         block_id=block_id,
@@ -75,10 +75,7 @@ def _asset_filename(block_id: str, image_path: Path) -> str:
 
 
 def _unique_asset_path(path: Path) -> Path:
-    if not path.exists():
-        return path
-    for index in range(2, 1000):
-        candidate = path.with_name(f"{path.stem}-{index}{path.suffix}")
-        if not candidate.exists():
-            return candidate
-    raise ImageAssetError(f"could not choose unique image asset path for: {path}")
+    return unique_path(
+        path,
+        on_exhausted=lambda exhausted: ImageAssetError(f"could not choose unique image asset path for: {exhausted}"),
+    )

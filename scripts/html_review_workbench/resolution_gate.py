@@ -65,6 +65,17 @@ def check_gate(
     )
 
 
+def try_check_gate(
+    root: Path,
+    comments_path: str = "annotations/comments.json",
+    state_path: str = DEFAULT_STATE_PATH,
+) -> GateResult | None:
+    try:
+        return check_gate(root, comments_path=comments_path, state_path=state_path)
+    except Exception:
+        return None
+
+
 def _get_classification(thread: dict[str, Any], state: dict[str, Any] | None) -> str:
     """Return the classification for a thread, using state cache or live classify."""
     if state:

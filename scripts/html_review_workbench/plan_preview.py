@@ -12,11 +12,12 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from html import escape
 from pathlib import Path
 from typing import Any
 
+from scripts.html_review_workbench.common import now_iso, pid_is_alive, write_json
 from scripts.html_review_workbench.preview_server import PreviewConfigurationError, PreviewMode, start_preview
 from scripts.html_review_workbench.render import render_bundle
 from scripts.html_review_workbench.validate_bundle import validate_bundle
@@ -93,22 +94,19 @@ def create_plan_preview(
     preview_id = uuid.uuid4().hex[:12]
     root = Path(tempfile.mkdtemp(prefix=ROOT_PREFIX)).resolve()
     _assert_plan_preview_root(root)
-    (root / MARKER_FILE).write_text(
-        json.dumps({"id": preview_id, "created_at": _now_iso()}, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    write_json(root / MARKER_FILE, {"id": preview_id, "created_at": now_iso()}, indent=None)
 
     model = build_plan_preview_model(payload, preview_id)
     model_path = root / "document-model.json"
     try:
-        model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(model_path, model)
         render_bundle(model_path, root)
         _validate_rendered_bundle(root, bundle_validator)
     except (OSError, ValueError, PlanPreviewError):
         shutil.rmtree(root, ignore_errors=True)
         raise
     session = preview_starter(root, mode, idle_timeout=ttl)
-    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
+    expires_at = (now_iso_datetime() + timedelta(seconds=ttl)).isoformat()
     cleanup_process = cleanup_starter(root, session.pid, ttl)
     _write_plan_preview_sentinel(preview_id)
     return PlanPreviewResult(
@@ -197,7 +195,7 @@ def build_plan_preview_model(payload: dict[str, Any], preview_id: str) -> dict[s
         "schema_version": "1.0",
         "document_id": f"plan-preview-{preview_id}",
         "title": title,
-        "generated_at": _now_iso(),
+        "generated_at": now_iso(),
         "summary": summary,
         "metadata": {
             "status": "draft",
@@ -226,7 +224,7 @@ def stop_plan_preview(
     root = root.resolve()
     _assert_plan_preview_root(root)
     stopped = False
-    if pid is not None and _pid_is_alive(pid):
+    if pid is not None and pid_is_alive(pid):
         try:
             os.kill(pid, signal.SIGTERM)
             stopped = True
@@ -428,30 +426,23 @@ def _write_plan_preview_sentinel(preview_id: str) -> None:
     sentinel = _plan_preview_sentinel_path()
     if sentinel is None:
         return
-    sentinel_dir = sentinel.parent
-    sentinel_dir.mkdir(parents=True, exist_ok=True)
-    sentinel.write_text(
-        json.dumps({"preview_id": preview_id, "created_at": _now_iso()}, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    write_json(
+        sentinel,
+        {"preview_id": preview_id, "created_at": now_iso()},
+        ensure_parent=True,
+        indent=None,
     )
 
 
 def _remove_plan_preview_sentinel() -> None:
+    """Remove the test-visible session sentinel if one was written."""
     sentinel = _plan_preview_sentinel_path()
     if sentinel is None:
         return
     sentinel.unlink(missing_ok=True)
 
 
-def _pid_is_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
+def now_iso_datetime() -> "datetime":
+    from datetime import datetime, timezone
 
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone.utc)

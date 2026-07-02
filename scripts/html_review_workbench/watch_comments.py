@@ -12,13 +12,12 @@ from urllib.parse import urlparse
 
 def _check_gate_status(root: Path) -> dict[str, object] | None:
     """Return gate payload or None on error."""
-    try:
-        from scripts.html_review_workbench.resolution_gate import check_gate
+    from scripts.html_review_workbench.resolution_gate import try_check_gate
 
-        result = check_gate(root)
-        return result.to_payload()
-    except Exception:
+    result = try_check_gate(root)
+    if result is None:
         return None
+    return result.to_payload()
 
 
 def run_watch(server_url: str, root: Path | None = None) -> int:

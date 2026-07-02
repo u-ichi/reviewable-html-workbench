@@ -15,17 +15,16 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Literal
 from urllib.parse import urlparse
 
-from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError, empty_comments
+from scripts.html_review_workbench.comment_store import CommentStore, CommentStoreError
+from scripts.html_review_workbench.common import now_iso, pid_is_alive, write_json
 from scripts.html_review_workbench.event_bus import EventBus, format_sse
 from scripts.html_review_workbench.preview_host_resolve import detect_tailscale_ipv4
 
 
-ROOT = Path(__file__).resolve().parents[2]
 PreviewMode = Literal["auto", "tailscale", "local"]
 ResolvedMode = Literal["tailscale", "local"]
 DEFAULT_PREVIEW_IDLE_TIMEOUT_SECONDS = 24 * 60 * 60
@@ -141,7 +140,7 @@ def start_preview(
     bind, resolved_mode = resolve_bind(mode)
     session_id = uuid.uuid4().hex
     owner_session = owner_session or current_owner_session() or "unknown"
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = now_iso()
 
     command = [
         sys.executable,
@@ -242,8 +241,7 @@ def resolve_bind(
 
 
 def write_session_manifest(path: Path, session: PreviewSession) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(session.manifest_payload(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(path, session.manifest_payload(), ensure_parent=True)
 
 
 def _validate_bind(bind: str) -> str:
@@ -428,7 +426,7 @@ def _start_owner_watchdog(
 ) -> None:
     def watch() -> None:
         while True:
-            if not _pid_is_alive(owner_pid):
+            if not pid_is_alive(owner_pid):
                 if idle_timeout > 0 and grace_seconds > 0:
                     time.sleep(grace_seconds)
                     return
@@ -511,16 +509,6 @@ def _start_comments_file_watcher(
     thread.start()
 
 
-def _pid_is_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
 def find_active_session(root: Path) -> dict[str, object] | None:
     """Return the manifest of the most recently created running preview session under *root*, or None."""
     annotations = root / "annotations"
@@ -534,7 +522,7 @@ def find_active_session(root: Path) -> dict[str, object] | None:
         except (json.JSONDecodeError, OSError):
             continue
         pid = manifest.get("pid")
-        if isinstance(pid, int) and _pid_is_alive(pid):
+        if isinstance(pid, int) and pid_is_alive(pid):
             ts = str(manifest.get("created_at", ""))
             if ts > newest_ts:
                 newest_ts = ts

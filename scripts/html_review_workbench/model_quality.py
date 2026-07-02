@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from scripts.html_review_workbench.diagram_planner import diagram_source
+
 
 DEPRECATED_RENDERER_TYPES = frozenset({"section", "text", "table"})
 HTML_TAG_RE = re.compile(r"<[A-Za-z][^>]*>")
@@ -103,7 +105,7 @@ def _check_diagram_block(
     errors: list[str],
     warnings: list[str],
 ) -> None:
-    source = _diagram_source(block, content)
+    source = diagram_source({**block, "content": content})
     if not source.strip():
         errors.append(f"diagram block {block_id} must contain Mermaid source")
     elif not _looks_like_mermaid(source):
@@ -113,16 +115,9 @@ def _check_diagram_block(
         errors.append(f"diagram block {block_id} must attach a generated image before render")
 
 
-def _diagram_source(block: dict[str, Any], content: str) -> str:
-    diagram = block.get("diagram")
-    if isinstance(diagram, dict) and isinstance(diagram.get("source"), str):
-        return diagram["source"]
-    source = block.get("diagram_source", content)
-    return source if isinstance(source, str) else ""
-
-
 def _looks_like_mermaid(source: str) -> bool:
     compact = source.strip().lower()
+    # This startswith validation is intentionally separate from diagram_planner._classify_diagram.
     return compact.startswith(
         (
             "flowchart",

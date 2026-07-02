@@ -181,6 +181,18 @@ class IngestReviewTest(unittest.TestCase):
             self.assertEqual(state["summary"]["model_updates_applied"], 1)
             self.assertEqual(state["classifications"][0]["status_after"], "resolved")
 
+    def test_ingest_review_uses_unknown_gate_payload_when_gate_check_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_comments(root, [_thread("cmt-action", "overview", "text", "Fix this.")])
+
+            from unittest.mock import patch
+
+            with patch("scripts.html_review_workbench.resolution_gate.try_check_gate", return_value=None):
+                result = ingest_review(root)
+
+            self.assertEqual(result.payload["gate"], {"gate": "unknown"})
+
 
 def _write_comments(root: Path, threads: list[dict[str, object]]) -> None:
     annotations = root / "annotations"

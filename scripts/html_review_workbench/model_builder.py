@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import html
-import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from scripts.html_review_workbench.common import now_iso, write_json
 
 
 DEFAULT_TITLE = "HTML Output"
@@ -36,8 +36,7 @@ def build_model_from_source(
 ) -> BuildModelResult:
     source_text = resolve_source_text(text=text, input_path=input_path)
     model = build_model(source_text, title=title, document_id=document_id, source_path=input_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(output_path, model, ensure_parent=True)
     return BuildModelResult(path=output_path, model=model)
 
 
@@ -72,7 +71,7 @@ def build_model(
         "document_id": resolved_document_id,
         "title": resolved_title,
         "summary": "Source-capture draft for agent-designed reviewable HTML output.",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now_iso(),
         "metadata": {
             "source": str(source_path) if source_path is not None else "inline",
             "planner": "source-capture-draft",
@@ -123,11 +122,6 @@ def html_block(
 
 def source_capture_html(source_text: str) -> str:
     return f"<pre><code>{html.escape(source_text.strip())}</code></pre>"
-
-
-def unique_block_id(title: str, index: int) -> str:
-    slug = slugify(title)
-    return f"{slug}-{index}"
 
 
 def slugify(value: str) -> str:

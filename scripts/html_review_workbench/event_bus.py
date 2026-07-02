@@ -6,9 +6,10 @@ import json
 import threading
 import time
 from collections import deque
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
 from typing import Iterator
+
+from scripts.html_review_workbench.common import now_iso
 
 
 @dataclass(frozen=True)
@@ -16,7 +17,7 @@ class ServerEvent:
     id: int
     type: str
     data: dict[str, object]
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=now_iso)
 
 
 class EventBus:

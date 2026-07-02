@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from scripts.html_review_workbench.common import (
+    COMMENTS_SCHEMA_PATH,
+    now_iso,
+    resolve_bundle_json_path as _resolve_bundle_json_path,
+    write_json,
+)
 from scripts.html_review_workbench.schema_validation import validate
 
 
-ROOT = Path(__file__).resolve().parents[2]
-COMMENTS_SCHEMA_PATH = ROOT / "schemas" / "comments.schema.json"
 DEFAULT_COMMENTS_PATH = "annotations/comments.json"
 DEFAULT_STATUS = "needs_agent_review"
 
@@ -43,8 +46,7 @@ class CommentStore:
 
     def write(self, payload: dict[str, Any]) -> Path:
         validate_comments_payload(payload)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(self.path, payload, ensure_parent=True)
         return self.path
 
     def add_thread(
@@ -131,7 +133,7 @@ def make_thread(
         "suffix": suffix,
         "comment": comment,
         "status": status,
-        "created_at": created_at or _now_iso(),
+        "created_at": created_at or now_iso(),
         "replies": [],
     }
     validate_comments_payload({"schema_version": "1.0", "document_id": document_id, "comments": [payload]})
@@ -145,7 +147,7 @@ def make_reply(*, author: str, role: str, kind: str, body: str, created_at: str 
         "role": role,
         "kind": kind,
         "body": body,
-        "created_at": created_at or _now_iso(),
+        "created_at": created_at or now_iso(),
     }
     schema = _comments_schema()["properties"]["comments"]["items"]["properties"]["replies"]["items"]
     errors = validate(payload, schema)
@@ -161,21 +163,7 @@ def validate_comments_payload(payload: dict[str, Any]) -> None:
 
 
 def resolve_comments_path(root: Path, comments_path: str = DEFAULT_COMMENTS_PATH) -> Path:
-    if not comments_path:
-        raise CommentStoreError("comments path is required")
-    candidate = Path(comments_path)
-    if candidate.is_absolute():
-        raise CommentStoreError("comments path must be relative")
-    if any(part == ".." for part in candidate.parts):
-        raise CommentStoreError("comments path must not contain parent traversal")
-
-    resolved_root = root.resolve()
-    resolved_path = (resolved_root / candidate).resolve()
-    if not resolved_path.is_relative_to(resolved_root):
-        raise CommentStoreError("comments path must stay inside the bundle root")
-    if resolved_path.suffix != ".json":
-        raise CommentStoreError("comments path must be a JSON file")
-    return resolved_path
+    return _resolve_bundle_json_path(root, comments_path, label="comments", error=CommentStoreError)
 
 
 def _comments_schema() -> dict[str, Any]:
@@ -195,10 +183,6 @@ def _status_after_reply(role: str) -> str:
     if role == "user":
         return "needs_agent_review"
     return DEFAULT_STATUS
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _new_id() -> str:

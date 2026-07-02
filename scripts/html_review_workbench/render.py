@@ -6,16 +6,16 @@ import hashlib
 import json
 import re
 import shutil
-from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench import __version__
+from scripts.html_review_workbench.common import MERMAID_INIT_JS, REPO_ROOT, now_iso, unique_path, write_json
 from scripts.html_review_workbench.diagram_planner import PlannedDiagram, plan_diagrams, write_diagram_sources
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
 TEMPLATE_PATH = ROOT / "templates" / "report.html.j2"
 STYLE_PATH = ROOT / "templates" / "style.css"
 COMMENTS_JS_PATH = ROOT / "templates" / "review-comments.js"
@@ -30,7 +30,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     assets_dir = output_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
-    rendered_at = datetime.now(timezone.utc).isoformat()
+    rendered_at = now_iso()
 
     diagrams = plan_diagrams(model["blocks"])
     diagram_outputs = write_diagram_sources(output_dir, diagrams)
@@ -102,10 +102,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
         "diagrams": [diagram.to_manifest() for diagram in diagrams.values()],
         "review_blocks": review_blocks,
     }
-    (output_dir / "renderer-manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_json(output_dir / "renderer-manifest.json", manifest)
     return index_path
 
 
@@ -120,7 +117,7 @@ def _render_mermaid_head(asset_version: str) -> str:
     version = escape(asset_version, quote=True)
     return (
         f'  <script src="assets/mermaid.min.js?v={version}"></script>\n'
-        "  <script>mermaid.initialize({startOnLoad: true, theme: 'dark', securityLevel: 'strict'})</script>\n"
+        f"  <script>{MERMAID_INIT_JS}</script>\n"
         f'  <script src="assets/diagram-zoom.js?v={version}" defer></script>'
     )
 
@@ -314,7 +311,7 @@ def _render_block(
     block_id = escape(block["id"], quote=True)
     block_type = escape(block["type"], quote=True)
     review_attr = "true" if review_required else "false"
-    title_html = _render_block_title(block.get("title"), block_id, heading_level, section_number)
+    title_html = _render_block_title(block.get("title"), heading_level)
     content_html = _render_block_content(block, diagram, image_src, heading_level, section_number)
     return (
         '<section class="review-block" '
@@ -328,9 +325,7 @@ def _render_block(
 
 def _render_block_title(
     title: object,
-    block_id: str,
     heading_level: int,
-    section_number: str | None = None,
 ) -> str:
     if not isinstance(title, str) or not title:
         return ""
@@ -351,7 +346,7 @@ def _render_block_content(
         return _render_image(block, image_src)
     if block_type == "html":
         if section_number is not None:
-            content = _shift_content_headings(str(content), section_number, heading_level)
+            content = _shift_content_headings(str(content), heading_level)
         return f'<div class="block-content">{content}</div>'
     if block_type == "callout":
         level = block.get("level", "info")
@@ -377,7 +372,7 @@ def _render_block_content(
     return f'<p class="block-content">{escape(content)}</p>'
 
 
-def _shift_content_headings(content: str, section_number: str, heading_level: int) -> str:
+def _shift_content_headings(content: str, heading_level: int) -> str:
     if heading_level == 3:
         content = content.replace("<h3>", "<h4>")
         content = content.replace("</h3>", "</h4>")
@@ -517,13 +512,10 @@ def _render_image(block: dict[str, Any], image_src: str | None) -> str:
 
 
 def _unique_output_asset(path: Path) -> Path:
-    if not path.exists():
-        return path
-    for index in range(2, 1000):
-        candidate = path.with_name(f"{path.stem}-{index}{path.suffix}")
-        if not candidate.exists():
-            return candidate
-    raise ValueError(f"could not choose unique output image path for: {path}")
+    return unique_path(
+        path,
+        on_exhausted=lambda exhausted: ValueError(f"could not choose unique output image path for: {exhausted}"),
+    )
 
 
 def _review_block_diagram_metadata(diagram: PlannedDiagram | None) -> dict[str, str]:
