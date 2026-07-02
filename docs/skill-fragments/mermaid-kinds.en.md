@@ -1,0 +1,3 @@
+## Mermaid Kinds and Minimal Samples
+
+Use Mermaid source supported by mermaid.js v11. The bundled `mermaid.min.js` renders diagram blocks into SVG in the browser, and rendered Mermaid diagrams can be opened from the zoom button for full-screen pan / zoom inspection. Common kinds include `flowchart` / `graph`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `journey`, `timeline`, `mindmap`, `pie`, `gitGraph`, `requirementDiagram`, `quadrantChart`, `sankey`, `xychart-beta`, `architecture-beta`, `block-beta`, `packet-beta`, `kanban`, `radar`, `treemap`, and `zenuml`. If syntax is uncertain, check the Mermaid docs. The schema `diagram_kind` is a display grouping label and does not need to match Mermaid's internal kind name.

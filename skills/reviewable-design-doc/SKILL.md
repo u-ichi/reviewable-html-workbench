@@ -49,11 +49,13 @@ Follow the language of the latest user request for progress updates, final respo
 
 ## 設計資料モデル作成の規約
 
+<!-- BEGIN SHARED: md-file-prohibition -->
 設計資料作成は、`.md` 原稿をHTMLへ変換する作業ではない。`reviewable-design-doc` は、設計内容を最初からレビュー可能なHTML bundleの情報設計として作る。
 
 - 新規に設計資料を作る場合、最初の保存対象は `output/tmp/<purpose>/document-model.json` または `output/<YYYY-MM-DD>_<name>/document-model.json` にする。
 - `.md` ファイルを設計本文の下書き、中間成果物、HTML化対象として作らない。
 - 一時的に自然文入力を保存する必要がある場合だけ、`source.txt`, `input.txt`, `source-content.txt` のようなプレーンテキスト名を使う。
+<!-- END SHARED: md-file-prohibition -->
 - 設計資料の本文は、見出し記号を含む原稿ではなく、`blocks[].title`, `blocks[].type`, `blocks[].heading_level`, `blocks[].content`, `review_required` を持つ文書モデルとして表現する。
 - 大区分のブロック（背景・要求、アーキテクチャ、代替案比較、意思決定、未決事項など）には `heading_level: 2` を設定し、その配下の詳細ブロックには `heading_level: 3` を使う。各章の冒頭にはその章で扱う内容を示す導入段落を置く。
 - 比較・代替案・評価軸は `html` block内の `<table>`、手順は `<ol>`、並列項目は `<ul>`、操作例・ログ・コマンドは `<pre><code>`、処理・依存・構成はdiagramブロック、決定・前提・注意はplain textのcallout、レビューしてほしい論点は専用のレビュー観点blockにする。
@@ -63,6 +65,7 @@ Follow the language of the latest user request for progress updates, final respo
 - 既存資料を取り込む場合も、既存ファイルをそのまま表示へ流し込まず、`visual-html-renderer` のHTML情報設計規約に従って文書モデルへ再構成する。
 - `build-model` は最終HTMLモデルを作るplannerではなく、入力退避用のsource-capture draftに限る。既存本文やユーザー指定内容を取り込む場合も、そのdraftをそのままrenderせず、agentが設計構造を判断して文書モデルを直接作る。
 
+<!-- BEGIN SHARED: mermaid-kinds -->
 ## Mermaid 対応 kind と最小サンプル
 
 diagramブロックのMermaid sourceは、mermaid.js v11系が対応する記法から選ぶ。同梱済み `mermaid.min.js` がHTML上でSVGに置換する。
@@ -136,6 +139,7 @@ sourceの記法が不確かな場合は mermaid.js 公式docs (https://mermaid.j
 ## Mermaid Kinds and Minimal Samples
 
 Use Mermaid source supported by mermaid.js v11. The bundled `mermaid.min.js` renders diagram blocks into SVG in the browser, and rendered Mermaid diagrams can be opened from the zoom button for full-screen pan / zoom inspection. Common kinds include `flowchart` / `graph`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `journey`, `timeline`, `mindmap`, `pie`, `gitGraph`, `requirementDiagram`, `quadrantChart`, `sankey`, `xychart-beta`, `architecture-beta`, `block-beta`, `packet-beta`, `kanban`, `radar`, `treemap`, and `zenuml`. If syntax is uncertain, check the Mermaid docs. The schema `diagram_kind` is a display grouping label and does not need to match Mermaid's internal kind name.
+<!-- END SHARED: mermaid-kinds -->
 
 ## Design Document Model Rules
 
@@ -232,6 +236,7 @@ After preview startup, monitor browser comment events with `watch-comments`. On 
 ## CodexでのCLI呼び出し
 
 HTML生成時は、`visual-html-renderer` と同じ共通CLI入口を使う。
+<!-- BEGIN SHARED: repo-root-resolution -->
 CLI実行前に、この `SKILL.md` の配置から renderer repo root を決める。
 `skills/reviewable-design-doc/SKILL.md` の2階層上が renderer repo root であり、
 そこに `scripts/html_review_workbench/cli.py` が存在することを確認する。
@@ -239,7 +244,9 @@ CLI実行前に、この `SKILL.md` の配置から renderer repo root を決め
 作業ディレクトリにして実行する。現在のチャットやworkspaceのcwdをrepo rootとして扱わない。
 cwdに `scripts/html_review_workbench/cli.py` が無い場合は、代替HTMLを作らず、
 renderer repo rootへ移動してCLIを実行する。
+<!-- END SHARED: repo-root-resolution -->
 
+<!-- BEGIN SHARED: cli-commands-core -->
 ```bash
 python3 -m scripts.html_review_workbench.cli build-model \
   --text "<existing content when converting an existing source>" \
@@ -264,10 +271,15 @@ python3 -m scripts.html_review_workbench.cli preview \
   --root <output-dir> \
   --mode auto
 ```
+<!-- END SHARED: cli-commands-core -->
 
+<!-- BEGIN SHARED: preview-owner-pid-note -->
 Codex / Claude では preview コマンドを一回限りの shell から起動することがあるため、標準手順では `--owner-pid` を渡さない。preview server は 24時間アクセスが無い場合に idle timeout で自動停止する。長寿命の所有プロセスが明確に分かる場合だけ `--owner-pid <pid>` を使ってよい。一回限りの shell の `$$` や `$PPID` は短命プロセスを指すため使わない。
+<!-- END SHARED: preview-owner-pid-note -->
 
+<!-- BEGIN SHARED: tailscale-sandbox-fallback -->
 Codex sandbox内で `tailscale ip -4` が設定ファイル読み取りに失敗する場合は、`visual-html-renderer` と同じく `python3 -m scripts.html_review_workbench.preview_host_resolve` で取得したIPv4を `HTML_REVIEW_WORKBENCH_TAILSCALE_IP` に渡してから `preview --mode auto` を起動する。
+<!-- END SHARED: tailscale-sandbox-fallback -->
 
 `preview` が `status: running` を返した場合、レビュー依頼の最終応答に `url` を必ず含める。ファイルパスだけで完了しない。標準では `--owner-pid` を渡さず、24時間アクセスが無い場合に idle timeout で自動停止させる。長寿命の所有プロセスが明確な場合だけ `--owner-pid <pid>` を使う。
 

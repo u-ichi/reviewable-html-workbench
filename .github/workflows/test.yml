@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Check generated skill docs
+        run: python3 scripts/build_skill_docs.py --check
+
       - name: Run unit tests
         run: python3 -m unittest discover -s tests
 
