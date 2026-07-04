@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,6 +67,21 @@ class CommonHelpersTest(unittest.TestCase):
 
     def test_pid_is_alive_accepts_current_process(self) -> None:
         self.assertTrue(pid_is_alive(os.getpid()))
+
+    def test_pid_is_alive_rejects_reaped_child(self) -> None:
+        # A spawned-then-exited process must report not-alive on every platform.
+        # On Windows os.kill(pid, 0) raises WinError 87 instead, so this
+        # guards the ctypes-based liveness probe.
+        import subprocess
+
+        proc = subprocess.Popen([sys.executable, "-c", ""])
+        proc.wait()
+
+        self.assertFalse(pid_is_alive(proc.pid))
+
+    def test_pid_is_alive_rejects_non_positive_pids(self) -> None:
+        self.assertFalse(pid_is_alive(0))
+        self.assertFalse(pid_is_alive(-1))
 
     def test_mermaid_init_js_matches_existing_inline_script(self) -> None:
         self.assertEqual(
