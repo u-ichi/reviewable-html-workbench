@@ -118,6 +118,7 @@
   initFocusToggle();
   initPublishToggle();
   initTocScrollSpy();
+  initCommentRailScroll();
 
   document.addEventListener("selectionchange", scheduleSelectionCapture);
   document.addEventListener("keyup", scheduleSelectionCapture);
@@ -434,8 +435,13 @@
   }
 
   function highlightThreadSelection(block, thread, number) {
-    if (thread.anchor && Number.isInteger(thread.anchor.start) && Number.isInteger(thread.anchor.end)) {
-      return highlightByOffsets(block, thread, thread.anchor.start, thread.anchor.end, number);
+    // Re-resolve offsets against the block's CURRENT text so a highlight stays
+    // on the words it was attached to even after the body was edited (or after
+    // an earlier comment in the same block shifted the text). Falls back to a
+    // plain text search, then to a badge, when the text can't be located.
+    const resolved = resolveHighlightOffsets(block, thread);
+    if (resolved && highlightByOffsets(block, thread, resolved.start, resolved.end, number)) {
+      return true;
     }
     const selectedText = typeof thread.selected_text === "string" ? thread.selected_text.trim() : "";
     if (!selectedText) {
@@ -508,6 +514,89 @@
       appendHighlightNumber(highlight, number);
     }
     return true;
+  }
+
+  // The concatenated text of the block as seen by highlightByOffsets/anchor
+  // math (text already inside a comment highlight is excluded, matching the
+  // basis used when the anchor was first captured).
+  function blockAnchorText(block) {
+    return textNodesIn(block).map((node) => node.nodeValue || "").join("");
+  }
+
+  // Decide which character offsets to highlight for a thread. Prefer the stored
+  // absolute offsets when they still point at the selected text; otherwise
+  // re-locate the selected text by its surrounding context so edits to the body
+  // don't leave the highlight stranded on the wrong words.
+  function resolveHighlightOffsets(block, thread) {
+    const selected = typeof thread.selected_text === "string" ? thread.selected_text : "";
+    const anchor = thread.anchor;
+    const hasAnchor = anchor && Number.isInteger(anchor.start) && Number.isInteger(anchor.end) && anchor.end > anchor.start;
+    if (!selected) {
+      return hasAnchor ? { start: anchor.start, end: anchor.end } : null;
+    }
+    const fullText = blockAnchorText(block);
+    if (hasAnchor) {
+      const slice = fullText.slice(anchor.start, anchor.end);
+      if (slice === selected || slice.trim() === selected) {
+        return { start: anchor.start, end: anchor.end };
+      }
+    }
+    return findBestOccurrence(fullText, selected, thread.prefix, thread.suffix);
+  }
+
+  // Locate `selected` inside `fullText`. When it occurs more than once, pick the
+  // occurrence whose neighbouring text best matches the stored prefix/suffix.
+  function findBestOccurrence(fullText, selected, prefix, suffix) {
+    if (!selected) {
+      return null;
+    }
+    const occurrences = [];
+    let from = fullText.indexOf(selected);
+    while (from !== -1) {
+      occurrences.push(from);
+      from = fullText.indexOf(selected, from + 1);
+    }
+    if (occurrences.length === 0) {
+      return null;
+    }
+    if (occurrences.length === 1) {
+      return { start: occurrences[0], end: occurrences[0] + selected.length };
+    }
+    const pref = typeof prefix === "string" ? prefix : "";
+    const suff = typeof suffix === "string" ? suffix : "";
+    let best = occurrences[0];
+    let bestScore = -1;
+    for (const start of occurrences) {
+      const before = fullText.slice(0, start);
+      const after = fullText.slice(start + selected.length);
+      const score = commonSuffixLen(before, pref) + commonPrefixLen(after, suff);
+      if (score > bestScore) {
+        bestScore = score;
+        best = start;
+      }
+    }
+    return { start: best, end: best + selected.length };
+  }
+
+  function commonPrefixLen(a, b) {
+    const max = Math.min(a.length, b.length);
+    let count = 0;
+    while (count < max && a[count] === b[count]) {
+      count += 1;
+    }
+    return count;
+  }
+
+  function commonSuffixLen(a, b) {
+    let i = a.length;
+    let j = b.length;
+    let count = 0;
+    while (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      i -= 1;
+      j -= 1;
+      count += 1;
+    }
+    return count;
   }
 
   function createHighlightElement(thread) {
@@ -767,38 +856,66 @@
     }, 0);
   }
 
+  // Cards flow normally inside the independently scrolling rail; here we only
+  // order them to follow their anchors' reading order in the document. The
+  // document is never scrolled — the rail scrolls on its own (see
+  // scrollActiveCardIntoView). Re-ordering happens only when the order actually
+  // changed, so an in-progress rail scroll is never interrupted.
   function positionCards() {
     const layer = document.getElementById("cmtLayer");
     if (!layer) {
       return;
     }
     const cards = Array.from(layer.querySelectorAll(".cmt"));
-    if (!isDesktopRail()) {
-      for (const card of cards) {
-        card.style.position = "";
-        card.style.top = "";
-      }
+    for (const card of cards) {
+      card.style.position = "";
+      card.style.top = "";
+    }
+    if (!isDesktopRail() || cards.length === 0) {
       return;
     }
-    const layerRect = layer.getBoundingClientRect();
-    cards.sort((a, b) => {
-      const aAnchor = document.querySelector(commentSelector(a.dataset.for));
-      const bAnchor = document.querySelector(commentSelector(b.dataset.for));
-      const aTop = aAnchor ? aAnchor.getBoundingClientRect().top : 0;
-      const bTop = bAnchor ? bAnchor.getBoundingClientRect().top : 0;
-      return aTop - bTop;
-    });
-    let cursor = 0;
-    for (const card of cards) {
-      if (card.hidden || card.style.display === "none") {
-        continue;
+    const sorted = cards
+      .map((card) => {
+        const anchor = document.querySelector(commentSelector(card.dataset.for));
+        const top = anchor ? anchor.getBoundingClientRect().top : Number.MAX_SAFE_INTEGER;
+        return { card, top };
+      })
+      .sort((a, b) => a.top - b.top)
+      .map((entry) => entry.card);
+    const sameOrder = sorted.every((card, index) => cards[index] === card);
+    if (!sameOrder) {
+      for (const card of sorted) {
+        layer.appendChild(card);
       }
-      const anchor = document.querySelector(commentSelector(card.dataset.for));
-      const ideal = anchor ? anchor.getBoundingClientRect().top - layerRect.top + layer.scrollTop : cursor;
-      const top = Math.max(ideal, cursor);
-      card.style.position = "absolute";
-      card.style.top = `${top}px`;
-      cursor = top + card.offsetHeight + 14;
+    }
+  }
+
+  // Scroll ONLY the comment rail so the active card is visible. The document
+  // itself never moves; the rail is an independent scroll container.
+  function scrollActiveCardIntoView(commentId) {
+    const layer = document.getElementById("cmtLayer");
+    const card = document.getElementById(cardId(commentId));
+    if (!layer || !card || !isDesktopRail()) {
+      return;
+    }
+    const margin = 12;
+    const cardTop = card.offsetTop;
+    const cardBottom = cardTop + card.offsetHeight;
+    const viewTop = layer.scrollTop;
+    const viewBottom = viewTop + layer.clientHeight;
+    let target = viewTop;
+    if (cardTop < viewTop + margin) {
+      target = cardTop - margin;
+    } else if (cardBottom > viewBottom - margin) {
+      target = cardBottom - layer.clientHeight + margin;
+    } else {
+      return;
+    }
+    target = Math.max(0, target);
+    if (typeof layer.scrollTo === "function") {
+      layer.scrollTo({ top: target, behavior: "smooth" });
+    } else {
+      layer.scrollTop = target;
     }
   }
 
@@ -817,6 +934,30 @@
     return window.matchMedia("(min-width: 901px)").matches && (!viewDoc || viewDoc.classList.contains("active"));
   }
 
+  // Keep wheel scrolling inside the comment rail from leaking to the document,
+  // so the comment column and the body column scroll independently.
+  function initCommentRailScroll() {
+    const layer = document.getElementById("cmtLayer");
+    if (!layer) {
+      return;
+    }
+    layer.addEventListener("wheel", (event) => {
+      const maxScroll = layer.scrollHeight - layer.clientHeight;
+      if (maxScroll <= 0) {
+        return;
+      }
+      const atTop = layer.scrollTop <= 0 && event.deltaY < 0;
+      const atBottom = layer.scrollTop >= maxScroll && event.deltaY > 0;
+      if (!atTop && !atBottom) {
+        event.preventDefault();
+        layer.scrollTop += event.deltaY;
+      }
+    }, { passive: false });
+  }
+
+  // scrollCard=true: activation came from the document side (highlight, badge,
+  // new comment) — reveal the matching card by scrolling the RAIL to it, never
+  // the document. false: the user is already working inside the card.
   function activate(commentId, scrollCard = true) {
     if (!commentId) {
       return;
@@ -825,12 +966,7 @@
     setActiveClasses(commentId);
     schedulePositionCards();
     if (scrollCard) {
-      window.requestAnimationFrame(() => {
-        const card = document.getElementById(cardId(commentId));
-        if (card) {
-          card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-      });
+      window.requestAnimationFrame(() => scrollActiveCardIntoView(commentId));
     }
   }
 

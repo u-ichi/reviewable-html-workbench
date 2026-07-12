@@ -23,6 +23,10 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
             "reviewBlockForRange",
             "renderCommentCards",
             "positionCards",
+            "scrollActiveCardIntoView",
+            "initCommentRailScroll",
+            "resolveHighlightOffsets",
+            "findBestOccurrence",
             "activate",
             "initPublishToggle",
             "setPublished",
@@ -69,7 +73,65 @@ class ReviewCommentsJavaScriptTest(unittest.TestCase):
         self.assertIn('card.dataset.cstate = cardState', script)
         self.assertIn('card.dataset.for = thread.id || ""', script)
         self.assertIn('document.querySelectorAll(".cx.is-active, .cmt.is-active")', script)
-        self.assertIn("card.scrollIntoView({ behavior: \"smooth\", block: \"nearest\" })", script)
+
+    def test_activation_reveals_card_in_rail_and_never_scrolls_the_document(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        activate_block = script[script.index("function activate") : script.index("function setActiveClasses")]
+        reveal_block = script[script.index("function scrollActiveCardIntoView") : script.index("function schedulePositionCards")]
+
+        # Scrolling the document (the body column) on activation is the bug we
+        # removed; only the comment rail may scroll.
+        self.assertNotIn("scrollIntoView", script)
+        self.assertIn("setActiveClasses(commentId);", activate_block)
+        self.assertIn("schedulePositionCards();", activate_block)
+        self.assertIn("scrollActiveCardIntoView(commentId)", activate_block)
+        self.assertIn('document.getElementById("cmtLayer")', reveal_block)
+        self.assertIn("layer.scrollTo", reveal_block)
+        self.assertNotIn("window.scroll", reveal_block)
+
+    def test_position_cards_orders_by_anchor_without_absolute_layout(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+        position_block = script[script.index("function positionCards") : script.index("function scrollActiveCardIntoView")]
+
+        self.assertNotIn("layoutCardTops", script)
+        self.assertNotIn("state.pin", script)
+        self.assertIn('card.style.position = "";', position_block)
+        self.assertIn('card.style.top = "";', position_block)
+        self.assertIn("commentSelector(card.dataset.for)", position_block)
+        self.assertIn("getBoundingClientRect().top", position_block)
+        self.assertIn("layer.appendChild(card)", position_block)
+
+    def test_comment_rail_scrolls_independently(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+
+        self.assertIn("initCommentRailScroll();", script)
+        rail_block = script[script.index("function initCommentRailScroll") : script.index("function activate")]
+
+        self.assertIn('layer.addEventListener("wheel"', rail_block)
+        self.assertIn("event.preventDefault();", rail_block)
+        self.assertIn("layer.scrollTop += event.deltaY;", rail_block)
+
+    def test_highlight_reanchors_selected_text_after_body_edits(self) -> None:
+        script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")
+
+        for function_name in [
+            "resolveHighlightOffsets",
+            "findBestOccurrence",
+            "commonPrefixLen",
+            "commonSuffixLen",
+            "blockAnchorText",
+        ]:
+            self.assertIn(f"function {function_name}", script)
+
+        select_block = script[script.index("function highlightThreadSelection") : script.index("function highlightByOffsets")]
+        resolve_block = script[script.index("function resolveHighlightOffsets") : script.index("function findBestOccurrence")]
+
+        # Offsets are resolved against the current text before falling back.
+        self.assertIn("resolveHighlightOffsets(block, thread)", select_block)
+        self.assertIn("highlightByOffsets(block, thread, resolved.start, resolved.end, number)", select_block)
+        # Stored offsets are trusted only while they still cover the selected text.
+        self.assertIn("fullText.slice(anchor.start, anchor.end)", resolve_block)
+        self.assertIn("findBestOccurrence(fullText, selected, thread.prefix, thread.suffix)", resolve_block)
 
     def test_filter_visibility_keeps_highlight_text_visible(self) -> None:
         script = (ROOT / "templates/review-comments.js").read_text(encoding="utf-8")

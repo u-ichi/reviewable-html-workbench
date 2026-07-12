@@ -236,15 +236,27 @@ body {
   box-shadow: var(--sh-1); padding: var(--sp-7) var(--sp-7) var(--sp-8);
 }
 
-/* comments rail */
-.cmt-rail { position: relative; min-width: 0; }
+/* comments rail — sticky column that scrolls independently of the document (mirrors .toc) */
+.cmt-rail {
+  position: sticky; top: 76px; max-height: calc(100vh - 76px - 32px);
+  min-width: 0; display: flex; flex-direction: column;
+}
 .cmt-rail-h {
   display: flex; align-items: center; justify-content: space-between;
   font-size: var(--fs-caption); letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3); font-weight: 650; margin-bottom: var(--sp-2);
+  flex-shrink: 0;
 }
 .cmt-rail-count { font-family: var(--font-mono); letter-spacing: 0; }
-.cmt-layer { position: relative; }
+.cmt-layer {
+  position: relative; flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+  scrollbar-width: thin; padding: 2px 2px 4px;
+}
+.cmt-layer::-webkit-scrollbar { width: 4px; }
+.cmt-layer::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 2px; }
+.cmt-layer::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
 /* ---------- 5. DOCUMENT HEADER ---------------------------- */
 .doc-breadcrumb { display: flex; align-items: center; gap: 7px; font-size: var(--fs-small); color: var(--ink-3); margin-bottom: var(--sp-4); flex-wrap: wrap; }
@@ -817,12 +829,14 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
   box-shadow: var(--sh-1); padding: var(--pad-card); font-size: var(--fs-small);
   border-left: 3px solid var(--ink-3); transition: box-shadow .15s, border-color .15s, transform .15s;
 }
-/* desktop absolute positioning */
-.doc-grid .cmt { position: absolute; left: 0; right: 0; width: 100%; }
 .cmt[data-cstate="open"]     { border-left-color: var(--open); }
 .cmt[data-cstate="reply"]    { border-left-color: var(--reply); }
 .cmt[data-cstate="resolved"] { border-left-color: var(--resolved); opacity: .78; }
-.cmt.is-active { box-shadow: var(--sh-3); border-color: var(--line-3); transform: translateX(-3px); z-index: 5; opacity: 1; }
+/* active card: state-colored double ring (same visual language as .cx.is-active) so a clicked highlight maps to its card at a glance */
+.cmt.is-active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--line-3), var(--sh-3); border-color: var(--line-3); transform: translateX(-3px); z-index: 5; opacity: 1; }
+.cmt[data-cstate="open"].is-active     { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--open),     var(--sh-3); border-color: var(--open); }
+.cmt[data-cstate="reply"].is-active    { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--reply),    var(--sh-3); border-color: var(--reply); }
+.cmt[data-cstate="resolved"].is-active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--resolved), var(--sh-3); border-color: var(--resolved); opacity: 1; }
 
 .cmt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .av { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--ink-inverse); font-size: 11px; font-weight: 700; font-family: var(--font-mono); }
@@ -839,8 +853,8 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .cmt[data-cstate="reply"] .cmt-state    { color: var(--reply);    background: var(--reply-bg); }
 .cmt[data-cstate="resolved"] .cmt-state { color: var(--resolved); background: var(--resolved-bg); }
 
-.cmt-quote { font-size: 12px; color: var(--ink-3); border-left: 2px solid var(--line-2); padding-left: 8px; margin: 0 0 8px; font-style: italic; }
-.cmt-body { color: var(--ink); line-height: 1.55; }
+.cmt-quote { font-size: 12px; color: var(--ink-3); border-left: 2px solid var(--line-2); padding-left: 8px; margin: 0 0 8px; font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cmt-body { color: var(--ink); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cmt-body p { margin: 0; }
 
 /* threaded replies */
@@ -850,7 +864,7 @@ figcaption .fc-no { font-family: var(--font-mono); font-weight: 600; color: var(
 .reply-name { font-weight: 650; font-size: 12px; }
 .reply-name .role { font-weight: 500; color: var(--ink-3); margin-left: 6px; font-size: 11px; }
 .reply-time { font-size: 10px; color: var(--ink-3); margin-left: 6px; }
-.reply-body { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+.reply-body { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reply.from-agent .av { background: linear-gradient(140deg, var(--brand), var(--agent-accent)); }
 
 /* resolved banner inside card */
