@@ -4,7 +4,9 @@
 
 `reviewable-html-workbench` は Codex plugin repo を管理元にする。base repo の `home/skills` / `home/generated/codex-skills` には同名 skill を置かず、必要になった場合だけ薄い adapter skill を追加する。
 
-この repo は plugin root と marketplace root を兼ねる。Codex marketplace loader の既存パターンに合わせるため、`plugins/reviewable-html-workbench` は repo root への symlink として置く。`codex plugin marketplace add <repo>` で `.agents/plugins/marketplace.json` が読まれ、`reviewable-html-workbench` plugin は `source.path: "./plugins/reviewable-html-workbench"` から読み込まれる。
+この repo は plugin root と marketplace root を兼ねる。`codex plugin marketplace add <repo>` で `.agents/plugins/marketplace.json` が読まれ、`reviewable-html-workbench` plugin は `source.path: "./"`、つまり marketplace root 自体から読み込まれる。
+
+以前は Codex loader の既存パターンに合わせて `plugins/reviewable-html-workbench` を repo root (`..`) への symlink として置き、`source.path` をそこへ向けていた。Windows の git は既定 (`core.symlinks=false`) で symlink をリンク先文字列を書いた通常ファイルとして checkout するため、その path を plugin root として走査した Claude Code / Codex が `ENOTDIR` で install に失敗する。symlink の解決先は元々 repo root なので、`source.path` を `"./"` に直せば POSIX 側の解決結果は変わらないまま Windows でも成立する。この理由から symlink は廃止し、tracked file に symlink を置かないことを `tests/test_project_layout.py` で検証する。
 
 ## ローカル登録手順
 

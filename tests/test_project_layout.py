@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -46,14 +47,31 @@ class ProjectLayoutTest(unittest.TestCase):
         self.assertEqual(len(plugins), 1)
         plugin = plugins[0]
         self.assertEqual(plugin["name"], "reviewable-html-workbench")
-        self.assertEqual(plugin["source"], {"source": "local", "path": "./plugins/reviewable-html-workbench"})
+        self.assertEqual(plugin["source"], {"source": "local", "path": "./"})
         self.assertEqual(plugin["policy"]["installation"], "INSTALLED_BY_DEFAULT")
         self.assertEqual(plugin["policy"]["authentication"], "ON_INSTALL")
         self.assertEqual(plugin["category"], "Productivity")
 
-        plugin_link = ROOT / "plugins" / "reviewable-html-workbench"
-        self.assertTrue(plugin_link.exists())
-        self.assertEqual(plugin_link.resolve(), ROOT)
+    def test_claude_marketplace_entry_points_to_plugin_root(self) -> None:
+        payload = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        plugins = payload["plugins"]
+        self.assertEqual(len(plugins), 1)
+        self.assertEqual(plugins[0]["name"], "reviewable-html-workbench")
+        self.assertEqual(plugins[0]["source"], "./")
+
+    def test_repo_contains_no_symlinks(self) -> None:
+        """Windows の git は既定 (core.symlinks=false) で symlink を通常ファイルとして
+        checkout する。marketplace source がそこを指すと install が ENOTDIR で失敗するため、
+        tracked file に symlink を持ち込まない。"""
+        listing = subprocess.run(
+            ["git", "ls-files", "-s"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        symlinks = [line.split("\t", 1)[1] for line in listing.splitlines() if line.startswith("120000 ")]
+        self.assertEqual(symlinks, [], f"tracked symlinks break Windows checkouts: {symlinks}")
 
     def test_codex_manifest_documents_required_interface(self) -> None:
         payload = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
