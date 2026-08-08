@@ -8,7 +8,7 @@
       "name": "reviewable-html-workbench",
       "source": {
         "source": "local",
-        "path": "./plugins/reviewable-html-workbench"
+        "path": "./"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
