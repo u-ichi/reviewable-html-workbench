@@ -532,18 +532,13 @@ h1.doc-title { font-family: var(--font-serif); font-weight: 700; font-size: var(
 }
 .block-content th:first-child,
 .block-content td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 1;
   min-width: 168px;
   background: var(--paper);
   border-left: 1px solid var(--line-1);
   border-right: 1px solid var(--line-2);
-  box-shadow: 1px 0 0 var(--line-1);
   font-weight: 600;
 }
 .block-content th:first-child {
-  z-index: 3;
   background: var(--paper-2);
 }
 

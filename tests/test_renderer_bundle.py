@@ -45,6 +45,8 @@ class RendererBundleTest(unittest.TestCase):
             # 比較表の sticky 軸列と推奨列ハイライトは SKILL.md 側で解禁済み (test_skill_docs_generation)
             self.assertIn("table.cmp th.axis, table.cmp td.axis", css)
             self.assertIn("table.cmp col.pick", css)
+            # 素の table の第1列は固定しない — 列固定は table.cmp の axis 指定だけ (docs/skill-fragments/html-style-classes)
+            self.assertIn(".block-content th:first-child,\n.block-content td:first-child {\n  min-width: 168px;", css)
             self.assertIn("overflow-wrap: anywhere", css)
 
             manifest = json.loads((output_dir / "renderer-manifest.json").read_text(encoding="utf-8"))
