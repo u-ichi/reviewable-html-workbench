@@ -49,12 +49,14 @@ claude plugin marketplace add u-ichi/reviewable-html-workbench
 claude plugin install reviewable-html-workbench
 ```
 
-Alternatively, clone the repository and install locally:
+Alternatively, clone the repository and install locally. This repository is both the plugin
+root and the marketplace root, so register the clone as a marketplace and then install from
+it. This repository's marketplace name is `reviewable-html-workbench-local`:
 
 ```bash
 git clone https://github.com/u-ichi/reviewable-html-workbench.git
-cd reviewable-html-workbench
-claude plugins install .
+claude plugin marketplace add ./reviewable-html-workbench
+claude plugin install reviewable-html-workbench@reviewable-html-workbench-local
 ```
 
 For local development, run Claude Code with this plugin directory:
