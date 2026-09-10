@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.html_review_workbench import __version__
+from scripts.html_review_workbench.breadcrumbs import render_breadcrumbs
 from scripts.html_review_workbench.common import (
     EARLY_THEME_JS,
     MAX_HEADING_LEVEL,
@@ -88,6 +89,7 @@ def render_bundle(model_path: Path, output_dir: Path) -> Path:
             "title": escape(model["title"]),
             "document_id": escape(model["document_id"]),
             "eyebrow": escape(str(metadata.get("eyebrow", "Reviewable HTML Workbench"))),
+            "breadcrumbs": render_breadcrumbs(metadata, model["title"], doc_lang),
             "doc_status": _render_doc_status(metadata),
             "deck": _render_deck(metadata),
             "byline": _render_byline(metadata),

@@ -316,6 +316,10 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 
 /* ---------- 5. DOCUMENT HEADER ---------------------------- */
 .doc-breadcrumb { display: flex; align-items: center; gap: 7px; font-size: var(--fs-small); color: var(--ink-3); margin-bottom: var(--sp-4); flex-wrap: wrap; }
+.doc-breadcrumb ol { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; margin: 0; padding: 0; }
+.doc-breadcrumb li { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.doc-breadcrumb a, .doc-breadcrumb [aria-current] { overflow-wrap: anywhere; }
+.doc-breadcrumb [aria-current] { color: var(--ink-2); }
 .doc-breadcrumb a { color: var(--ink-3); text-decoration: none; }
 .doc-breadcrumb a:hover { color: var(--ink-2); text-decoration: underline; }
 .doc-breadcrumb .sep { color: var(--ink-faint); }

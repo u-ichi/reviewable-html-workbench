@@ -39,21 +39,55 @@
             "light": {
               "type": "object",
               "properties": {
-                "brand": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-                "brand_soft": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+                "brand": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "brand_soft": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
               },
               "additionalProperties": false
             },
             "dark": {
               "type": "object",
               "properties": {
-                "brand": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-                "brand_soft": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+                "brand": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "brand_soft": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
               },
               "additionalProperties": false
             }
           },
           "additionalProperties": false
+        },
+        "breadcrumbs": {
+          "type": "array",
+          "description": "上位ページを上から順に指定する。現在の文書名はrendererが末尾へ追加する。未指定または空配列なら表示しない。",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "href": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "label",
+              "href"
+            ],
+            "additionalProperties": false
+          }
         }
       }
     },
@@ -119,7 +153,11 @@
           },
           "heading_level": {
             "type": "integer",
-            "enum": [2, 3, 4],
+            "enum": [
+              2,
+              3,
+              4
+            ],
             "description": "見出しタグのレベル。2 = 章見出し (h2)、3 = 節見出し (h3)、4 = 項見出し (h4)。文書タイトルが h1 を使うため、本文ブロックの見出しは h2 から始まる。content 内の小見出しは、節では h4、項では h5 になる (renderer が自動で押し下げる)。"
           },
           "callout_title": {
@@ -127,7 +165,11 @@
           },
           "level": {
             "type": "string",
-            "enum": ["info", "warn", "success"]
+            "enum": [
+              "info",
+              "warn",
+              "success"
+            ]
           },
           "filename": {
             "type": "string"
@@ -137,7 +179,10 @@
           },
           "highlight_lines": {
             "type": "array",
-            "items": { "type": "integer", "minimum": 1 }
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
           },
           "diagram": {
             "type": "object",
