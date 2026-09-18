@@ -480,7 +480,7 @@
           <li>既存skillからこのpluginを呼ぶ場合は、直接script呼び出しではなくplugin skill境界経由にする。</li>
         </ul>
         <h3>採用する登録方式</h3>
-        <p>このrepoは plugin root と repo-local marketplace root を兼ねる。<code>.agents/plugins/marketplace.json</code> は <code>reviewable-html-workbench-local</code> marketplace を定義し、plugin entry は <code>source.path: "./plugins/reviewable-html-workbench"</code> を参照する。<code>plugins/reviewable-html-workbench</code> はrepo rootへのsymlinkで、Codex marketplace loaderの既存パターンに合わせるために置く。導入は <code>codex plugin marketplace add /path/to/reviewable-html-workbench</code> で行う。</p>
+        <p>このrepoは plugin root と repo-local marketplace root を兼ねる。<code>.agents/plugins/marketplace.json</code> は <code>reviewable-html-workbench-local</code> marketplace を定義し、plugin entry は <code>source.path: "./"</code> を参照し、marketplace root 自体を plugin root として解決する。以前は repo root への symlink <code>plugins/reviewable-html-workbench</code> を経由していたが、Windows の git が既定で symlink を通常ファイルとして checkout し install が <code>ENOTDIR</code> で失敗するため廃止した。導入は <code>codex plugin marketplace add /path/to/reviewable-html-workbench</code> で行う。</p>
         <p>marketplace policy は <code>INSTALLED_BY_DEFAULT</code> とする。<code>AVAILABLE</code> のままだと marketplace 登録後もplugin cacheが作られず、skill discovery に載らない。</p>
         <p>repo path に空白が含まれる環境では、Codex CLIのsource判定がgit source側へ倒れる場合がある。その場合は空白を含まないsymlinkを作り、<code>codex plugin marketplace add /private/tmp/reviewable-html-workbench</code> のようにsymlink pathを渡す。</p>
         <p>base repoの <code>install.sh</code> には含めない。Codex全プロジェクトに強制配布すると同名skillの二重登録リスクが高いため、まずは個別導入とし、必要になった場合だけbase repo側へ薄いadapterを追加する。</p>

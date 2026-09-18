@@ -851,7 +851,7 @@
           </tbody>
         </table>
         <div class="callout">
-          採用方針は、専用repoを plugin repo の管理元にし、<code>visual-html-renderer</code> と <code>reviewable-design-doc</code> を同梱する形。Codex側は <code>.agents/plugins/marketplace.json</code> を持つ repo-local marketplace として登録し、<code>plugins/reviewable-html-workbench</code> symlink から plugin root を解決する。base repo の <code>home/skills</code> には同名skillを置かない。
+          採用方針は、専用repoを plugin repo の管理元にし、<code>visual-html-renderer</code> と <code>reviewable-design-doc</code> を同梱する形。Codex側は <code>.agents/plugins/marketplace.json</code> を持つ repo-local marketplace として登録し、<code>source.path: "./"</code> つまり marketplace root 自体を plugin root として解決する。base repo の <code>home/skills</code> には同名skillを置かない。
         </div>
         <h3>base repoとの衝突回避</h3>
         <p>base repoの <code>bin/build-codex-skills.sh</code> は <code>home/skills</code> から <code>home/generated/codex-skills</code> を生成する。<code>visual-html-renderer</code> と <code>reviewable-design-doc</code> はこのplugin repoで管理し、base repo側には同名skillを追加しないため、生成skill経路とは分離される。</p>
